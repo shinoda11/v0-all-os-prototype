@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { FileText } from 'lucide-react'; // Import FileText
 import {
   Sheet,
   SheetContent,
@@ -26,6 +27,7 @@ import {
 } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useStore } from '@/state/store';
+import { useI18n } from '@/i18n/I18nProvider';
 import { selectExceptions, selectCurrentStore } from '@/core/selectors';
 import type { ExceptionItem, Proposal, ProposalType, ExpectedEffect, TimeBand, ImpactType } from '@/core/types';
 import {
@@ -38,7 +40,6 @@ import {
   CheckCircle2,
   Clock,
   Package,
-  FileText,
   Send,
   X,
 } from 'lucide-react';
@@ -47,76 +48,76 @@ import { cn } from '@/lib/utils';
 // Exception type config
 const EXCEPTION_CONFIG: Record<
   ExceptionItem['type'],
-  { icon: React.ReactNode; color: string; label: string }
+  { icon: React.ReactNode; color: string; labelKey: string }
 > = {
   'delivery-delay': {
     icon: <Truck className="h-5 w-5" />,
     color: 'text-purple-600',
-    label: '配送遅延',
+    labelKey: 'exception.type.delivery-delay',
   },
   'staff-shortage': {
     icon: <Users className="h-5 w-5" />,
     color: 'text-blue-600',
-    label: '人員不足',
+    labelKey: 'exception.type.staff-shortage',
   },
   'demand-surge': {
     icon: <TrendingUp className="h-5 w-5" />,
     color: 'text-green-600',
-    label: '需要急増',
+    labelKey: 'exception.type.demand-surge',
   },
   'prep-behind': {
     icon: <ChefHat className="h-5 w-5" />,
     color: 'text-orange-600',
-    label: '仕込み遅延',
+    labelKey: 'exception.type.prep-behind',
   },
 };
 
-// Impact type labels
-const IMPACT_TYPE_LABELS: Record<ImpactType, { label: string; color: string }> = {
-  stockout: { label: '欠品', color: 'bg-red-100 text-red-800' },
-  delay: { label: '遅延', color: 'bg-yellow-100 text-yellow-800' },
-  excess: { label: '過剰', color: 'bg-blue-100 text-blue-800' },
-  quality: { label: '品質', color: 'bg-purple-100 text-purple-800' },
+// Impact type labels - use i18n keys
+const IMPACT_TYPE_LABELS: Record<ImpactType, { labelKey: string; color: string }> = {
+  stockout: { labelKey: 'impact.stockout', color: 'bg-red-100 text-red-800' },
+  delay: { labelKey: 'impact.delay', color: 'bg-yellow-100 text-yellow-800' },
+  excess: { labelKey: 'impact.excess', color: 'bg-blue-100 text-blue-800' },
+  quality: { labelKey: 'impact.quality', color: 'bg-purple-100 text-purple-800' },
 };
 
 // Impact severity labels
-const IMPACT_SEVERITY_LABELS: Record<string, { label: string; color: string }> = {
-  high: { label: '高', color: 'bg-red-100 text-red-800' },
-  medium: { label: '中', color: 'bg-yellow-100 text-yellow-800' },
-  low: { label: '低', color: 'bg-green-100 text-green-800' },
+const IMPACT_SEVERITY_LABELS: Record<string, { labelKey: string; color: string }> = {
+  high: { labelKey: 'impact.high', color: 'bg-red-100 text-red-800' },
+  medium: { labelKey: 'impact.medium', color: 'bg-yellow-100 text-yellow-800' },
+  low: { labelKey: 'impact.low', color: 'bg-green-100 text-green-800' },
 };
 
-// TimeBand labels
+// TimeBand labels - use i18n keys
 const TIME_BAND_LABELS: Record<TimeBand, string> = {
-  all: '終日',
-  lunch: 'ランチ',
-  idle: 'アイドル',
-  dinner: 'ディナー',
+  all: 'timeband.all',
+  lunch: 'timeband.lunch',
+  idle: 'timeband.idle',
+  dinner: 'timeband.dinner',
 };
 
-// Status config
-const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
-  unhandled: { label: '未対応', color: 'bg-red-100 text-red-800 border-red-200' },
-  'proposal-created': { label: '提案済み', color: 'bg-blue-100 text-blue-800 border-blue-200' },
-  ongoing: { label: '対応中', color: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
-  resolved: { label: '解消', color: 'bg-green-100 text-green-800 border-green-200' },
+// Status config - use i18n keys
+const STATUS_CONFIG: Record<string, { labelKey: string; color: string }> = {
+  unhandled: { labelKey: 'exceptions.unhandled', color: 'bg-red-100 text-red-800 border-red-200' },
+  'proposal-created': { labelKey: 'exceptions.proposed', color: 'bg-blue-100 text-blue-800 border-blue-200' },
+  ongoing: { labelKey: 'exceptions.inProgress', color: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
+  resolved: { labelKey: 'exceptions.resolved', color: 'bg-green-100 text-green-800 border-green-200' },
 };
 
-// Proposal type options
-const PROPOSAL_TYPE_OPTIONS: Array<{ value: ProposalType; label: string }> = [
-  { value: 'menu-restriction', label: 'メニュー制限' },
-  { value: 'prep-reorder', label: '仕込み順序変更' },
-  { value: 'extra-prep', label: '仕込み量変更' },
-  { value: 'scope-reduction', label: '休憩調整' },
-  { value: 'help-request', label: '配置ローテーション' },
+// Proposal type options - use i18n keys
+const PROPOSAL_TYPE_OPTIONS: Array<{ value: ProposalType; labelKey: string }> = [
+  { value: 'menu-restriction', labelKey: 'proposal.type.menu-restriction' },
+  { value: 'prep-reorder', labelKey: 'proposal.type.prep-reorder' },
+  { value: 'extra-prep', labelKey: 'proposal.type.extra-prep' },
+  { value: 'scope-reduction', labelKey: 'proposal.type.scope-reduction' },
+  { value: 'help-request', labelKey: 'proposal.type.help-request' },
 ];
 
-// Expected effect options
-const EFFECT_OPTIONS: Array<{ value: ExpectedEffect; label: string }> = [
-  { value: 'sales-impact', label: '売上影響' },
-  { value: 'stockout-avoidance', label: '欠品回避' },
-  { value: 'waste-reduction', label: 'ロス削減' },
-  { value: 'labor-savings', label: '工数削減' },
+// Expected effect options - use i18n keys
+const EFFECT_OPTIONS: Array<{ value: ExpectedEffect; labelKey: string }> = [
+  { value: 'sales-impact', labelKey: 'effect.salesImpact' },
+  { value: 'stockout-avoidance', labelKey: 'effect.stockoutAvoidance' },
+  { value: 'waste-reduction', labelKey: 'effect.wasteReduction' },
+  { value: 'labor-savings', labelKey: 'effect.laborSavings' },
 ];
 
 // Exception Card Component
@@ -127,6 +128,7 @@ interface ExceptionCardProps {
 }
 
 function ExceptionCard({ exception, onCreateProposal, onResolve }: ExceptionCardProps) {
+  const { t, locale } = useI18n();
   const config = EXCEPTION_CONFIG[exception.type];
   const isCritical = exception.severity === 'critical';
   const statusConfig = STATUS_CONFIG[exception.status];
@@ -146,10 +148,10 @@ function ExceptionCard({ exception, onCreateProposal, onResolve }: ExceptionCard
                 <div className="flex items-center gap-2 flex-wrap">
                   <h3 className="font-medium">{exception.title}</h3>
                   <Badge variant={isCritical ? 'destructive' : 'secondary'} className="text-xs">
-                    {isCritical ? '緊急' : '注意'}
+                    {isCritical ? t('exceptions.critical') : t('exceptions.warning')}
                   </Badge>
                   <Badge className={cn('text-xs border', statusConfig.color)}>
-                    {statusConfig.label}
+                    {t(statusConfig.labelKey)}
                   </Badge>
                 </div>
                 <p className="text-sm text-muted-foreground mt-1">{exception.description}</p>
@@ -159,22 +161,22 @@ function ExceptionCard({ exception, onCreateProposal, onResolve }: ExceptionCard
 
           {/* Impact Info */}
           <div className="bg-muted/50 rounded-lg p-3 space-y-2">
-            <div className="text-xs font-medium text-muted-foreground">影響範囲</div>
+            <div className="text-xs font-medium text-muted-foreground">{t('exceptions.impact')}</div>
             <div className="flex flex-wrap gap-2">
               <Badge variant="outline" className="text-xs gap-1">
                 <Clock className="h-3 w-3" />
-                {TIME_BAND_LABELS[exception.impact.timeBand]}
+                {t(TIME_BAND_LABELS[exception.impact.timeBand])}
               </Badge>
               <Badge className={cn('text-xs', impactTypeConfig.color)}>
-                {impactTypeConfig.label}
+                {t(impactTypeConfig.labelKey)}
               </Badge>
               <Badge className={cn('text-xs', impactSeverityConfig.color)}>
-                影響度: {impactSeverityConfig.label}
+                {t('exceptions.impactLevel')}: {t(impactSeverityConfig.labelKey)}
               </Badge>
             </div>
             {exception.impact.affectedItems.length > 0 && (
               <div className="flex flex-wrap gap-1 mt-2">
-                <span className="text-xs text-muted-foreground">対象品目:</span>
+                <span className="text-xs text-muted-foreground">{t('exceptions.affectedItems')}:</span>
                 {exception.impact.affectedItems.map((item) => (
                   <Badge key={item.id} variant="outline" className="text-xs">
                     <Package className="h-3 w-3 mr-1" />
@@ -188,19 +190,19 @@ function ExceptionCard({ exception, onCreateProposal, onResolve }: ExceptionCard
           {/* Actions */}
           <div className="flex items-center justify-between pt-2 border-t">
             <p className="text-xs text-muted-foreground">
-              検出: {new Date(exception.detectedAt).toLocaleTimeString('ja-JP')}
+              {t('exceptions.detectedAt')}: {new Date(exception.detectedAt).toLocaleTimeString(locale === 'ja' ? 'ja-JP' : 'en-US')}
             </p>
             <div className="flex gap-2">
               {!hasProposal && exception.status === 'unhandled' && (
                 <Button size="sm" variant="outline" onClick={onCreateProposal} className="gap-1 bg-transparent">
                   <FileText className="h-4 w-4" />
-                  提案作成
+                  {t('exceptions.createProposal')}
                 </Button>
               )}
               {exception.status !== 'resolved' && (
                 <Button size="sm" variant="outline" onClick={onResolve} className="gap-1 bg-transparent">
                   <CheckCircle2 className="h-4 w-4" />
-                  解消
+                  {t('exceptions.resolve')}
                 </Button>
               )}
             </div>
@@ -221,6 +223,7 @@ interface ProposalDraftDrawerProps {
 }
 
 function ProposalDraftDrawer({ exception, roles, open, onClose, onSubmit }: ProposalDraftDrawerProps) {
+  const { t } = useI18n();
   const [proposalType, setProposalType] = useState<ProposalType>('menu-restriction');
   const [selectedEffects, setSelectedEffects] = useState<ExpectedEffect[]>([]);
   const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
@@ -287,12 +290,13 @@ function ProposalDraftDrawer({ exception, roles, open, onClose, onSubmit }: Prop
     const deadlineDate = new Date();
     deadlineDate.setHours(hours, minutes, 0, 0);
 
+    const proposalOption = PROPOSAL_TYPE_OPTIONS.find((o) => o.value === proposalType);
     const proposal: Proposal = {
       id: `proposal-${Date.now()}`,
       type: proposalType,
-      title: `${PROPOSAL_TYPE_OPTIONS.find((o) => o.value === proposalType)?.label}: ${exception.title}`,
+      title: `${proposalOption ? t(proposalOption.labelKey) : ''}: ${exception.title}`,
       description: exception.description,
-      reason: `${EXCEPTION_CONFIG[exception.type].label}への対応`,
+      reason: `${t(EXCEPTION_CONFIG[exception.type].labelKey)}`,
       triggeredBy: exception.relatedEventId || exception.id,
       priority: exception.severity === 'critical' ? 'critical' : 'high',
       createdAt: now.toISOString(),
@@ -320,17 +324,17 @@ function ProposalDraftDrawer({ exception, roles, open, onClose, onSubmit }: Prop
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
-            提案ドラフト作成
+            {t('exceptions.proposalDraft')}
           </SheetTitle>
           <SheetDescription>
-            例外「{exception.title}」に対する提案を作成します
+            {exception.title}
           </SheetDescription>
         </SheetHeader>
 
         <div className="space-y-6 mt-6">
           {/* Proposal Type */}
           <div className="space-y-2">
-            <Label>提案タイプ</Label>
+            <Label>{t('exceptions.proposalType')}</Label>
             <Select value={proposalType} onValueChange={(v) => setProposalType(v as ProposalType)}>
               <SelectTrigger>
                 <SelectValue />
@@ -338,7 +342,7 @@ function ProposalDraftDrawer({ exception, roles, open, onClose, onSubmit }: Prop
               <SelectContent>
                 {PROPOSAL_TYPE_OPTIONS.map((option) => (
                   <SelectItem key={option.value} value={option.value}>
-                    {option.label}
+                    {t(option.labelKey)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -347,15 +351,15 @@ function ProposalDraftDrawer({ exception, roles, open, onClose, onSubmit }: Prop
 
           {/* Reason (Auto) */}
           <div className="space-y-2">
-            <Label>理由（自動）</Label>
+            <Label>{t('exceptions.reasonAuto')}</Label>
             <div className="p-3 bg-muted rounded-lg text-sm">
-              {EXCEPTION_CONFIG[exception.type].label}への対応 - {exception.description}
+              {t(EXCEPTION_CONFIG[exception.type].labelKey)} - {exception.description}
             </div>
           </div>
 
           {/* Expected Effects */}
           <div className="space-y-2">
-            <Label>期待効果</Label>
+            <Label>{t('proposal.expectedEffect')}</Label>
             <div className="grid grid-cols-2 gap-2">
               {EFFECT_OPTIONS.map((option) => (
                 <div key={option.value} className="flex items-center space-x-2">
@@ -365,7 +369,7 @@ function ProposalDraftDrawer({ exception, roles, open, onClose, onSubmit }: Prop
                     onCheckedChange={() => handleEffectToggle(option.value)}
                   />
                   <label htmlFor={option.value} className="text-sm cursor-pointer">
-                    {option.label}
+                    {t(option.labelKey)}
                   </label>
                 </div>
               ))}
@@ -374,7 +378,7 @@ function ProposalDraftDrawer({ exception, roles, open, onClose, onSubmit }: Prop
 
           {/* Target Roles */}
           <div className="space-y-2">
-            <Label>配布先ロール</Label>
+            <Label>{t('exceptions.targetRoles')}</Label>
             <div className="grid grid-cols-2 gap-2">
               {roles.map((role) => (
                 <div key={role.id} className="flex items-center space-x-2">
@@ -393,7 +397,7 @@ function ProposalDraftDrawer({ exception, roles, open, onClose, onSubmit }: Prop
 
           {/* Deadline */}
           <div className="space-y-2">
-            <Label>期限</Label>
+            <Label>{t('proposal.deadline')}</Label>
             <Input
               type="time"
               value={deadline}
@@ -403,11 +407,11 @@ function ProposalDraftDrawer({ exception, roles, open, onClose, onSubmit }: Prop
 
           {/* Summary */}
           <div className="bg-muted/50 rounded-lg p-3 space-y-2">
-            <div className="text-xs font-medium text-muted-foreground">配布サマリー</div>
+            <div className="text-xs font-medium text-muted-foreground">{t('exceptions.distributeSummary')}</div>
             <div className="text-sm">
-              <span className="font-medium">{selectedRoles.length}</span> 件のToDoを配布
+              <span className="font-medium">{selectedRoles.length}</span> ToDos
               <span className="text-muted-foreground ml-2">
-                ({roles.filter((r) => selectedRoles.includes(r.id)).map((r) => r.name).join(', ') || 'なし'})
+                ({roles.filter((r) => selectedRoles.includes(r.id)).map((r) => r.name).join(', ') || t('common.none')})
               </span>
             </div>
           </div>
@@ -416,11 +420,11 @@ function ProposalDraftDrawer({ exception, roles, open, onClose, onSubmit }: Prop
           <div className="flex gap-2 pt-4 border-t">
             <Button variant="outline" onClick={onClose} className="flex-1 bg-transparent">
               <X className="h-4 w-4 mr-2" />
-              キャンセル
+              {t('common.cancel')}
             </Button>
             <Button onClick={handleSubmit} className="flex-1" disabled={selectedRoles.length === 0}>
               <Send className="h-4 w-4 mr-2" />
-              キューへ送信
+              {t('exceptions.sendToQueue')}
             </Button>
           </div>
         </div>
@@ -431,6 +435,7 @@ function ProposalDraftDrawer({ exception, roles, open, onClose, onSubmit }: Prop
 
 // Main Page Component
 export default function ExceptionsPage() {
+  const { t } = useI18n();
   const params = useParams();
   const storeId = params.storeId as string;
   const { state, actions } = useStore();
@@ -477,28 +482,28 @@ export default function ExceptionsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="例外センター" subtitle={shortName} />
+      <PageHeader title={t('exceptions.title')} subtitle={shortName} />
 
       {/* Summary cards */}
       <div className="grid gap-4 sm:grid-cols-4">
         <MetricCard
-          title="未対応"
-          value={`${statusCounts.unhandled}件`}
+          title={t('exceptions.unhandled')}
+          value={statusCounts.unhandled}
           icon={<AlertCircle className="h-4 w-4 text-red-600" />}
           status={statusCounts.unhandled > 0 ? 'error' : 'default'}
         />
         <MetricCard
-          title="提案済み"
-          value={`${statusCounts.proposalCreated}件`}
+          title={t('exceptions.proposed')}
+          value={statusCounts.proposalCreated}
           icon={<FileText className="h-4 w-4 text-blue-600" />}
         />
         <MetricCard
-          title="対応中"
-          value={`${statusCounts.ongoing}件`}
+          title={t('exceptions.inProgress')}
+          value={statusCounts.ongoing}
           icon={<Clock className="h-4 w-4 text-yellow-600" />}
         />
         <MetricCard
-          title="緊急 / 注意"
+          title={t('exceptions.criticalCount')}
           value={`${criticalCount} / ${warningCount}`}
           icon={<AlertTriangle className="h-4 w-4 text-orange-600" />}
           status={criticalCount > 0 ? 'error' : warningCount > 0 ? 'warning' : 'success'}
@@ -509,17 +514,16 @@ export default function ExceptionsPage() {
       <Card>
         <CardHeader>
           <CardTitle className="text-lg flex items-center justify-between">
-            <span>例外一覧</span>
-            <Badge variant="outline">{activeExceptions.length}件</Badge>
+            <span>{t('exceptions.list')}</span>
+            <Badge variant="outline">{activeExceptions.length}</Badge>
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {activeExceptions.length === 0 ? (
-            <EmptyState
-              icon={<CheckCircle2 className="h-8 w-8 text-green-500" />}
-              title="例外なし"
-              description="現在対応が必要な例外はありません"
-            />
+{activeExceptions.length === 0 ? (
+  <EmptyState
+    icon={<CheckCircle2 className="h-8 w-8 text-green-500" />}
+    title={t('exceptions.noExceptions')}
+  />
           ) : (
             <div className="space-y-4">
               {activeExceptions.map((exception) => (

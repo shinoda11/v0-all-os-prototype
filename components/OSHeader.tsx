@@ -1,11 +1,13 @@
 'use client';
 
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { TimeBandTabs } from '@/components/TimeBandTabs';
 import { useStore } from '@/state/store';
 import { selectCurrentStore } from '@/core/selectors';
+import { useI18n, useLocaleDateFormat } from '@/i18n/I18nProvider';
 import type { TimeBand } from '@/core/types';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, Globe } from 'lucide-react';
 
 interface OSHeaderProps {
   title: string;
@@ -22,10 +24,12 @@ export function OSHeader({
 }: OSHeaderProps) {
   const { state } = useStore();
   const currentStore = selectCurrentStore(state);
+  const { locale, setLocale, t } = useI18n();
+  const { formatDate, formatTime } = useLocaleDateFormat();
 
   // Get current business date (today for now)
   const today = new Date();
-  const businessDate = today.toLocaleDateString('ja-JP', {
+  const businessDate = formatDate(today, {
     year: 'numeric',
     month: 'long',
     day: 'numeric',
@@ -34,12 +38,13 @@ export function OSHeader({
 
   // Mock last updated time (would come from state in real app)
   const lastUpdated = new Date();
-  const lastUpdatedStr = lastUpdated.toLocaleTimeString('ja-JP', {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  const lastUpdatedStr = formatTime(lastUpdated);
 
   const shortName = currentStore?.name.replace('Aburi TORA 熟成鮨と炙り鮨 ', '') ?? '';
+
+  const toggleLocale = () => {
+    setLocale(locale === 'ja' ? 'en' : 'ja');
+  };
 
   return (
     <div className="space-y-4">
@@ -47,7 +52,7 @@ export function OSHeader({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <Badge variant="default" className="bg-primary text-primary-foreground font-semibold">
-            All OS
+            {t('os.header.badge')}
           </Badge>
           <div>
             <h1 className="text-xl font-bold sm:text-2xl">{title}</h1>
@@ -57,16 +62,27 @@ export function OSHeader({
           </div>
         </div>
 
-        {/* Business Date and Last Updated */}
+        {/* Business Date, Last Updated, and Language Toggle */}
         <div className="flex items-center gap-4 text-sm">
           <div className="flex items-center gap-2">
-            <span className="text-muted-foreground">営業日:</span>
+            <span className="text-muted-foreground">{t('os.header.businessDate')}:</span>
             <span className="font-medium">{businessDate}</span>
           </div>
           <div className="flex items-center gap-1.5 text-muted-foreground">
             <RefreshCw className="h-3.5 w-3.5" />
-            <span>更新: {lastUpdatedStr}</span>
+            <span>{t('os.header.lastUpdated')}: {lastUpdatedStr}</span>
           </div>
+          
+          {/* Language Toggle */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={toggleLocale}
+            className="h-7 px-2 text-xs gap-1.5"
+          >
+            <Globe className="h-3.5 w-3.5" />
+            <span>{locale === 'ja' ? 'English' : '日本語'}</span>
+          </Button>
         </div>
       </div>
 

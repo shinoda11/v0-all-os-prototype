@@ -11,6 +11,7 @@ import { appReducer, initialState } from './reducer';
 import { loadMockData, loadSampleEvents } from '@/data/mock';
 import { generateProposals } from '@/core/proposals';
 import * as commands from '@/core/commands';
+import { eventBus, type EventBusEventType } from './eventBus';
 
 // ------------------------------------------------------------
 // Context Types
@@ -61,6 +62,15 @@ const StoreContext = createContext<StoreContextValue | null>(null);
 // ------------------------------------------------------------
 // Provider Component
 // ------------------------------------------------------------
+
+// Helper to publish events to the event bus
+const publishStateUpdate = (
+  type: EventBusEventType,
+  eventType?: string,
+  changedKeys?: string[]
+) => {
+  eventBus.publish(type, { eventType, changedKeys });
+};
 
 export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [state, dispatch] = useReducer(appReducer, initialState);
@@ -152,6 +162,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (!storeId) return;
       const event = commands.checkIn(storeId, staffId);
       dispatch({ type: 'ADD_EVENT', event });
+      publishStateUpdate('labor:changed', 'check-in', ['labor', 'cockpit-labor']);
     },
 
     checkOut: (staffId: string) => {
@@ -159,6 +170,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (!storeId) return;
       const event = commands.checkOut(storeId, staffId);
       dispatch({ type: 'ADD_EVENT', event });
+      publishStateUpdate('labor:changed', 'check-out', ['labor', 'cockpit-labor']);
     },
 
     startBreak: (staffId: string) => {
@@ -166,6 +178,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (!storeId) return;
       const event = commands.startBreak(storeId, staffId);
       dispatch({ type: 'ADD_EVENT', event });
+      publishStateUpdate('labor:changed', 'break-start', ['labor', 'cockpit-labor']);
     },
 
     endBreak: (staffId: string) => {
@@ -173,6 +186,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (!storeId) return;
       const event = commands.endBreak(storeId, staffId);
       dispatch({ type: 'ADD_EVENT', event });
+      publishStateUpdate('labor:changed', 'break-end', ['labor', 'cockpit-labor']);
     },
 
     // Prep
@@ -181,6 +195,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (!storeId) return;
       const event = commands.startPrep(storeId, prepItemId, quantity, staffId, decisionId);
       dispatch({ type: 'ADD_EVENT', event });
+      publishStateUpdate('prep:changed', 'prep-started', ['prep', 'cockpit-operations', 'todo']);
     },
 
     completePrep: (prepItemId: string, quantity: number, staffId?: string, decisionId?: string) => {
@@ -188,6 +203,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (!storeId) return;
       const event = commands.completePrep(storeId, prepItemId, quantity, staffId, decisionId);
       dispatch({ type: 'ADD_EVENT', event });
+      publishStateUpdate('prep:changed', 'prep-completed', ['prep', 'cockpit-operations', 'todo']);
     },
 
     // Decision - creates decision event and distributes todos
@@ -214,6 +230,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
       
       dispatch({ type: 'REMOVE_PROPOSAL', proposalId: proposal.id });
+      publishStateUpdate('decision:changed', 'approved', ['decision', 'todo', 'cockpit-exceptions']);
     },
 
     rejectProposal: (proposal: Proposal) => {
@@ -222,6 +239,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const event = commands.rejectProposal(storeId, proposal);
       dispatch({ type: 'ADD_EVENT', event });
       dispatch({ type: 'REMOVE_PROPOSAL', proposalId: proposal.id });
+      publishStateUpdate('decision:changed', 'rejected', ['decision', 'cockpit-exceptions']);
     },
 
     startDecision: (proposal: Proposal) => {
@@ -229,6 +247,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (!storeId) return;
       const event = commands.startDecision(storeId, proposal);
       dispatch({ type: 'ADD_EVENT', event });
+      publishStateUpdate('decision:changed', 'started', ['decision', 'todo']);
     },
 
     // Complete decision - marks todo as done and records prep event if applicable
@@ -254,6 +273,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           dispatch({ type: 'ADD_EVENT', event: prepEvent });
         }
       }
+      publishStateUpdate('decision:changed', 'completed', ['decision', 'todo', 'prep', 'cockpit-operations']);
     },
 
     updateProposal: (proposal: Proposal) => {
@@ -268,10 +288,12 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     startReplay: () => {
       const sampleEvents = loadSampleEvents();
       dispatch({ type: 'REPLAY_START', events: sampleEvents });
+      publishStateUpdate('state:updated', 'replay-start', []);
     },
 
     stepReplay: () => {
       dispatch({ type: 'REPLAY_STEP' });
+      publishStateUpdate('replay:step', 'replay-step', ['sales', 'labor', 'prep', 'delivery', 'decision', 'forecast']);
     },
 
     playReplay: () => {
@@ -284,6 +306,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     resetReplay: () => {
       dispatch({ type: 'REPLAY_RESET' });
+      publishStateUpdate('state:updated', 'replay-reset', []);
     },
 
     // Proposals - use stateRef to always get fresh state
@@ -301,6 +324,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         currentState.roles
       );
       dispatch({ type: 'SET_PROPOSALS', proposals });
+      publishStateUpdate('proposal:changed', 'proposals-refreshed', ['proposals']);
     },
   }), []);
 

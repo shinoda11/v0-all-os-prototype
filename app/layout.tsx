@@ -3,6 +3,7 @@ import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { StoreProvider } from '@/state/store'
+import { I18nProvider } from '@/i18n/I18nProvider'
 import './globals.css'
 
 const _geist = Geist({ subsets: ["latin"] });
@@ -39,9 +40,11 @@ export default function RootLayout({
   return (
     <html lang="ja">
       <body className={`font-sans antialiased`}>
-        <StoreProvider>
-          {children}
-        </StoreProvider>
+        <I18nProvider>
+          <StoreProvider>
+            {children}
+          </StoreProvider>
+        </I18nProvider>
         <Analytics />
       </body>
     </html>

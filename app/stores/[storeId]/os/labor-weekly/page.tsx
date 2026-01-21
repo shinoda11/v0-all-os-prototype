@@ -1,18 +1,33 @@
 'use client';
 
-import React from "react"
-
-import { useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { OSHeader } from '@/components/OSHeader';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { useStore } from '@/state/store';
+import { useI18n } from '@/i18n/I18nProvider';
+import { formatCurrency, formatPercent, formatHours, formatNumber } from '@/i18n/format';
 import {
   selectCurrentStore,
-  selectLaborMetrics,
-  selectShiftSummary,
+  selectWeeklyLaborMetrics,
 } from '@/core/selectors';
+import { FreshnessBadge } from '@/components/FreshnessBadge';
 import {
   TrendingUp,
   TrendingDown,
@@ -21,28 +36,21 @@ import {
   Clock,
   AlertTriangle,
   ExternalLink,
-  Coffee,
   DollarSign,
   Calendar,
   Lightbulb,
-  ArrowRight,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
+import type { WeeklyLaborMetrics } from '@/core/types';
 
-// Weekly summary mock data (would be derived from actual events in production)
-interface WeeklySummary {
-  totalSales: number;
-  totalLaborCost: number;
-  laborRate: number;
-  targetLaborRate: number;
-  totalHours: number;
-  targetHours: number;
-  skillMix: { star3: number; star2: number; star1: number };
-  targetSkillMix: { star3: number; star2: number; star1: number };
-  weekStart: string;
-  weekEnd: string;
-}
+// Target values (would come from store config in production)
+const TARGETS = {
+  laborRate: 25.0,
+  star3Ratio: 0.3,
+  star2Ratio: 0.4,
+  star1Ratio: 0.3,
+};
 
 interface LaborProposal {
   id: string;
@@ -54,101 +62,88 @@ interface LaborProposal {
   priority: 'high' | 'medium' | 'low';
 }
 
-// Generate weekly summary based on current metrics
-function useWeeklySummary(storeId: string): WeeklySummary {
-  const today = new Date();
-  const weekStart = new Date(today);
-  weekStart.setDate(today.getDate() - today.getDay());
-  const weekEnd = new Date(weekStart);
-  weekEnd.setDate(weekStart.getDate() + 6);
-
-  // Mock data - in production would aggregate from events
-  return {
-    totalSales: 2450000,
-    totalLaborCost: 686000,
-    laborRate: 28.0,
-    targetLaborRate: 25.0,
-    totalHours: 312,
-    targetHours: 288,
-    skillMix: { star3: 12, star2: 18, star1: 24 },
-    targetSkillMix: { star3: 16, star2: 20, star1: 18 },
-    weekStart: weekStart.toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' }),
-    weekEnd: weekEnd.toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' }),
-  };
-}
-
-// Generate labor improvement proposals
-function useLaborProposals(summary: WeeklySummary): LaborProposal[] {
+// Generate labor improvement proposals based on metrics
+function generateProposals(metrics: WeeklyLaborMetrics): LaborProposal[] {
   const proposals: LaborProposal[] = [];
-
-  // Check for skill shortage
-  if (summary.skillMix.star3 < summary.targetSkillMix.star3) {
-    const shortage = summary.targetSkillMix.star3 - summary.skillMix.star3;
-    proposals.push({
-      id: 'skill-1',
-      type: 'skill-shortage',
-      title: 'ディナー帯の★3スタッフ不足',
-      description: `ディナー帯で★3スタッフが${shortage}名不足しています。ピーク時の品質低下リスクがあります。`,
-      timeBand: 'dinner',
-      impact: 'サービス品質低下、クレーム増加の可能性',
-      priority: 'high',
-    });
-  }
-
-  // Check for overstaffing in idle time
-  if (summary.totalHours > summary.targetHours * 1.05) {
-    proposals.push({
-      id: 'over-1',
-      type: 'overstaffing',
-      title: 'アイドル帯の過剰人時',
-      description: `週間人時が目標を${Math.round((summary.totalHours - summary.targetHours))}時間超過しています。アイドル帯(14-17時)の人員配置を見直してください。`,
-      timeBand: 'idle',
-      impact: `人件費 約¥${Math.round((summary.totalHours - summary.targetHours) * 1200).toLocaleString()}の超過`,
-      priority: 'medium',
-    });
-  }
-
-  // Check for break distribution
-  proposals.push({
-    id: 'break-1',
-    type: 'break-imbalance',
-    title: '休憩配置の偏り',
-    description: 'ランチ後(13:30-14:00)に休憩が集中しています。ディナー準備との兼ね合いで分散を検討してください。',
-    timeBand: 'lunch',
-    impact: 'ディナー仕込み開始の遅延リスク',
-    priority: 'low',
-  });
-
-  // Check for labor rate
-  if (summary.laborRate > summary.targetLaborRate) {
+  const { weekSummary, dailyRows } = metrics;
+  
+  // Check for labor rate overrun
+  if (weekSummary.avgLaborRate !== null && weekSummary.avgLaborRate > TARGETS.laborRate) {
+    const diff = weekSummary.avgLaborRate - TARGETS.laborRate;
     proposals.push({
       id: 'cost-1',
       type: 'cost-overrun',
       title: '人件費率の超過',
-      description: `人件費率${summary.laborRate.toFixed(1)}%が目標${summary.targetLaborRate.toFixed(1)}%を${(summary.laborRate - summary.targetLaborRate).toFixed(1)}pt超過しています。`,
-      impact: `月間利益への影響: 約¥${Math.round((summary.laborRate - summary.targetLaborRate) * summary.totalSales / 100 * 4).toLocaleString()}減`,
-      priority: 'high',
+      description: `人件費率${weekSummary.avgLaborRate.toFixed(1)}%が目標${TARGETS.laborRate.toFixed(1)}%を${diff.toFixed(1)}pt超過しています。`,
+      impact: weekSummary.totalSales 
+        ? `月間利益への影響: 約¥${Math.round(diff * weekSummary.totalSales / 100 * 4).toLocaleString()}減`
+        : '利益への影響あり',
+      priority: diff > 3 ? 'high' : 'medium',
     });
   }
-
-  // Check for star1 overreliance
-  if (summary.skillMix.star1 > summary.targetSkillMix.star1 * 1.2) {
+  
+  // Check for skill mix imbalance
+  const totalStaff = weekSummary.starMixTotal.star3 + weekSummary.starMixTotal.star2 + weekSummary.starMixTotal.star1;
+  if (totalStaff > 0) {
+    const star3Ratio = weekSummary.starMixTotal.star3 / totalStaff;
+    const star1Ratio = weekSummary.starMixTotal.star1 / totalStaff;
+    
+    if (star3Ratio < TARGETS.star3Ratio * 0.8) {
+      proposals.push({
+        id: 'skill-1',
+        type: 'skill-shortage',
+        title: 'ディナー帯の★3スタッフ不足',
+        description: `★3スタッフの配置が目標比${Math.round((1 - star3Ratio / TARGETS.star3Ratio) * 100)}%不足しています。`,
+        timeBand: 'dinner',
+        impact: 'サービス品質低下、クレーム増加の可能性',
+        priority: 'high',
+      });
+    }
+    
+    if (star1Ratio > TARGETS.star1Ratio * 1.3) {
+      proposals.push({
+        id: 'skill-2',
+        type: 'understaffing',
+        title: '★1スタッフへの依存過多',
+        description: `★1スタッフが目標比${Math.round((star1Ratio / TARGETS.star1Ratio - 1) * 100)}%過多です。`,
+        impact: '教育負荷増加、ミス発生率上昇',
+        priority: 'medium',
+      });
+    }
+  }
+  
+  // Check for overstaffing on specific days
+  const avgDailyHours = weekSummary.totalHours / 7;
+  const highHoursDays = dailyRows.filter(r => r.hours > avgDailyHours * 1.3);
+  if (highHoursDays.length >= 2) {
     proposals.push({
-      id: 'skill-2',
-      type: 'understaffing',
-      title: '★1スタッフへの依存過多',
-      description: `★1スタッフが目標比${Math.round((summary.skillMix.star1 / summary.targetSkillMix.star1 - 1) * 100)}%過多です。教育コストとサービス品質への影響を考慮してください。`,
-      impact: '教育負荷増加、ミス発生率上昇',
+      id: 'over-1',
+      type: 'overstaffing',
+      title: 'アイドル帯の過剰人時',
+      description: `${highHoursDays.map(d => d.dayLabel).join('・')}曜日の人時が週平均を大きく上回っています。`,
+      timeBand: 'idle',
+      impact: `週間で約${Math.round((highHoursDays.reduce((s, d) => s + d.hours, 0) - avgDailyHours * highHoursDays.length) * 1200).toLocaleString()}円の超過`,
       priority: 'medium',
     });
   }
-
-  return proposals.slice(0, 5); // Max 5 proposals
+  
+  // Always add break distribution suggestion
+  proposals.push({
+    id: 'break-1',
+    type: 'break-imbalance',
+    title: '休憩配置の確認推奨',
+    description: 'ランチ後(13:30-14:00)に休憩が集中していないか確認してください。',
+    timeBand: 'lunch',
+    impact: 'ディナー仕込み開始の遅延リスク',
+    priority: 'low',
+  });
+  
+  return proposals.slice(0, 5);
 }
 
 const proposalTypeConfig: Record<LaborProposal['type'], { icon: React.ReactNode; color: string; bgColor: string }> = {
   'skill-shortage': { icon: <Star className="h-4 w-4" />, color: 'text-yellow-700', bgColor: 'bg-yellow-50' },
-  'break-imbalance': { icon: <Coffee className="h-4 w-4" />, color: 'text-blue-700', bgColor: 'bg-blue-50' },
+  'break-imbalance': { icon: <Clock className="h-4 w-4" />, color: 'text-blue-700', bgColor: 'bg-blue-50' },
   'overstaffing': { icon: <Users className="h-4 w-4" />, color: 'text-orange-700', bgColor: 'bg-orange-50' },
   'understaffing': { icon: <Users className="h-4 w-4" />, color: 'text-red-700', bgColor: 'bg-red-50' },
   'cost-overrun': { icon: <DollarSign className="h-4 w-4" />, color: 'text-red-700', bgColor: 'bg-red-50' },
@@ -166,35 +161,94 @@ const priorityConfig: Record<string, { label: string; variant: 'destructive' | '
   low: { label: '低', variant: 'secondary' },
 };
 
+// Generate week options (current week and past 4 weeks)
+function getWeekOptions(): { value: string; label: string }[] {
+  const options: { value: string; label: string }[] = [];
+  const today = new Date();
+  
+  for (let i = 0; i < 5; i++) {
+    const weekStart = new Date(today);
+    const dayOfWeek = weekStart.getDay();
+    weekStart.setDate(weekStart.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1) - (i * 7));
+    
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6);
+    
+    const label = i === 0 ? '今週' : i === 1 ? '先週' : `${i}週前`;
+    const dateLabel = `${weekStart.getMonth() + 1}/${weekStart.getDate()} 〜 ${weekEnd.getMonth() + 1}/${weekEnd.getDate()}`;
+    
+    options.push({
+      value: weekStart.toISOString().split('T')[0],
+      label: `${label} (${dateLabel})`,
+    });
+  }
+  
+  return options;
+}
+
 export default function LaborWeeklyPage() {
   const { state } = useStore();
   const currentStore = selectCurrentStore(state);
+  const { t, locale } = useI18n();
   const storeId = state.selectedStoreId ?? '1';
-
-  const weeklySummary = useWeeklySummary(storeId);
-  const proposals = useLaborProposals(weeklySummary);
-
-  const laborRateDiff = weeklySummary.laborRate - weeklySummary.targetLaborRate;
-  const hoursDiff = weeklySummary.totalHours - weeklySummary.targetHours;
+  
+  // Week selection
+  const weekOptions = useMemo(() => getWeekOptions(), []);
+  const [selectedWeek, setSelectedWeek] = useState(weekOptions[0]?.value ?? '');
+  
+  // Get metrics for selected week
+  const metrics = selectWeeklyLaborMetrics(state, selectedWeek);
+  const proposals = useMemo(() => generateProposals(metrics), [metrics]);
+  
+  const { weekSummary, dailyRows } = metrics;
+  
+  // Calculate diffs from targets
+  const laborRateDiff = weekSummary.avgLaborRate !== null 
+    ? weekSummary.avgLaborRate - TARGETS.laborRate 
+    : null;
 
   return (
     <div className="space-y-6 p-6">
-      <OSHeader title="週次労務レビュー" showTimeBandTabs={false} />
+      <OSHeader title={t('laborWeekly.title')} showTimeBandTabs={false} />
 
-      {/* Week Range */}
+      {/* Week Selector */}
       <Card>
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Calendar className="h-5 w-5 text-muted-foreground" />
-              <CardTitle className="text-base">対象週</CardTitle>
+              <CardTitle className="text-base">{t('laborWeekly.targetWeek')}</CardTitle>
             </div>
-            <Badge variant="outline" className="text-sm">
-              {weeklySummary.weekStart} 〜 {weeklySummary.weekEnd}
-            </Badge>
+            <div className="flex items-center gap-3">
+              <Select value={selectedWeek} onValueChange={setSelectedWeek}>
+                <SelectTrigger className="w-[220px]">
+                  <SelectValue placeholder={t('laborWeekly.selectWeek')} />
+                </SelectTrigger>
+                <SelectContent>
+                  {weekOptions.map(opt => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FreshnessBadge lastUpdate={metrics.lastUpdate} />
+            </div>
           </div>
         </CardHeader>
       </Card>
+
+      {/* Calculating State */}
+      {metrics.isCalculating && (
+        <Card className="border-yellow-200 bg-yellow-50/50">
+          <CardContent className="py-4">
+            <div className="flex items-center gap-2 text-yellow-700">
+              <AlertTriangle className="h-4 w-4" />
+              <span className="text-sm">{t('laborWeekly.dataInsufficient')}</span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Weekly Summary Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -203,12 +257,15 @@ export default function LaborWeeklyPage() {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
               <TrendingUp className="h-4 w-4" />
-              週間売上
+              {t('laborWeekly.weeklySales')}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              ¥{weeklySummary.totalSales.toLocaleString()}
+              {weekSummary.totalSales !== null 
+                ? formatCurrency(weekSummary.totalSales, locale)
+                : <span className="text-muted-foreground text-lg">{t('laborWeekly.notCalculated')}</span>
+              }
             </div>
           </CardContent>
         </Card>
@@ -218,67 +275,148 @@ export default function LaborWeeklyPage() {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
               <DollarSign className="h-4 w-4" />
-              週間人件費
+              {t('laborWeekly.weeklyLaborCost')}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              ¥{weeklySummary.totalLaborCost.toLocaleString()}
+              {formatCurrency(weekSummary.totalLaborCost, locale)}
+            </div>
+            <div className="text-xs text-muted-foreground mt-1">
+              {formatHours(weekSummary.totalHours, locale)}
             </div>
           </CardContent>
         </Card>
 
         {/* Labor Rate */}
-        <Card className={cn(laborRateDiff > 0 && 'border-red-200 bg-red-50/50')}>
+        <Card className={cn(laborRateDiff !== null && laborRateDiff > 0 && 'border-red-200 bg-red-50/50')}>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
               <Users className="h-4 w-4" />
-              人件費率
+              {t('laborWeekly.laborRate')}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {weeklySummary.laborRate.toFixed(1)}%
+              {weekSummary.avgLaborRate !== null 
+                ? formatPercent(weekSummary.avgLaborRate, locale)
+                : <span className="text-muted-foreground text-lg">--</span>
+              }
             </div>
-            <div className={cn(
-              'flex items-center gap-1 text-xs mt-1',
-              laborRateDiff > 0 ? 'text-red-600' : 'text-green-600'
-            )}>
-              {laborRateDiff > 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-              <span>目標 {weeklySummary.targetLaborRate.toFixed(1)}% ({laborRateDiff > 0 ? '+' : ''}{laborRateDiff.toFixed(1)}pt)</span>
-            </div>
+            {laborRateDiff !== null && (
+              <div className={cn(
+                'flex items-center gap-1 text-xs mt-1',
+                laborRateDiff > 0 ? 'text-red-600' : 'text-green-600'
+              )}>
+                {laborRateDiff > 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                <span>{t('laborWeekly.target')} {formatPercent(TARGETS.laborRate, locale)} ({laborRateDiff > 0 ? '+' : ''}{formatNumber(laborRateDiff, locale, 1)}pt)</span>
+              </div>
+            )}
           </CardContent>
         </Card>
 
         {/* Total Hours */}
-        <Card className={cn(hoursDiff > 0 && 'border-yellow-200 bg-yellow-50/50')}>
+        <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
               <Clock className="h-4 w-4" />
-              週間人時
+              {t('laborWeekly.weeklyHours')}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {weeklySummary.totalHours}h
+              {formatHours(weekSummary.totalHours, locale)}
             </div>
-            <div className={cn(
-              'flex items-center gap-1 text-xs mt-1',
-              hoursDiff > 0 ? 'text-yellow-600' : 'text-green-600'
-            )}>
-              {hoursDiff > 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-              <span>目標 {weeklySummary.targetHours}h ({hoursDiff > 0 ? '+' : ''}{hoursDiff}h)</span>
+            <div className="text-xs text-muted-foreground mt-1">
+              {t('laborWeekly.activeStaff')}: {weekSummary.staffCountTotal}
             </div>
           </CardContent>
         </Card>
       </div>
+
+      {/* Daily Breakdown Table */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Calendar className="h-5 w-5 text-muted-foreground" />
+            {t('laborWeekly.dailyBreakdown')}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[80px]">{t('laborWeekly.date')}</TableHead>
+                <TableHead className="text-right">{t('laborWeekly.hours')}</TableHead>
+                <TableHead className="text-right">{t('laborWeekly.laborCost')}</TableHead>
+                <TableHead className="text-right">{t('laborWeekly.sales')}</TableHead>
+                <TableHead className="text-right">{t('laborWeekly.laborRate')}</TableHead>
+                <TableHead className="text-right">{t('laborWeekly.staffCount')}</TableHead>
+                <TableHead>{t('laborWeekly.skillMix')}</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {dailyRows.map((row) => (
+                <TableRow key={row.date}>
+                  <TableCell className="font-medium">
+                    {row.date.slice(5).replace('-', '/')} ({row.dayLabel})
+                  </TableCell>
+                  <TableCell className="text-right">{formatHours(row.hours, locale)}</TableCell>
+                  <TableCell className="text-right">{formatCurrency(row.laborCost, locale)}</TableCell>
+                  <TableCell className="text-right">
+                    {row.sales !== null 
+                      ? formatCurrency(row.sales, locale)
+                      : <span className="text-muted-foreground">--</span>
+                    }
+                  </TableCell>
+                  <TableCell className={cn(
+                    'text-right',
+                    row.laborRate !== null && row.laborRate > TARGETS.laborRate && 'text-red-600 font-medium'
+                  )}>
+                    {row.laborRate !== null ? formatPercent(row.laborRate, locale) : '--'}
+                  </TableCell>
+                  <TableCell className="text-right">{row.staffCount}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1">
+                      {row.starMix.star3 > 0 && (
+                        <Badge variant="outline" className="text-[10px] gap-0.5">
+                          <Star className="h-2.5 w-2.5 fill-yellow-400 text-yellow-400" />
+                          <Star className="h-2.5 w-2.5 fill-yellow-400 text-yellow-400" />
+                          <Star className="h-2.5 w-2.5 fill-yellow-400 text-yellow-400" />
+                          {row.starMix.star3}
+                        </Badge>
+                      )}
+                      {row.starMix.star2 > 0 && (
+                        <Badge variant="outline" className="text-[10px] gap-0.5">
+                          <Star className="h-2.5 w-2.5 fill-yellow-400 text-yellow-400" />
+                          <Star className="h-2.5 w-2.5 fill-yellow-400 text-yellow-400" />
+                          {row.starMix.star2}
+                        </Badge>
+                      )}
+                      {row.starMix.star1 > 0 && (
+                        <Badge variant="outline" className="text-[10px] gap-0.5">
+                          <Star className="h-2.5 w-2.5 fill-yellow-400 text-yellow-400" />
+                          {row.starMix.star1}
+                        </Badge>
+                      )}
+                      {row.staffCount === 0 && (
+                        <span className="text-xs text-muted-foreground">--</span>
+                      )}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
 
       {/* Skill Mix Summary */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
             <Star className="h-5 w-5 text-yellow-500" />
-            スキルミックス（週間シフト実績）
+            {t('laborWeekly.skillMixWeekly')}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -291,19 +429,9 @@ export default function LaborWeeklyPage() {
                   <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
                   <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
                 </div>
-                <span className="text-sm">ベテラン</span>
+                <span className="text-sm">{t('laborWeekly.veteran')}</span>
               </div>
-              <div className="text-right">
-                <span className={cn(
-                  'text-lg font-bold',
-                  weeklySummary.skillMix.star3 < weeklySummary.targetSkillMix.star3 && 'text-red-600'
-                )}>
-                  {weeklySummary.skillMix.star3}名
-                </span>
-                <span className="text-xs text-muted-foreground ml-1">
-                  / 目標{weeklySummary.targetSkillMix.star3}名
-                </span>
-              </div>
+              <span className="text-lg font-bold">{weekSummary.starMixTotal.star3}</span>
             </div>
 
             {/* Star 2 */}
@@ -313,14 +441,9 @@ export default function LaborWeeklyPage() {
                   <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
                   <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
                 </div>
-                <span className="text-sm">中堅</span>
+                <span className="text-sm">{t('laborWeekly.intermediate')}</span>
               </div>
-              <div className="text-right">
-                <span className="text-lg font-bold">{weeklySummary.skillMix.star2}名</span>
-                <span className="text-xs text-muted-foreground ml-1">
-                  / 目標{weeklySummary.targetSkillMix.star2}名
-                </span>
-              </div>
+              <span className="text-lg font-bold">{weekSummary.starMixTotal.star2}</span>
             </div>
 
             {/* Star 1 */}
@@ -329,19 +452,9 @@ export default function LaborWeeklyPage() {
                 <div className="flex">
                   <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
                 </div>
-                <span className="text-sm">新人</span>
+                <span className="text-sm">{t('laborWeekly.newbie')}</span>
               </div>
-              <div className="text-right">
-                <span className={cn(
-                  'text-lg font-bold',
-                  weeklySummary.skillMix.star1 > weeklySummary.targetSkillMix.star1 * 1.2 && 'text-yellow-600'
-                )}>
-                  {weeklySummary.skillMix.star1}名
-                </span>
-                <span className="text-xs text-muted-foreground ml-1">
-                  / 目標{weeklySummary.targetSkillMix.star1}名
-                </span>
-              </div>
+              <span className="text-lg font-bold">{weekSummary.starMixTotal.star1}</span>
             </div>
           </div>
         </CardContent>
@@ -354,19 +467,19 @@ export default function LaborWeeklyPage() {
             <div>
               <CardTitle className="text-base flex items-center gap-2">
                 <Lightbulb className="h-5 w-5 text-amber-500" />
-                改善提案
+                {t('laborWeekly.suggestions')}
               </CardTitle>
               <CardDescription>
-                週次データに基づく労務改善の提案です。編集はAll Managementで行います。
+                {t('laborWeekly.suggestionsDesc')}
               </CardDescription>
             </div>
-            <Badge variant="outline">{proposals.length}件</Badge>
+            <Badge variant="outline">{proposals.length}</Badge>
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
           {proposals.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              改善提案はありません
+              {t('laborWeekly.noSuggestions')}
             </div>
           ) : (
             proposals.map((proposal) => {
@@ -388,7 +501,7 @@ export default function LaborWeeklyPage() {
                       <div className="flex items-center gap-2 flex-wrap">
                         <h4 className="font-medium text-sm">{proposal.title}</h4>
                         <Badge variant={priority.variant} className="text-[10px]">
-                          優先度: {priority.label}
+                          {t('laborWeekly.priority')}: {priority.label}
                         </Badge>
                         {proposal.timeBand && (
                           <Badge variant="outline" className="text-[10px]">
@@ -401,7 +514,7 @@ export default function LaborWeeklyPage() {
                       </p>
                       <div className="flex items-center gap-1 mt-2 text-xs text-muted-foreground">
                         <AlertTriangle className="h-3 w-3" />
-                        <span>影響: {proposal.impact}</span>
+                        <span>{t('laborWeekly.impact')}: {proposal.impact}</span>
                       </div>
                     </div>
                   </div>
@@ -417,25 +530,19 @@ export default function LaborWeeklyPage() {
         <CardContent className="py-6">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="text-center sm:text-left">
-              <h3 className="font-semibold text-lg">シフト修正はAll Managementで</h3>
               <p className="text-sm text-muted-foreground">
-                労務計画の編集は週次で行います。営業中の変更は原則不可です。
+                {t('laborWeekly.suggestionsDesc')}
               </p>
             </div>
             <Button asChild className="gap-2">
               <Link href={`/stores/${storeId}/management/labor`}>
-                All Managementで週次シフト修正へ
+                {t('laborWeekly.editShift')}
                 <ExternalLink className="h-4 w-4" />
               </Link>
             </Button>
           </div>
         </CardContent>
       </Card>
-
-      {/* Notice */}
-      <div className="text-xs text-muted-foreground text-center">
-        このページは参照専用です。シフトの編集・承認はAll Managementで行ってください。
-      </div>
     </div>
   );
 }

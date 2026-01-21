@@ -30,6 +30,8 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useStore } from '@/state/store';
+import { useI18n } from '@/i18n/I18nProvider';
+import { useStateSubscription } from '@/state/eventBus';
 import {
   selectActiveTodos,
   selectCompletedTodos,
@@ -53,20 +55,20 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-const PRIORITY_CONFIG: Record<Proposal['priority'], { label: string; color: string; icon: React.ReactNode }> = {
-  critical: { label: '緊急', color: 'bg-red-100 text-red-800 border-red-200', icon: <AlertCircle className="h-3 w-3" /> },
-  high: { label: '高', color: 'bg-orange-100 text-orange-800 border-orange-200', icon: <AlertTriangle className="h-3 w-3" /> },
-  medium: { label: '中', color: 'bg-yellow-100 text-yellow-800 border-yellow-200', icon: null },
-  low: { label: '低', color: 'bg-gray-100 text-gray-800 border-gray-200', icon: null },
+const PRIORITY_CONFIG: Record<Proposal['priority'], { labelKey: string; color: string; icon: React.ReactNode }> = {
+  critical: { labelKey: 'exceptions.critical', color: 'bg-red-100 text-red-800 border-red-200', icon: <AlertCircle className="h-3 w-3" /> },
+  high: { labelKey: 'todo.high', color: 'bg-orange-100 text-orange-800 border-orange-200', icon: <AlertTriangle className="h-3 w-3" /> },
+  medium: { labelKey: 'todo.medium', color: 'bg-yellow-100 text-yellow-800 border-yellow-200', icon: null },
+  low: { labelKey: 'todo.low', color: 'bg-gray-100 text-gray-800 border-gray-200', icon: null },
 };
 
 const DELAY_REASONS = [
-  { value: 'material-shortage', label: '材料不足' },
-  { value: 'equipment-issue', label: '機器の問題' },
-  { value: 'staff-shortage', label: '人手不足' },
-  { value: 'priority-change', label: '優先度変更' },
-  { value: 'unexpected-order', label: '予期せぬ注文' },
-  { value: 'other', label: 'その他' },
+  { value: 'material-shortage', labelKey: 'completion.materialShortage' },
+  { value: 'equipment-issue', labelKey: 'completion.equipmentIssue' },
+  { value: 'staff-shortage', labelKey: 'completion.staffShortage' },
+  { value: 'priority-change', labelKey: 'completion.priorityChange' },
+  { value: 'unexpected-order', labelKey: 'completion.unexpectedOrder' },
+  { value: 'other', labelKey: 'completion.other' },
 ];
 
 interface CompletionData {
@@ -88,6 +90,7 @@ interface TodoCardProps {
 }
 
 function TodoCard({ todo, roleNames, status, onStart, onPause, onResume, onComplete }: TodoCardProps) {
+  const { t, locale } = useI18n();
   const priority = PRIORITY_CONFIG[todo.priority];
   const isCompleted = status === 'completed';
   const isPaused = status === 'paused';
@@ -99,12 +102,12 @@ function TodoCard({ todo, roleNames, status, onStart, onPause, onResume, onCompl
     const diffMins = Math.floor(diffMs / (1000 * 60));
     
     if (diffMins < 0) {
-      return { text: `${Math.abs(diffMins)}分超過`, isOverdue: true };
+      return { text: locale === 'ja' ? `${Math.abs(diffMins)}分超過` : `${Math.abs(diffMins)}min over`, isOverdue: true };
     }
     if (diffMins < 60) {
-      return { text: `残り${diffMins}分`, isOverdue: false };
+      return { text: locale === 'ja' ? `残り${diffMins}分` : `${diffMins}min left`, isOverdue: false };
     }
-    return { text: date.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }), isOverdue: false };
+    return { text: date.toLocaleTimeString(locale === 'ja' ? 'ja-JP' : 'en-US', { hour: '2-digit', minute: '2-digit' }), isOverdue: false };
   };
 
   const deadlineInfo = todo.deadline ? formatDeadline(todo.deadline) : null;
@@ -128,7 +131,7 @@ function TodoCard({ todo, roleNames, status, onStart, onPause, onResume, onCompl
           <div className="flex items-center gap-2 flex-wrap">
             <Badge variant="outline" className={cn(priority.color, 'gap-1')}>
               {priority.icon}
-              {priority.label}
+              {t(priority.labelKey)}
             </Badge>
             {roleNames.map((name) => (
               <Badge key={name} variant="secondary" className="gap-1">
@@ -139,19 +142,19 @@ function TodoCard({ todo, roleNames, status, onStart, onPause, onResume, onCompl
             {todo.linkedExceptionId && (
               <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-200 gap-1">
                 <AlertTriangle className="h-3 w-3" />
-                例外対応
+                {t('todo.exceptionResponse')}
               </Badge>
             )}
             {isCompleted && (
               <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200 gap-1">
                 <CheckSquare className="h-3 w-3" />
-                完了
+                {t('todo.completed')}
               </Badge>
             )}
             {isPaused && (
               <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-200 gap-1">
                 <Pause className="h-3 w-3" />
-                一時停止
+                {t('todo.paused')}
               </Badge>
             )}
           </div>
@@ -169,15 +172,15 @@ function TodoCard({ todo, roleNames, status, onStart, onPause, onResume, onCompl
             {todo.quantity && todo.quantity > 0 && (
               <div className="flex items-center gap-1.5">
                 <Package className="h-4 w-4 text-muted-foreground" />
-                <span className="text-muted-foreground">数量:</span>
+                <span className="text-muted-foreground">{t('todo.quantity')}:</span>
                 <span className="font-medium">{todo.quantity}</span>
               </div>
             )}
             {todo.estimatedMinutes && (
               <div className="flex items-center gap-1.5">
                 <Timer className="h-4 w-4 text-muted-foreground" />
-                <span className="text-muted-foreground">目安:</span>
-                <span className="font-medium">{todo.estimatedMinutes}分</span>
+                <span className="text-muted-foreground">{t('todo.estimate')}:</span>
+                <span className="font-medium">{todo.estimatedMinutes}{locale === 'ja' ? '分' : 'min'}</span>
               </div>
             )}
             {deadlineInfo && (
@@ -186,7 +189,7 @@ function TodoCard({ todo, roleNames, status, onStart, onPause, onResume, onCompl
                 deadlineInfo.isOverdue && 'text-red-600'
               )}>
                 <Clock className="h-4 w-4" />
-                <span className={deadlineInfo.isOverdue ? '' : 'text-muted-foreground'}>期限:</span>
+                <span className={deadlineInfo.isOverdue ? '' : 'text-muted-foreground'}>{t('todo.deadline')}:</span>
                 <span className="font-medium">{deadlineInfo.text}</span>
               </div>
             )}
@@ -197,13 +200,13 @@ function TodoCard({ todo, roleNames, status, onStart, onPause, onResume, onCompl
             <div className="pt-2 border-t border-muted text-sm text-muted-foreground">
               <div className="flex gap-4">
                 {todo.actualQuantity && (
-                  <span>実績数量: {todo.actualQuantity}</span>
+                  <span>{t('todo.actual')}: {todo.actualQuantity}</span>
                 )}
                 {todo.actualMinutes && (
-                  <span>所要時間: {todo.actualMinutes}分</span>
+                  <span>{locale === 'ja' ? '所要時間' : 'Time'}: {todo.actualMinutes}{locale === 'ja' ? '分' : 'min'}</span>
                 )}
                 {todo.delayReason && (
-                  <span>遅延理由: {DELAY_REASONS.find(r => r.value === todo.delayReason)?.label}</span>
+                  <span>{t('completion.delayReason')}: {t(DELAY_REASONS.find(r => r.value === todo.delayReason)?.labelKey || 'completion.none')}</span>
                 )}
               </div>
             </div>
@@ -215,7 +218,7 @@ function TodoCard({ todo, roleNames, status, onStart, onPause, onResume, onCompl
           {status === 'pending' && onStart && (
             <Button size="sm" onClick={onStart} className="gap-1">
               <Play className="h-4 w-4" />
-              開始
+              {t('todo.start')}
             </Button>
           )}
           {status === 'active' && (
@@ -223,13 +226,13 @@ function TodoCard({ todo, roleNames, status, onStart, onPause, onResume, onCompl
               {onPause && (
                 <Button size="sm" variant="outline" onClick={onPause} className="gap-1 bg-transparent">
                   <Pause className="h-4 w-4" />
-                  一時停止
+                  {t('todo.pause')}
                 </Button>
               )}
               {onComplete && (
                 <Button size="sm" onClick={onComplete} className="gap-1">
                   <CheckCircle className="h-4 w-4" />
-                  完了
+                  {t('todo.complete')}
                 </Button>
               )}
             </>
@@ -237,7 +240,7 @@ function TodoCard({ todo, roleNames, status, onStart, onPause, onResume, onCompl
           {status === 'paused' && onResume && (
             <Button size="sm" onClick={onResume} className="gap-1">
               <Play className="h-4 w-4" />
-              再開
+              {t('todo.resume')}
             </Button>
           )}
         </div>
@@ -254,6 +257,7 @@ interface CompletionModalProps {
 }
 
 function CompletionModal({ todo, open, onOpenChange, onSubmit }: CompletionModalProps) {
+  const { t, locale } = useI18n();
   const [actualQuantity, setActualQuantity] = useState(todo?.quantity ?? 0);
   const [actualMinutes, setActualMinutes] = useState(todo?.estimatedMinutes ?? 0);
   const [delayReason, setDelayReason] = useState<string>('none'); // Updated default value
@@ -288,16 +292,16 @@ function CompletionModal({ todo, open, onOpenChange, onSubmit }: CompletionModal
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>タスク完了</DialogTitle>
+          <DialogTitle>{t('completion.title')}</DialogTitle>
           <DialogDescription>
-            {todo.title}の完了情報を入力してください
+            {todo.title}
           </DialogDescription>
         </DialogHeader>
         
         <div className="space-y-4 py-4">
           {/* Actual Quantity */}
           <div className="space-y-2">
-            <Label htmlFor="actualQuantity">実績数量</Label>
+            <Label htmlFor="actualQuantity">{t('completion.actualQuantity')}</Label>
             <Input
               id="actualQuantity"
               type="number"
@@ -306,13 +310,13 @@ function CompletionModal({ todo, open, onOpenChange, onSubmit }: CompletionModal
               onChange={(e) => setActualQuantity(Number(e.target.value))}
             />
             {todo.quantity && (
-              <p className="text-xs text-muted-foreground">推奨: {todo.quantity}</p>
+              <p className="text-xs text-muted-foreground">{t('completion.recommended')}: {todo.quantity}</p>
             )}
           </div>
 
           {/* Actual Minutes */}
           <div className="space-y-2">
-            <Label htmlFor="actualMinutes">かかった時間（分）</Label>
+            <Label htmlFor="actualMinutes">{t('completion.timeTaken')}</Label>
             <Input
               id="actualMinutes"
               type="number"
@@ -321,22 +325,22 @@ function CompletionModal({ todo, open, onOpenChange, onSubmit }: CompletionModal
               onChange={(e) => setActualMinutes(Number(e.target.value))}
             />
             {todo.estimatedMinutes && (
-              <p className="text-xs text-muted-foreground">目安: {todo.estimatedMinutes}分</p>
+              <p className="text-xs text-muted-foreground">{t('completion.estimate')}: {todo.estimatedMinutes}{locale === 'ja' ? '分' : 'min'}</p>
             )}
           </div>
 
           {/* Delay Reason (optional) */}
           <div className="space-y-2">
-            <Label htmlFor="delayReason">遅延理由（任意）</Label>
+            <Label htmlFor="delayReason">{t('completion.delayReason')}</Label>
             <Select value={delayReason} onValueChange={setDelayReason}>
               <SelectTrigger>
-                <SelectValue placeholder="選択してください" />
+                <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">なし</SelectItem>
+                <SelectItem value="none">{t('completion.none')}</SelectItem>
                 {DELAY_REASONS.map((reason) => (
                   <SelectItem key={reason.value} value={reason.value}>
-                    {reason.label}
+                    {t(reason.labelKey)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -351,19 +355,19 @@ function CompletionModal({ todo, open, onOpenChange, onSubmit }: CompletionModal
               onCheckedChange={(checked) => setHasIssue(checked === true)}
             />
             <Label htmlFor="hasIssue" className="text-sm font-normal">
-              異常・問題があった
+              {t('completion.hasIssue')}
             </Label>
           </div>
 
           {/* Issue Note (if has issue) */}
           {hasIssue && (
             <div className="space-y-2">
-              <Label htmlFor="issueNote">問題の内容</Label>
+              <Label htmlFor="issueNote">{t('completion.issueContent')}</Label>
               <Textarea
                 id="issueNote"
                 value={issueNote}
                 onChange={(e) => setIssueNote(e.target.value)}
-                placeholder="問題の内容を記入してください"
+                placeholder={t('completion.issueContentPlaceholder')}
                 rows={3}
               />
             </div>
@@ -372,10 +376,10 @@ function CompletionModal({ todo, open, onOpenChange, onSubmit }: CompletionModal
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            キャンセル
+            {t('common.cancel')}
           </Button>
           <Button onClick={handleSubmit}>
-            完了を記録
+            {t('completion.record')}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -384,22 +388,30 @@ function CompletionModal({ todo, open, onOpenChange, onSubmit }: CompletionModal
 }
 
 export default function TodoPage() {
+  const { t, locale } = useI18n();
   const { state, actions } = useStore();
   const currentStore = selectCurrentStore(state);
   const [selectedRole, setSelectedRole] = useState<string | undefined>(undefined);
   const [timeBand, setTimeBand] = useState<TimeBand>(state.selectedTimeBand);
   const [completingTodo, setCompletingTodo] = useState<DecisionEvent | null>(null);
+
+  // Subscribe to state updates via event bus
+  const { lastUpdateTime: busUpdateTime } = useStateSubscription(['todo', 'decision', 'prep']);
   const [lastUpdate, setLastUpdate] = useState(new Date());
 
   const activeTodos = selectActiveTodos(state, selectedRole);
   const completedTodos = selectCompletedTodos(state);
   const todoStats = selectTodoStats(state, selectedRole);
 
-  // Update last update time periodically and on data changes
+  // Update last update time from event bus or periodically
+  useEffect(() => {
+    setLastUpdate(new Date(busUpdateTime));
+  }, [busUpdateTime]);
+  
   useEffect(() => {
     const interval = setInterval(() => {
       setLastUpdate(new Date());
-    }, 30000); // Update every 30 seconds
+    }, 30000); // Update every 30 seconds as fallback
     return () => clearInterval(interval);
   }, []);
 
@@ -514,32 +526,32 @@ export default function TodoPage() {
       icon: <Clock className="h-6 w-6 text-yellow-600" />,
       iconBgColor: 'bg-yellow-100',
       value: pendingTodos.length,
-      label: '待機中',
+      label: t('todo.pending'),
     },
     {
       icon: <Play className="h-6 w-6 text-blue-600" />,
       iconBgColor: 'bg-blue-100',
       value: inProgressTodos.length + pausedTodos.length,
-      label: '進行中',
+      label: t('todo.inProgress'),
     },
     {
       icon: <CheckCircle className="h-6 w-6 text-green-600" />,
       iconBgColor: 'bg-green-100',
       value: filteredCompletedTodos.length,
-      label: '完了',
+      label: t('todo.completed'),
     },
   ];
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="現場ToDo"
+        title={t('todo.title')}
         subtitle={shortName}
         actions={
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <RefreshCw className="h-3 w-3" />
-              最終更新: {lastUpdate.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}
+              {t('todo.lastUpdate')}: {lastUpdate.toLocaleTimeString(locale === 'ja' ? 'ja-JP' : 'en-US', { hour: '2-digit', minute: '2-digit' })}
             </div>
             <TimeBandTabs value={timeBand} onChange={handleTimeBandChange} />
           </div>
@@ -548,14 +560,14 @@ export default function TodoPage() {
 
       {/* Role Filter */}
       <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-sm text-muted-foreground">ロール絞り込み:</span>
+        <span className="text-sm text-muted-foreground">{t('todo.roleFilter')}:</span>
         <div className="flex gap-1 flex-wrap">
           <Badge
             variant={selectedRole === undefined ? 'default' : 'outline'}
             className="cursor-pointer"
             onClick={() => setSelectedRole(undefined)}
           >
-            すべて
+            {t('common.all')}
           </Badge>
           {state.roles.map((role) => (
             <Badge
@@ -577,7 +589,7 @@ export default function TodoPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Clock className="h-5 w-5 text-yellow-600" />
-            待機中のタスク
+            {t('todo.pendingTasks')}
             {pendingTodos.length > 0 && (
               <Badge variant="secondary">{pendingTodos.length}</Badge>
             )}
@@ -585,7 +597,7 @@ export default function TodoPage() {
         </CardHeader>
         <CardContent>
           {pendingTodos.length === 0 ? (
-            <EmptyState title="待機中のタスクはありません" />
+            <EmptyState title={t('todo.noTasks')} />
           ) : (
             <div className="space-y-4">
               {pendingTodos.map((todo) => (
@@ -607,7 +619,7 @@ export default function TodoPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Play className="h-5 w-5 text-blue-600" />
-            進行中のタスク
+            {t('todo.inProgressTasks')}
             {(inProgressTodos.length + pausedTodos.length) > 0 && (
               <Badge variant="secondary">{inProgressTodos.length + pausedTodos.length}</Badge>
             )}
@@ -615,7 +627,7 @@ export default function TodoPage() {
         </CardHeader>
         <CardContent>
           {inProgressTodos.length === 0 && pausedTodos.length === 0 ? (
-            <EmptyState title="進行中のタスクはありません" />
+            <EmptyState title={t('todo.noTasks')} />
           ) : (
             <div className="space-y-4">
               {inProgressTodos.map((todo) => (
@@ -647,7 +659,7 @@ export default function TodoPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <CheckCircle className="h-5 w-5 text-green-600" />
-            完了したタスク
+            {t('todo.completedTasks')}
             {filteredCompletedTodos.length > 0 && (
               <Badge variant="secondary">{filteredCompletedTodos.length}</Badge>
             )}
@@ -655,7 +667,7 @@ export default function TodoPage() {
         </CardHeader>
         <CardContent>
           {filteredCompletedTodos.length === 0 ? (
-            <EmptyState title="完了したタスクはありません" />
+            <EmptyState title={t('todo.noTasks')} />
           ) : (
             <div className="space-y-4">
               {filteredCompletedTodos.slice(0, 5).map((todo) => (

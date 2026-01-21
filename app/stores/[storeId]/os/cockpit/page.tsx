@@ -14,6 +14,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { useStore } from '@/state/store';
+import { useStateSubscription } from '@/state/eventBus';
+import { useI18n } from '@/i18n/I18nProvider';
+import { formatCurrency, formatCurrencyDiff, formatPercent, formatHours, formatRatio } from '@/i18n/format';
 import {
   selectCockpitMetrics,
   selectCurrentStore,
@@ -453,9 +456,15 @@ function calculateLandingEstimate(
 export default function CockpitPage() {
   const { state, actions } = useStore();
   const currentStore = selectCurrentStore(state);
+  const { t, locale } = useI18n();
   const [timeBand, setTimeBand] = useState<TimeBand>('all');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingProposal, setEditingProposal] = useState<Proposal | null>(null);
+
+  // Subscribe to state updates via event bus
+  const { lastUpdateTime: busUpdateTime } = useStateSubscription([
+    'sales', 'labor', 'prep', 'delivery', 'decision', 'cockpit-sales', 'cockpit-labor', 'cockpit-operations'
+  ]);
 
   // All hooks must be called before any early returns
   const eventsLength = state.events.length;
@@ -472,9 +481,9 @@ export default function CockpitPage() {
   const shiftSummary = selectShiftSummary(state);
   const supplyDemandMetrics = selectSupplyDemandMetrics(state, undefined, timeBand);
 
-  // Calculate enhanced metrics
+  // Calculate enhanced metrics - use bus update time for freshness
   const now = new Date();
-  const lastUpdateTime = now.toISOString();
+  const lastUpdateTime = busUpdateTime;
   
   // Sales calculations
   const salesActual = metrics?.sales?.actual ?? 0;
@@ -550,8 +559,8 @@ export default function CockpitPage() {
   // Now we can have early returns after all hooks
   if (!currentStore) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <p className="text-muted-foreground">読み込み中...</p>
+<div className="flex items-center justify-center h-64">
+        <p className="text-muted-foreground">{t('common.loading')}</p>
       </div>
     );
   }
@@ -561,7 +570,7 @@ export default function CockpitPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <PageHeader title="運用コックピット" subtitle={shortName} />
+        <PageHeader title={t('cockpit.title')} subtitle={shortName} />
         <TimeBandTabs value={timeBand} onChange={setTimeBand} />
       </div>
 
@@ -572,20 +581,20 @@ export default function CockpitPage() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {/* Sales Card */}
         <MetricCard
-          title="売上"
-          value={`¥${salesActual.toLocaleString()}`}
-          subValue={`予測 ¥${salesForecast.toLocaleString()}`}
+          title={t('cockpit.sales')}
+          value={formatCurrency(salesActual, locale)}
+          subValue={`${t('cockpit.forecast')} ${formatCurrency(salesForecast, locale)}`}
           trend={salesDiff >= 0 ? 'up' : 'down'}
-          trendValue={`${salesDiff >= 0 ? '+' : ''}¥${salesDiff.toLocaleString()}`}
+          trendValue={formatCurrencyDiff(salesDiff, locale)}
           icon={<TrendingUp className="h-4 w-4" />}
           status={salesAchievementRate >= 100 ? 'success' : salesAchievementRate >= 80 ? 'default' : 'warning'}
           lastUpdate={lastUpdateTime}
         >
           <div className="space-y-1">
-            <div className="text-xs text-muted-foreground">
-              着地見込: ¥{landingMin.toLocaleString()} 〜 ¥{landingMax.toLocaleString()}
+            <div className="text-xs text-muted-foreground truncate">
+              {t('cockpit.landing')}: {formatCurrency(landingMin, locale)} ~ {formatCurrency(landingMax, locale)}
             </div>
-            <div className="text-[10px] text-muted-foreground/80 bg-muted/50 px-1.5 py-0.5 rounded">
+            <div className="text-[10px] text-muted-foreground/80 bg-muted/50 px-1.5 py-0.5 rounded truncate">
               {landingExplanation}
             </div>
           </div>
@@ -593,41 +602,41 @@ export default function CockpitPage() {
 
         {/* Labor Card - Cost Focused */}
         <MetricCard
-          title="レーバー"
-          value={`¥${laborCost.toLocaleString()}`}
-          subValue={`人件費率 ${laborRate.toFixed(1)}%`}
+          title={t('cockpit.labor')}
+          value={formatCurrency(laborCost, locale)}
+          subValue={`${t('cockpit.laborRate')} ${formatPercent(laborRate, locale)}`}
           icon={<DollarSign className="h-4 w-4" />}
           status={laborRate <= 25 ? 'success' : laborRate <= 30 ? 'default' : 'warning'}
           lastUpdate={lastUpdateTime}
         >
           <div className="space-y-1 text-xs text-muted-foreground">
             <div className="flex justify-between">
-              <span>売上/人件費</span>
-              <span className="font-medium">{salesPerLabor.toFixed(1)}倍</span>
+              <span className="truncate">{t('cockpit.sales')}/{t('cockpit.laborCost')}</span>
+              <span className="font-medium">{formatRatio(salesPerLabor, locale)}</span>
             </div>
             <div className="flex justify-between">
-              <span>人時</span>
+              <span>{t('shift.hours')}</span>
               <span className={cn('font-medium', actualHours > plannedHours && 'text-red-600')}>
-                {actualHours.toFixed(1)}h / {plannedHours}h
+                {formatHours(actualHours, locale)} / {formatHours(plannedHours, locale, 0)}
               </span>
             </div>
             <div className="flex items-center gap-1">
               <Coffee className="h-3 w-3" />
-              <span>休憩中 {breakCount}名</span>
+              <span>{t('cockpit.onBreak')} {breakCount}</span>
             </div>
           </div>
         </MetricCard>
 
         {/* Supply/Demand Card - Enhanced */}
         <MetricCard
-          title="需給"
+          title={t('cockpit.supplyDemand')}
           value={
-            supplyDemandStatus === 'danger' ? '危険' :
-            supplyDemandStatus === 'caution' ? '要注意' : '正常'
+            supplyDemandStatus === 'danger' ? t('cockpit.danger') :
+            supplyDemandStatus === 'caution' ? t('cockpit.caution') : t('cockpit.normal')
           }
           subValue={
             stockoutRisk > 0 || excessRisk > 0 
-              ? `欠品 ${stockoutRisk} / 過剰 ${excessRisk}`
+              ? `${t('cockpit.stockoutRisk')} ${stockoutRisk} / ${t('cockpit.excessRisk')} ${excessRisk}`
               : undefined
           }
           icon={<Package className="h-4 w-4" />}
@@ -645,15 +654,15 @@ export default function CockpitPage() {
                     <Badge 
                       variant="outline" 
                       className={cn(
-                        'text-[9px] px-1',
+                        'text-[9px] px-1 shrink-0',
                         item.riskType === 'stockout' ? 'border-red-200 text-red-700 bg-red-50' : 'border-yellow-200 text-yellow-700 bg-yellow-50'
                       )}
                     >
-                      {item.riskType === 'stockout' ? '欠品' : '過剰'}{item.riskLevel === 'high' ? '高' : '中'}
+                      {item.riskType === 'stockout' ? t('cockpit.stockoutRisk') : t('cockpit.excessRisk')}
                     </Badge>
                     <span className="font-medium truncate">{item.itemName}</span>
                   </div>
-                  <span className="text-muted-foreground pl-1">→ {item.recommendedAction}</span>
+                  <span className="text-muted-foreground pl-1 truncate">→ {item.recommendedAction}</span>
                 </div>
               ))}
             </div>
@@ -662,9 +671,9 @@ export default function CockpitPage() {
 
         {/* Operations Card */}
         <MetricCard
-          title="オペ"
-          value={`完了率 ${completionRate.toFixed(0)}%`}
-          subValue={delayedCount > 0 ? `遅延 ${delayedCount}件` : '順調'}
+          title={t('cockpit.operations')}
+          value={`${t('cockpit.prepCompleted')} ${completionRate.toFixed(0)}%`}
+          subValue={delayedCount > 0 ? `${t('todo.pending')} ${delayedCount}` : t('cockpit.normal')}
           icon={<Clock className="h-4 w-4" />}
           status={completionRate >= 80 ? 'success' : completionRate >= 50 ? 'warning' : 'error'}
           lastUpdate={lastUpdateTime}
@@ -678,9 +687,9 @@ export default function CockpitPage() {
 
         {/* Exceptions Card */}
         <MetricCard
-          title="例外"
-          value={criticalCount > 0 ? `緊急 ${criticalCount}` : warningCount > 0 ? `警告 ${warningCount}` : '正常'}
-          subValue={criticalCount > 0 && warningCount > 0 ? `+ 警告 ${warningCount}` : undefined}
+          title={t('cockpit.exceptions')}
+          value={criticalCount > 0 ? `${t('cockpit.danger')} ${criticalCount}` : warningCount > 0 ? `${t('cockpit.caution')} ${warningCount}` : t('cockpit.normal')}
+          subValue={criticalCount > 0 && warningCount > 0 ? `+ ${t('cockpit.caution')} ${warningCount}` : undefined}
           icon={<AlertTriangle className="h-4 w-4" />}
           status={criticalCount > 0 ? 'error' : warningCount > 0 ? 'warning' : 'success'}
           lastUpdate={lastUpdateTime}

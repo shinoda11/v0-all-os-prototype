@@ -309,6 +309,36 @@ export interface SupplyDemandMetrics {
   lastUpdate: string;
 }
 
+// Weekly Labor Metrics (derived from events)
+export interface WeeklyLaborDailyRow {
+  date: string; // YYYY-MM-DD
+  dayLabel: string; // e.g., "月", "火"
+  hours: number;
+  laborCost: number;
+  laborRate: number | null; // null if sales not available
+  salesPerLaborCost: number | null;
+  staffCount: number;
+  starMix: { star3: number; star2: number; star1: number };
+  sales: number | null; // null if sales_event not available
+}
+
+export interface WeeklyLaborMetrics {
+  weekSummary: {
+    totalHours: number;
+    totalLaborCost: number;
+    avgLaborRate: number | null;
+    salesPerLaborCost: number | null;
+    totalSales: number | null;
+    staffCountTotal: number;
+    starMixTotal: { star3: number; star2: number; star1: number };
+  };
+  dailyRows: WeeklyLaborDailyRow[];
+  weekStart: string;
+  weekEnd: string;
+  lastUpdate: string;
+  isCalculating: boolean;
+}
+
 export interface OperationsKPI {
   delayedCount: number;
   completionRate: number;

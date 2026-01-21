@@ -1154,3 +1154,207 @@ function timeBandLabel(timeBand: TimeBand): string {
     default: return '全日';
   }
 }
+
+// ------------------------------------------------------------
+// Weekly Labor Metrics Derivation
+// ------------------------------------------------------------
+
+import type { WeeklyLaborMetrics, WeeklyLaborDailyRow } from './types';
+
+const DAY_LABELS = ['日', '月', '火', '水', '木', '金', '土'];
+
+export const deriveWeeklyLaborMetrics = (
+  events: DomainEvent[],
+  storeId: string,
+  weekStartDate: string, // YYYY-MM-DD
+  staff: Staff[]
+): WeeklyLaborMetrics => {
+  const now = new Date();
+  const staffMap = new Map(staff.filter(s => s.storeId === storeId).map(s => [s.id, s]));
+  
+  // Generate 7 days starting from weekStartDate
+  const weekStart = new Date(weekStartDate);
+  const dates: string[] = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(weekStart);
+    d.setDate(weekStart.getDate() + i);
+    dates.push(d.toISOString().split('T')[0]);
+  }
+  const weekEnd = dates[6];
+  
+  // Filter labor and sales events for this store
+  const laborEvents = filterByType(events, 'labor') as LaborEvent[];
+  const salesEvents = filterByType(events, 'sales') as SalesEvent[];
+  
+  const dailyRows: WeeklyLaborDailyRow[] = [];
+  let totalHours = 0;
+  let totalLaborCost = 0;
+  let totalSales: number | null = 0;
+  let hasSalesData = false;
+  const staffIdsAllWeek = new Set<string>();
+  const starMixTotal = { star3: 0, star2: 0, star1: 0 };
+  
+  for (const date of dates) {
+    const dayOfWeek = new Date(date).getDay();
+    const dayLabel = DAY_LABELS[dayOfWeek];
+    
+    // Get labor events for this day
+    const dayLaborEvents = laborEvents.filter(
+      e => e.storeId === storeId && e.timestamp.startsWith(date)
+    );
+    
+    // Get sales events for this day
+    const daySalesEvents = salesEvents.filter(
+      e => e.storeId === storeId && e.timestamp.startsWith(date)
+    );
+    
+    // Calculate daily sales
+    let daySales: number | null = null;
+    if (daySalesEvents.length > 0) {
+      daySales = daySalesEvents.reduce((sum, e) => sum + e.amount, 0);
+      totalSales = (totalSales ?? 0) + daySales;
+      hasSalesData = true;
+    }
+    
+    // Track staff sessions for this day
+    interface Session {
+      staffId: string;
+      checkInTime: Date;
+      checkOutTime?: Date;
+      breakMinutes: number;
+      isActive: boolean;
+      currentBreakStart?: Date;
+    }
+    
+    const sessions = new Map<string, Session>();
+    
+    // Sort and process labor events
+    const sortedLaborEvents = dayLaborEvents.sort((a, b) => 
+      new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+    );
+    
+    for (const event of sortedLaborEvents) {
+      const eventTime = new Date(event.timestamp);
+      let session = sessions.get(event.staffId);
+      
+      switch (event.action) {
+        case 'check-in':
+          session = {
+            staffId: event.staffId,
+            checkInTime: eventTime,
+            checkOutTime: undefined,
+            breakMinutes: 0,
+            isActive: true,
+            currentBreakStart: undefined,
+          };
+          sessions.set(event.staffId, session);
+          break;
+        case 'check-out':
+          if (session && session.isActive) {
+            session.checkOutTime = eventTime;
+            session.isActive = false;
+            // Close any open break
+            if (session.currentBreakStart) {
+              session.breakMinutes += (eventTime.getTime() - session.currentBreakStart.getTime()) / (1000 * 60);
+              session.currentBreakStart = undefined;
+            }
+          }
+          break;
+        case 'break-start':
+          if (session && session.isActive && !session.currentBreakStart) {
+            session.currentBreakStart = eventTime;
+          }
+          break;
+        case 'break-end':
+          if (session && session.isActive && session.currentBreakStart) {
+            session.breakMinutes += (eventTime.getTime() - session.currentBreakStart.getTime()) / (1000 * 60);
+            session.currentBreakStart = undefined;
+          }
+          break;
+      }
+    }
+    
+    // Calculate daily metrics
+    let dayHours = 0;
+    let dayLaborCost = 0;
+    const dayStaffIds = new Set<string>();
+    const dayStarMix = { star3: 0, star2: 0, star1: 0 };
+    
+    for (const [staffId, session] of sessions) {
+      const staffMember = staffMap.get(staffId);
+      if (!staffMember) continue;
+      
+      dayStaffIds.add(staffId);
+      staffIdsAllWeek.add(staffId);
+      
+      // Count star level (once per staff per day, not per session)
+      if (staffMember.starLevel === 3) dayStarMix.star3++;
+      else if (staffMember.starLevel === 2) dayStarMix.star2++;
+      else dayStarMix.star1++;
+      
+      // Calculate hours worked
+      if (session.checkInTime) {
+        const endTime = session.checkOutTime ?? (session.isActive ? now : session.checkInTime);
+        const grossMinutes = (endTime.getTime() - session.checkInTime.getTime()) / (1000 * 60);
+        const netMinutes = Math.max(0, grossMinutes - session.breakMinutes);
+        const hours = netMinutes / 60;
+        
+        dayHours += hours;
+        dayLaborCost += hours * staffMember.wage;
+      }
+    }
+    
+    // Calculate labor rate
+    let dayLaborRate: number | null = null;
+    let daySalesPerLaborCost: number | null = null;
+    if (daySales !== null && daySales > 0) {
+      dayLaborRate = (dayLaborCost / daySales) * 100;
+      daySalesPerLaborCost = daySales / dayLaborCost;
+    }
+    
+    totalHours += dayHours;
+    totalLaborCost += dayLaborCost;
+    
+    // Accumulate star mix total
+    starMixTotal.star3 += dayStarMix.star3;
+    starMixTotal.star2 += dayStarMix.star2;
+    starMixTotal.star1 += dayStarMix.star1;
+    
+    dailyRows.push({
+      date,
+      dayLabel,
+      hours: Math.round(dayHours * 10) / 10,
+      laborCost: Math.round(dayLaborCost),
+      laborRate: dayLaborRate !== null ? Math.round(dayLaborRate * 10) / 10 : null,
+      salesPerLaborCost: daySalesPerLaborCost !== null ? Math.round(daySalesPerLaborCost * 100) / 100 : null,
+      staffCount: dayStaffIds.size,
+      starMix: dayStarMix,
+      sales: daySales,
+    });
+  }
+  
+  // Calculate weekly summary
+  const avgLaborRate = hasSalesData && totalSales && totalSales > 0
+    ? Math.round((totalLaborCost / totalSales) * 1000) / 10
+    : null;
+  const salesPerLaborCost = hasSalesData && totalLaborCost > 0 && totalSales
+    ? Math.round((totalSales / totalLaborCost) * 100) / 100
+    : null;
+  
+  return {
+    weekSummary: {
+      totalHours: Math.round(totalHours * 10) / 10,
+      totalLaborCost: Math.round(totalLaborCost),
+      avgLaborRate,
+      salesPerLaborCost,
+      totalSales: hasSalesData ? totalSales : null,
+      staffCountTotal: staffIdsAllWeek.size,
+      starMixTotal,
+    },
+    dailyRows,
+    weekStart: weekStartDate,
+    weekEnd,
+    lastUpdate: now.toISOString(),
+    isCalculating: dailyRows.every(r => r.staffCount === 0),
+  };
+};

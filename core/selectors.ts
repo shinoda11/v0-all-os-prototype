@@ -4,7 +4,7 @@
 // UI components should ONLY use selectors, never derive directly
 // ============================================================
 
-import { AppState, TimeBand, DailySalesMetrics, CockpitMetrics, ExceptionItem, DecisionEvent, ShiftSummary, SupplyDemandMetrics } from './types';
+import { AppState, TimeBand, DailySalesMetrics, CockpitMetrics, ExceptionItem, DecisionEvent, ShiftSummary, SupplyDemandMetrics, WeeklyLaborMetrics } from './types';
 import {
   deriveForecastTable,
   deriveForecastForDate,
@@ -21,6 +21,7 @@ import {
   deriveEnhancedCockpitMetrics,
   deriveShiftSummary,
   deriveSupplyDemandMetrics,
+  deriveWeeklyLaborMetrics,
   ForecastCell,
   StaffState,
   CalendarCell,
@@ -466,4 +467,43 @@ export const selectSupplyDemandMetrics = (
   }
   
   return deriveSupplyDemandMetrics(state.events, storeId, targetDate, targetTimeBand, prepItemNames);
+};
+
+// ------------------------------------------------------------
+// Weekly Labor Metrics Selector
+// ------------------------------------------------------------
+
+export const selectWeeklyLaborMetrics = (
+  state: AppState,
+  weekStartDate?: string
+): WeeklyLaborMetrics => {
+  const storeId = state.selectedStoreId;
+  
+  // Default to current week's Monday
+  const today = new Date();
+  const dayOfWeek = today.getDay();
+  const monday = new Date(today);
+  monday.setDate(today.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
+  const targetWeekStart = weekStartDate ?? monday.toISOString().split('T')[0];
+  
+  if (!storeId) {
+    return {
+      weekSummary: {
+        totalHours: 0,
+        totalLaborCost: 0,
+        avgLaborRate: null,
+        salesPerLaborCost: null,
+        totalSales: null,
+        staffCountTotal: 0,
+        starMixTotal: { star3: 0, star2: 0, star1: 0 },
+      },
+      dailyRows: [],
+      weekStart: targetWeekStart,
+      weekEnd: targetWeekStart,
+      lastUpdate: new Date().toISOString(),
+      isCalculating: true,
+    };
+  }
+  
+  return deriveWeeklyLaborMetrics(state.events, storeId, targetWeekStart, state.staff);
 };

@@ -3,6 +3,7 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { Clock, CheckCircle, AlertCircle } from 'lucide-react';
+import { useI18n } from '@/i18n/I18nProvider';
 
 export type FreshnessStatus = 'fresh' | 'warning' | 'stale';
 
@@ -23,16 +24,16 @@ export function getFreshnessStatus(lastUpdate: string | Date): FreshnessStatus {
   return 'stale';
 }
 
-export function formatUpdateTime(lastUpdate: string | Date): string {
+export function formatUpdateTime(lastUpdate: string | Date, locale: 'ja' | 'en' = 'ja'): string {
   const updateTime = typeof lastUpdate === 'string' ? new Date(lastUpdate) : lastUpdate;
-  return updateTime.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+  return updateTime.toLocaleTimeString(locale === 'ja' ? 'ja-JP' : 'en-US', { hour: '2-digit', minute: '2-digit' });
 }
 
-export function getFreshnessLabel(status: FreshnessStatus): string {
+export function getFreshnessLabel(status: FreshnessStatus, t: (key: string) => string): string {
   switch (status) {
-    case 'fresh': return '最新';
-    case 'warning': return '少し前';
-    case 'stale': return '更新が必要';
+    case 'fresh': return t('freshness.fresh');
+    case 'warning': return t('freshness.warning');
+    case 'stale': return t('freshness.stale');
   }
 }
 
@@ -42,8 +43,9 @@ export function FreshnessBadge({
   showTime = true,
   compact = false,
 }: FreshnessBadgeProps) {
+  const { locale, t } = useI18n();
   const status = getFreshnessStatus(lastUpdate);
-  const time = formatUpdateTime(lastUpdate);
+  const time = formatUpdateTime(lastUpdate, locale);
   
   const statusConfig = {
     fresh: {
@@ -109,6 +111,7 @@ export function FreshnessIndicator({
   lastUpdate: string | Date; 
   className?: string;
 }) {
+  const { locale, t } = useI18n();
   const status = getFreshnessStatus(lastUpdate);
   
   const dotColors = {
@@ -120,11 +123,11 @@ export function FreshnessIndicator({
   return (
     <div 
       className={cn('flex items-center gap-1', className)}
-      title={`${getFreshnessLabel(status)} (${formatUpdateTime(lastUpdate)})`}
+      title={`${getFreshnessLabel(status, t)} (${formatUpdateTime(lastUpdate, locale)})`}
     >
       <div className={cn('h-1.5 w-1.5 rounded-full', dotColors[status])} />
       <span className="text-[10px] text-muted-foreground">
-        {formatUpdateTime(lastUpdate)}
+        {formatUpdateTime(lastUpdate, locale)}
       </span>
     </div>
   );

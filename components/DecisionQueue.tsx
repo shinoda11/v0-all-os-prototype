@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { useI18n } from '@/i18n/I18nProvider';
 import {
   Check,
   X,
@@ -33,59 +34,61 @@ interface DecisionQueueProps {
 
 const priorityConfig: Record<
   Proposal['priority'],
-  { label: string; color: string; icon: React.ReactNode }
+  { labelKey: string; color: string; icon: React.ReactNode }
 > = {
   critical: {
-    label: '緊急',
+    labelKey: 'cockpit.danger',
     color: 'bg-red-100 text-red-800 border-red-200',
     icon: <AlertCircle className="h-4 w-4" />,
   },
   high: {
-    label: '高',
+    labelKey: 'todo.high',
     color: 'bg-orange-100 text-orange-800 border-orange-200',
     icon: <AlertTriangle className="h-4 w-4" />,
   },
   medium: {
-    label: '中',
+    labelKey: 'todo.medium',
     color: 'bg-yellow-100 text-yellow-800 border-yellow-200',
     icon: <Info className="h-4 w-4" />,
   },
   low: {
-    label: '低',
+    labelKey: 'todo.low',
     color: 'bg-gray-100 text-gray-800 border-gray-200',
     icon: <Info className="h-4 w-4" />,
   },
 };
 
-const effectConfig: Record<ExpectedEffect, { label: string; icon: React.ReactNode; color: string }> = {
+const effectConfig: Record<ExpectedEffect, { labelKey: string; icon: React.ReactNode; color: string }> = {
   'sales-impact': {
-    label: '売上影響',
+    labelKey: 'effect.salesImpact',
     icon: <TrendingUp className="h-3 w-3" />,
     color: 'bg-green-100 text-green-700',
   },
   'stockout-avoidance': {
-    label: '欠品回避',
+    labelKey: 'effect.stockoutAvoidance',
     icon: <ShieldAlert className="h-3 w-3" />,
     color: 'bg-blue-100 text-blue-700',
   },
   'waste-reduction': {
-    label: 'ロス削減',
+    labelKey: 'effect.wasteReduction',
     icon: <Trash2 className="h-3 w-3" />,
     color: 'bg-amber-100 text-amber-700',
   },
   'labor-savings': {
-    label: '工数削減',
+    labelKey: 'effect.laborSavings',
     icon: <Wrench className="h-3 w-3" />,
     color: 'bg-purple-100 text-purple-700',
   },
 };
 
-const timeBandLabels: Record<TimeBand, string> = {
-  all: '終日',
-  lunch: 'ランチ',
-  idle: 'アイドル',
-  dinner: 'ディナー',
+const timeBandLabelKeys: Record<TimeBand, string> = {
+  all: 'timeband.all',
+  lunch: 'timeband.lunch',
+  idle: 'timeband.idle',
+  dinner: 'timeband.dinner',
 };
+
+const timeBandLabels = timeBandLabelKeys;
 
 function formatDeadline(deadline: string): string {
   try {
@@ -117,11 +120,13 @@ export function DecisionQueue({
   onReject,
   onEdit,
 }: DecisionQueueProps) {
+  const { t } = useI18n();
+  
   if (proposals.length === 0) {
     return (
       <Card>
         <CardContent className="flex items-center justify-center py-8">
-          <p className="text-muted-foreground">現在の提案はありません</p>
+          <p className="text-muted-foreground">{t('decision.noProposals')}</p>
         </CardContent>
       </Card>
     );
@@ -152,7 +157,7 @@ export function DecisionQueue({
                       className={cn('gap-1', priority.color)}
                     >
                       {priority.icon}
-                      {priority.label}
+                      {t(priority.labelKey)}
                     </Badge>
                     <Badge variant="secondary">{proposal.type}</Badge>
                     <Badge
@@ -193,7 +198,7 @@ export function DecisionQueue({
                       className={cn('gap-1 text-xs', config.color)}
                     >
                       {config.icon}
-                      {config.label}
+                      {t(config.labelKey)}
                     </Badge>
                   );
                 })}
@@ -203,7 +208,7 @@ export function DecisionQueue({
               <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
                 <div className="flex items-center gap-1">
                   <Target className="h-3 w-3" />
-                  <span>タイムバンド: {timeBandLabels[proposal.timeBand]}</span>
+                  <span>{t('timeband.' + proposal.timeBand)}</span>
                 </div>
                 {proposal.targetMenuIds.length > 0 && (
                   <div className="flex items-center gap-1">
@@ -246,7 +251,7 @@ export function DecisionQueue({
                   className="gap-1"
                 >
                   <Check className="h-4 w-4" />
-                  承認 ({proposal.todoCount ?? 1}件配布)
+                  {t('decision.approve')} ({proposal.todoCount ?? 1})
                 </Button>
                 <Button
                   size="sm"
@@ -255,7 +260,7 @@ export function DecisionQueue({
                   className="gap-1 bg-transparent"
                 >
                   <X className="h-4 w-4" />
-                  却下
+                  {t('decision.reject')}
                 </Button>
                 <Button
                   size="sm"
@@ -264,7 +269,7 @@ export function DecisionQueue({
                   className="gap-1"
                 >
                   <Edit2 className="h-4 w-4" />
-                  編集
+                  {t('common.edit')}
                 </Button>
               </div>
             </CardContent>

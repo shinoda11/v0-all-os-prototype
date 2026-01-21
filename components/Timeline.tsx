@@ -27,6 +27,7 @@ import {
   ChevronUp,
 } from 'lucide-react';
 import { FreshnessBadge, getFreshnessStatus, type FreshnessStatus } from '@/components/FreshnessBadge';
+import { useI18n } from '@/i18n/I18nProvider';
 
 // Lane definitions
 export type TimelineLane = 'sales' | 'forecast' | 'prep' | 'delivery' | 'labor' | 'decision';
@@ -35,43 +36,43 @@ const LANE_CONFIG: Record<TimelineLane, {
   icon: React.ReactNode; 
   color: string; 
   bgColor: string;
-  label: string;
+  labelKey: string;
 }> = {
   sales: {
     icon: <DollarSign className="h-3 w-3" />,
     color: 'text-green-700',
     bgColor: 'bg-green-100',
-    label: '売上',
+    labelKey: 'lane.sales',
   },
   forecast: {
     icon: <BarChart3 className="h-3 w-3" />,
     color: 'text-indigo-700',
     bgColor: 'bg-indigo-100',
-    label: '予測',
+    labelKey: 'lane.forecast',
   },
   prep: {
     icon: <ChefHat className="h-3 w-3" />,
     color: 'text-orange-700',
     bgColor: 'bg-orange-100',
-    label: '仕込み',
+    labelKey: 'lane.prep',
   },
   delivery: {
     icon: <Truck className="h-3 w-3" />,
     color: 'text-purple-700',
     bgColor: 'bg-purple-100',
-    label: '配送',
+    labelKey: 'lane.delivery',
   },
   labor: {
     icon: <Users className="h-3 w-3" />,
     color: 'text-blue-700',
     bgColor: 'bg-blue-100',
-    label: '労務',
+    labelKey: 'lane.labor',
   },
   decision: {
     icon: <CheckCircle className="h-3 w-3" />,
     color: 'text-teal-700',
     bgColor: 'bg-teal-100',
-    label: '意思決定',
+    labelKey: 'lane.decision',
   },
 };
 
@@ -179,6 +180,7 @@ interface EventDetailPanelProps {
 }
 
 function EventDetailPanel({ event, open, onClose }: EventDetailPanelProps) {
+  const { t } = useI18n();
   if (!event) return null;
 
   const lane = event.type as TimelineLane;
@@ -194,7 +196,7 @@ function EventDetailPanel({ event, open, onClose }: EventDetailPanelProps) {
             <span className={cn('p-1.5 rounded', config.bgColor, config.color)}>
               {config.icon}
             </span>
-            {config.label}イベント
+            {t(config.labelKey)}
           </SheetTitle>
           <SheetDescription>
             {formatTime(event.timestamp)} のイベント詳細
@@ -290,6 +292,7 @@ interface LaneTimelineProps {
 const MAX_EXPANDED = 20;
 
 export function LaneTimeline({ laneEvents, maxPerLane = 5 }: LaneTimelineProps) {
+  const { t } = useI18n();
   const [selectedEvent, setSelectedEvent] = useState<DomainEvent | null>(null);
   const [expandedLanes, setExpandedLanes] = useState<Set<TimelineLane>>(new Set());
 
@@ -301,13 +304,16 @@ export function LaneTimeline({ laneEvents, maxPerLane = 5 }: LaneTimelineProps) 
   const minTime = timestamps.length > 0 ? Math.min(...timestamps) : 0;
   const maxTime = timestamps.length > 0 ? Math.max(...timestamps) : 0;
   
-  // Generate time markers (hourly)
-  const timeMarkers: { hour: number; label: string }[] = [];
+  // Generate time markers (30-minute intervals)
+  const timeMarkers: { time: number; label: string; isHour: boolean }[] = [];
   if (minTime && maxTime) {
     const startHour = new Date(minTime).getHours();
     const endHour = new Date(maxTime).getHours();
     for (let h = startHour; h <= endHour; h++) {
-      timeMarkers.push({ hour: h, label: `${h.toString().padStart(2, '0')}:00` });
+      timeMarkers.push({ time: h * 60, label: `${h.toString().padStart(2, '0')}:00`, isHour: true });
+      if (h < endHour) {
+        timeMarkers.push({ time: h * 60 + 30, label: `${h.toString().padStart(2, '0')}:30`, isHour: false });
+      }
     }
   }
 
@@ -327,7 +333,7 @@ export function LaneTimeline({ laneEvents, maxPerLane = 5 }: LaneTimelineProps) 
     return (
       <Card>
         <CardContent className="flex items-center justify-center py-8 text-muted-foreground">
-          イベントがありません
+          {t('timeline.noEvents')}
         </CardContent>
       </Card>
     );
@@ -337,7 +343,7 @@ export function LaneTimeline({ laneEvents, maxPerLane = 5 }: LaneTimelineProps) 
     <Card>
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-sm font-medium">統合タイムライン</CardTitle>
+          <CardTitle className="text-sm font-medium">{t('timeline.title')}</CardTitle>
           {/* Time axis header */}
           {timeMarkers.length > 1 && (
             <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
@@ -348,21 +354,28 @@ export function LaneTimeline({ laneEvents, maxPerLane = 5 }: LaneTimelineProps) 
         </div>
       </CardHeader>
       
-      {/* Simple time axis */}
+      {/* Simple time axis (30-min intervals) */}
       {timeMarkers.length > 1 && (
         <div className="px-6 pb-2">
           <div className="flex items-center ml-20 border-b border-border/50 relative">
-            {timeMarkers.map((marker, i) => (
+            {timeMarkers.map((marker) => (
               <div 
-                key={marker.hour} 
+                key={marker.time} 
                 className="flex-1 text-center relative"
-                style={{ minWidth: '40px' }}
+                style={{ minWidth: marker.isHour ? '40px' : '30px' }}
               >
-                <div className="absolute left-0 top-0 w-px h-2 bg-border/50" />
-                <span className="text-[9px] text-muted-foreground">{marker.label}</span>
+                <div className={cn(
+                  'absolute left-0 top-0 w-px',
+                  marker.isHour ? 'h-3 bg-border' : 'h-1.5 bg-border/30'
+                )} />
+                {marker.isHour ? (
+                  <span className="text-[9px] text-muted-foreground font-medium">{marker.label}</span>
+                ) : (
+                  <span className="text-[8px] text-muted-foreground/60">{marker.label}</span>
+                )}
               </div>
             ))}
-            <div className="absolute right-0 top-0 w-px h-2 bg-border/50" />
+            <div className="absolute right-0 top-0 w-px h-3 bg-border" />
           </div>
         </div>
       )}
@@ -399,7 +412,7 @@ export function LaneTimeline({ laneEvents, maxPerLane = 5 }: LaneTimelineProps) 
                   config.color
                 )}>
                   {config.icon}
-                  <span>{config.label}</span>
+                  <span className="truncate">{t(config.labelKey)}</span>
                 </div>
                 {/* Lane freshness indicator */}
                 {latestEvent && (
@@ -432,7 +445,7 @@ export function LaneTimeline({ laneEvents, maxPerLane = 5 }: LaneTimelineProps) 
                     onClick={() => toggleLaneExpand(lane)}
                     className="flex items-center gap-0.5 px-2 py-0.5 rounded text-[10px] text-muted-foreground hover:bg-muted transition-colors"
                   >
-                    <span>+{remainingCount}件</span>
+                    <span>{t('timeline.moreItems').replace('{count}', String(remainingCount))}</span>
                     <ChevronDown className="h-3 w-3" />
                   </button>
                 )}
@@ -442,7 +455,7 @@ export function LaneTimeline({ laneEvents, maxPerLane = 5 }: LaneTimelineProps) 
                     onClick={() => toggleLaneExpand(lane)}
                     className="flex items-center gap-0.5 px-2 py-0.5 rounded text-[10px] text-muted-foreground hover:bg-muted transition-colors"
                   >
-                    <span>閉じる</span>
+                    <span>{t('timeline.collapse')}</span>
                     <ChevronUp className="h-3 w-3" />
                   </button>
                 )}
@@ -450,7 +463,7 @@ export function LaneTimeline({ laneEvents, maxPerLane = 5 }: LaneTimelineProps) 
                 {/* Stale warning */}
                 {laneFreshness === 'stale' && displayEvents.length > 0 && (
                   <Badge variant="outline" className="text-[9px] text-red-600 border-red-200 bg-red-50">
-                    古いデータ
+                    {t('timeline.staleData')}
                   </Badge>
                 )}
               </div>

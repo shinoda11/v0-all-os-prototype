@@ -23,6 +23,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useStore } from '@/state/store';
+import { useI18n } from '@/i18n/I18nProvider';
+import { formatCurrency, formatHours, formatTimeHHMM } from '@/i18n/format';
 import { selectCurrentStore, selectLaborMetrics, selectStaffStates } from '@/core/selectors';
 import type { Staff, Role } from '@/core/types';
 import type { StaffStatus } from '@/core/derive';
@@ -288,6 +290,7 @@ function StaffRow({
 export default function TimeclockPage() {
   const { state, actions } = useStore();
   const currentStore = selectCurrentStore(state);
+  const { t, locale } = useI18n();
   const today = new Date().toISOString().split('T')[0];
   const now = new Date();
   
@@ -347,7 +350,7 @@ export default function TimeclockPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="勤怠管理"
+        title={t('timeclock.title')}
         subtitle={`${shortName} - ${today}`}
       />
 
@@ -357,11 +360,11 @@ export default function TimeclockPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Calendar className="h-4 w-4" />
-              <span>本日のシフト概要</span>
+              <span>{t('timeclock.shiftSummary')}</span>
             </div>
             <div className="flex items-center gap-4 text-sm">
-              <span>予定: <strong>{scheduledCount}名</strong></span>
-              <span>出勤済: <strong>{checkedInCount}名</strong></span>
+              <span>{t('timeclock.scheduled')}: <strong>{scheduledCount}</strong></span>
+              <span>{t('timeclock.checkedIn')}: <strong>{checkedInCount}</strong></span>
             </div>
           </div>
         </CardContent>
@@ -373,32 +376,32 @@ export default function TimeclockPage() {
           icon={<Users className="h-6 w-6 text-green-600" />}
           iconBgColor="bg-green-100"
           value={laborMetrics.activeStaffCount}
-          label="出勤中"
+          label={t('timeclock.onDuty')}
           lastUpdate={now.toISOString()}
         />
         <KPICard
           icon={<Coffee className="h-6 w-6 text-yellow-600" />}
           iconBgColor="bg-yellow-100"
           value={laborMetrics.onBreakCount}
-          label="休憩中"
+          label={t('timeclock.onBreak')}
           lastUpdate={now.toISOString()}
         />
         <KPICard
           icon={<Clock className="h-6 w-6 text-blue-600" />}
           iconBgColor="bg-blue-100"
-          value={isHoursValid ? `${laborMetrics.totalHoursToday}h` : ''}
-          label="総稼働時間"
+          value={isHoursValid ? formatHours(laborMetrics.totalHoursToday, locale) : ''}
+          label={t('timeclock.totalHours')}
           isError={!isHoursValid}
-          errorMessage="データ不整合"
+          errorMessage={t('timeclock.dataError')}
           lastUpdate={now.toISOString()}
         />
         <KPICard
           icon={<LogOut className="h-6 w-6 text-purple-600" />}
           iconBgColor="bg-purple-100"
-          value={isCostValid ? `¥${laborMetrics.laborCostEstimate.toLocaleString()}` : ''}
-          label="推定人件費"
+          value={isCostValid ? formatCurrency(laborMetrics.laborCostEstimate, locale) : ''}
+          label={t('timeclock.estCost')}
           isError={!isCostValid}
-          errorMessage="計算中"
+          errorMessage={t('timeclock.calculating')}
           lastUpdate={now.toISOString()}
         />
       </div>
@@ -407,9 +410,9 @@ export default function TimeclockPage() {
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
-            <CardTitle>スタッフ一覧</CardTitle>
+            <CardTitle>{t('timeclock.staffList')}</CardTitle>
             <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">操作モード:</span>
+              <span className="text-sm text-muted-foreground">{t('timeclock.operationMode')}:</span>
               <div className="flex gap-1">
                 <Button
                   size="sm"
@@ -418,7 +421,7 @@ export default function TimeclockPage() {
                   className={cn('gap-1', mode === 'self' ? '' : 'bg-transparent')}
                 >
                   <User className="h-4 w-4" />
-                  本人
+                  {t('timeclock.selfMode')}
                 </Button>
                 <Button
                   size="sm"
@@ -427,17 +430,17 @@ export default function TimeclockPage() {
                   className={cn('gap-1', mode === 'admin' ? '' : 'bg-transparent')}
                 >
                   <Shield className="h-4 w-4" />
-                  管理者
+                  {t('timeclock.adminMode')}
                 </Button>
               </div>
             </div>
           </div>
           {mode === 'self' && (
             <div className="flex items-center gap-2 mt-2">
-              <span className="text-sm text-muted-foreground">操作対象:</span>
+              <span className="text-sm text-muted-foreground">{t('timeclock.operationTarget')}:</span>
               <Select value={selectedStaffId ?? ''} onValueChange={setSelectedStaffId}>
                 <SelectTrigger className="w-48">
-                  <SelectValue placeholder="スタッフを選択" />
+                  <SelectValue placeholder={t('timeclock.selectStaff')} />
                 </SelectTrigger>
                 <SelectContent>
                   {storeStaff.map((staff) => (
