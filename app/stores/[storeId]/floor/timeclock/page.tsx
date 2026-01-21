@@ -67,17 +67,17 @@ const MOCK_SHIFT_PLAN: Record<string, { startTime: string; endTime: string }> = 
   '8': { startTime: '10:00', endTime: '15:00' },
 };
 
-function getStatusConfig(status: StaffStatus): { label: string; color: string; icon: React.ReactNode } {
+function getStatusConfig(status: StaffStatus): { labelKey: string; color: string; icon: React.ReactNode } {
   if (status === 'out') {
-    return { label: '未出勤', color: 'bg-gray-100 text-gray-800 border-gray-200', icon: <LogOut className="h-3 w-3" /> };
+    return { labelKey: 'timeclock.status.out', color: 'bg-gray-100 text-gray-800 border-gray-200', icon: <LogOut className="h-3 w-3" /> };
   }
   if (status === 'working') {
-    return { label: '出勤中', color: 'bg-green-100 text-green-800 border-green-200', icon: <LogIn className="h-3 w-3" /> };
+    return { labelKey: 'timeclock.status.working', color: 'bg-green-100 text-green-800 border-green-200', icon: <LogIn className="h-3 w-3" /> };
   }
   if (status === 'break') {
-    return { label: '休憩中', color: 'bg-yellow-100 text-yellow-800 border-yellow-200', icon: <Coffee className="h-3 w-3" /> };
+    return { labelKey: 'timeclock.status.break', color: 'bg-yellow-100 text-yellow-800 border-yellow-200', icon: <Coffee className="h-3 w-3" /> };
   }
-  return { label: '不明', color: 'bg-gray-100 text-gray-800 border-gray-200', icon: <LogOut className="h-3 w-3" /> };
+  return { labelKey: 'timeclock.status.unknown', color: 'bg-gray-100 text-gray-800 border-gray-200', icon: <LogOut className="h-3 w-3" /> };
 }
 
 type OperationMode = 'self' | 'admin';
@@ -92,28 +92,29 @@ interface ConfirmDialogProps {
 }
 
 function ConfirmDialog({ open, onOpenChange, staffName, action, onConfirm }: ConfirmDialogProps) {
-  const actionLabels: Record<ActionType, string> = {
-    'check-in': '出勤',
-    'check-out': '退勤',
-    'break-start': '休憩開始',
-    'break-end': '休憩終了',
+  const { t } = useI18n();
+  const actionLabelKeys: Record<ActionType, string> = {
+    'check-in': 'timeclock.action.checkIn',
+    'check-out': 'timeclock.action.checkOut',
+    'break-start': 'timeclock.action.breakStart',
+    'break-end': 'timeclock.action.breakEnd',
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>操作確認</DialogTitle>
+          <DialogTitle>{t('timeclock.confirmTitle')}</DialogTitle>
           <DialogDescription>
-            {staffName}さんの{actionLabels[action]}を実行しますか？
+            {t('timeclock.confirmMessage', { name: staffName, action: t(actionLabelKeys[action]) })}
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} className="bg-transparent">
-            キャンセル
+            {t('common.cancel')}
           </Button>
           <Button onClick={() => { onConfirm(); onOpenChange(false); }}>
-            確認
+            {t('common.confirm')}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -169,7 +170,7 @@ function KPICard({ icon, iconBgColor, label, value, isError, errorMessage, lastU
         </div>
         {lastUpdate && (
           <p className="mt-2 text-[10px] text-muted-foreground text-right">
-            更新: {new Date(lastUpdate).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}
+            {/* Updated timestamp handled by parent with locale */}
           </p>
         )}
       </CardContent>
@@ -202,16 +203,17 @@ function StaffRow({
   currentStaffId,
   onAction,
 }: StaffRowProps) {
+  const { t, locale } = useI18n();
   const config = getStatusConfig(status);
   const isSelf = mode === 'self' && staff.id === currentStaffId;
   const canOperate = mode === 'admin' || isSelf;
 
   const getNextSchedule = () => {
     if (status === 'working' && shiftEndTime) {
-      return `終了予定: ${shiftEndTime}`;
+      return `${t('timeclock.endTime')}: ${shiftEndTime}`;
     }
     if (status === 'out' && shiftEndTime) {
-      return `シフト: ${MOCK_SHIFT_PLAN[staff.id]?.startTime ?? '--:--'} - ${shiftEndTime}`;
+      return `${t('timeclock.shift')}: ${MOCK_SHIFT_PLAN[staff.id]?.startTime ?? '--:--'} - ${shiftEndTime}`;
     }
     return null;
   };
@@ -241,7 +243,7 @@ function StaffRow({
           <div className="flex items-center gap-2">
             <Badge variant="outline" className={cn('text-xs', config.color)}>
               {config.icon}
-              <span className="ml-1">{config.label}</span>
+              <span className="ml-1">{t(config.labelKey)}</span>
             </Badge>
             {nextSchedule && (
               <span className="text-xs text-muted-foreground">{nextSchedule}</span>
@@ -249,7 +251,7 @@ function StaffRow({
           </div>
           {lastAction && (
             <p className="text-[10px] text-muted-foreground">
-              最終操作: {new Date(lastAction).toLocaleTimeString('ja-JP')}
+              {t('timeclock.lastAction')}: {new Date(lastAction).toLocaleTimeString(locale === 'ja' ? 'ja-JP' : 'en-US')}
             </p>
           )}
         </div>
@@ -260,25 +262,25 @@ function StaffRow({
           {status === 'out' && (
             <Button size="sm" onClick={() => onAction('check-in')} className="gap-1">
               <LogIn className="h-4 w-4" />
-              出勤
+              {t('timeclock.action.checkIn')}
             </Button>
           )}
           {status === 'working' && (
             <>
               <Button size="sm" variant="outline" onClick={() => onAction('break-start')} className="gap-1 bg-transparent">
                 <Coffee className="h-4 w-4" />
-                休憩
+                {t('timeclock.action.break')}
               </Button>
               <Button size="sm" variant="outline" onClick={() => onAction('check-out')} className="gap-1 bg-transparent">
                 <LogOut className="h-4 w-4" />
-                退勤
+                {t('timeclock.action.checkOut')}
               </Button>
             </>
           )}
           {status === 'break' && (
             <Button size="sm" onClick={() => onAction('break-end')} className="gap-1">
               <Play className="h-4 w-4" />
-              休憩終了
+              {t('timeclock.action.breakEnd')}
             </Button>
           )}
         </div>

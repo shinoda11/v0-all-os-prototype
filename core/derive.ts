@@ -23,6 +23,16 @@ import {
   OperationsKPI,
   ExceptionsKPI,
   EnhancedCockpitMetrics,
+  Staff,
+  Role,
+  LaborGuardrailBracket,
+  Proposal,
+  LaborInterventionMeta,
+  ShiftSummary,
+  SupplyDemandMetrics,
+  RiskItem,
+  WeeklyLaborMetrics,
+  WeeklyLaborDailyRow,
 } from './types';
 
 // ------------------------------------------------------------
@@ -877,8 +887,6 @@ export const deriveEnhancedCockpitMetrics = (
 // Shift Summary Derivation (replaces MOCK_SHIFT_SUMMARY)
 // ------------------------------------------------------------
 
-import type { ShiftSummary, SupplyDemandMetrics, RiskItem, Staff, Role } from './types';
-
 export const deriveShiftSummary = (
   events: DomainEvent[],
   staff: Staff[],
@@ -1082,7 +1090,7 @@ export const deriveSupplyDemandMetrics = (
       itemName: d.itemName,
       riskType: 'stockout',
       riskLevel: (d.delayMinutes ?? 0) > 60 ? 'high' : 'medium',
-      impact: timeBand === 'all' ? '本日影響' : timeBandLabel(timeBand) + '帯影響',
+      impact: timeBand === 'all' ? '本日影響' : '全日帯影響',
       recommendedAction: 'メニュー制限提案',
     });
   }
@@ -1101,7 +1109,7 @@ export const deriveSupplyDemandMetrics = (
         itemName,
         riskType: 'stockout',
         riskLevel: status.completed < status.planned * 0.3 ? 'high' : 'medium',
-        impact: timeBand === 'all' ? '本日影響' : timeBandLabel(timeBand) + '帯影響',
+        impact: timeBand === 'all' ? '本日影響' : '全日帯影響',
         recommendedAction: '追加仕込み提案',
       });
     }
@@ -1158,8 +1166,6 @@ function timeBandLabel(timeBand: TimeBand): string {
 // ------------------------------------------------------------
 // Weekly Labor Metrics Derivation
 // ------------------------------------------------------------
-
-import type { WeeklyLaborMetrics, WeeklyLaborDailyRow } from './types';
 
 const DAY_LABELS = ['日', '月', '火', '水', '木', '金', '土'];
 
@@ -1357,4 +1363,301 @@ export const deriveWeeklyLaborMetrics = (
     lastUpdate: now.toISOString(),
     isCalculating: dailyRows.every(r => r.staffCount === 0),
   };
+};
+
+// ------------------------------------------------------------
+// Labor Guardrail Summary Derivation
+// ------------------------------------------------------------
+
+import { LABOR_GUARDRAILS_CONFIG } from '@/data/mock';
+
+export interface LaborGuardrailSummary {
+  selectedBracket: LaborGuardrailBracket;
+  projectedLaborCostEOD: number;
+  projectedLaborRateEOD: number;
+  goodRateSales: number;  // highSales at goodRate
+  badRateSales: number;   // lowSales at badRate
+  deltaToGood: number;    // positive = over good threshold (danger)
+  deltaToBad: number;     // positive = over bad threshold (critical)
+  status: 'safe' | 'caution' | 'danger';
+  lastUpdate: string;
+}
+
+/**
+ * Select the most appropriate guardrail bracket based on forecast sales
+ * Uses the bracket with highSales closest to (but >= ) forecastSalesDaily
+ */
+function selectGuardrailBracket(
+  forecastSales: number,
+  dayType: 'weekday' | 'weekend'
+): LaborGuardrailBracket {
+  const brackets = dayType === 'weekday' 
+    ? LABOR_GUARDRAILS_CONFIG.weekday 
+    : LABOR_GUARDRAILS_CONFIG.weekend;
+  
+  // Sort brackets by highSales ascending
+  const sorted = [...brackets].sort((a, b) => a.highSales - b.highSales);
+  
+  // Find the first bracket where highSales >= forecastSales
+  for (const bracket of sorted) {
+    if (bracket.highSales >= forecastSales) {
+      return bracket;
+    }
+  }
+  
+  // If forecast exceeds all brackets, return the highest
+  return sorted[sorted.length - 1];
+}
+
+export type DailyGuardrailStatus = 'good' | 'caution' | 'bad';
+
+export interface DailyGuardrailResult {
+  status: DailyGuardrailStatus;
+  actualRate: number;
+  goodRate: number;
+  badRate: number;
+  deltaToGood: number; // positive = over good threshold
+  deltaToBad: number;  // positive = over bad threshold
+}
+
+/**
+ * Evaluate a single day's labor rate against guardrail thresholds
+ * Used for weekly review to show GOOD/CAUTION/BAD status per day
+ */
+export const evaluateDailyGuardrail = (
+  sales: number | null,
+  laborCost: number,
+  dayOfWeek: number // 0=Sunday, 6=Saturday
+): DailyGuardrailResult | null => {
+  if (sales === null || sales === 0) return null;
+  
+  const dayType: 'weekday' | 'weekend' = (dayOfWeek === 0 || dayOfWeek === 6) ? 'weekend' : 'weekday';
+  const bracket = selectGuardrailBracket(sales, dayType);
+  
+  const actualRate = laborCost / sales;
+  const deltaToGood = actualRate - bracket.goodRate;
+  const deltaToBad = actualRate - bracket.badRate;
+  
+  let status: DailyGuardrailStatus;
+  if (deltaToBad >= 0) {
+    status = 'bad';
+  } else if (deltaToGood >= 0) {
+    status = 'caution';
+  } else {
+    status = 'good';
+  }
+  
+  return {
+    status,
+    actualRate,
+    goodRate: bracket.goodRate,
+    badRate: bracket.badRate,
+    deltaToGood,
+    deltaToBad,
+  };
+};
+
+/**
+ * Derive labor guardrail summary for cockpit display
+ * This helps managers understand if labor cost is on track relative to sales
+ */
+export const deriveLaborGuardrailSummary = (
+  input: { businessDate: string; dayType: 'weekday' | 'weekend'; forecastSalesDaily: number; runRateSalesDaily: number; plannedLaborCostDaily: number; }
+): LaborGuardrailSummary => {
+  const {
+    dayType,
+    forecastSalesDaily,
+    runRateSalesDaily,
+    plannedLaborCostDaily,
+  } = input;
+  
+  // Select appropriate bracket
+  const bracket = selectGuardrailBracket(forecastSalesDaily, dayType);
+  
+  // For now, projected cost = planned cost (later: adjust for overtime/early leave)
+  const projectedLaborCostEOD = plannedLaborCostDaily;
+  
+  // Calculate projected labor rate based on run rate sales
+  const projectedLaborRateEOD = runRateSalesDaily > 0 
+    ? projectedLaborCostEOD / runRateSalesDaily 
+    : 0;
+  
+  // Calculate deltas
+  const deltaToGood = projectedLaborRateEOD - bracket.goodRate;
+  const deltaToBad = projectedLaborRateEOD - bracket.badRate;
+  
+  // Determine status
+  let status: 'safe' | 'caution' | 'danger';
+  if (deltaToBad >= 0) {
+    status = 'danger';
+  } else if (deltaToGood >= 0) {
+    status = 'caution';
+  } else {
+    status = 'safe';
+  }
+  
+  return {
+    selectedBracket: bracket,
+    projectedLaborCostEOD,
+    projectedLaborRateEOD,
+    goodRateSales: bracket.highSales,
+    badRateSales: bracket.lowSales,
+    deltaToGood,
+    deltaToBad,
+    status,
+    lastUpdate: new Date().toISOString(),
+  };
+};
+
+// ------------------------------------------------------------
+// Labor Intervention Proposals Derivation
+// ------------------------------------------------------------
+
+export const deriveLaborInterventionProposals = (
+  input: { storeId: string; guardrailSummary: LaborGuardrailSummary; activeStaff: Staff[]; plannedLaborCostDaily: number; runRateSalesDaily: number; currentTimeBand: string; }
+): Proposal[] => {
+  const {
+    storeId,
+    guardrailSummary,
+    activeStaff,
+    plannedLaborCostDaily,
+    runRateSalesDaily,
+    currentTimeBand,
+  } = input;
+
+  // Only generate proposals if over goodRate threshold
+  if (guardrailSummary.deltaToGood <= 0) {
+    return [];
+  }
+
+  const proposals: Proposal[] = [];
+  const now = new Date();
+  const baseDeadline = new Date(now.getTime() + 30 * 60 * 1000).toISOString(); // 30 min from now
+
+  // Calculate average wage for estimation
+  const avgWage = activeStaff.length > 0
+    ? activeStaff.reduce((sum, s) => sum + s.wage, 0) / activeStaff.length
+    : 1200;
+
+  // 1. Break Adjustment Proposal
+  // Moving breaks earlier reduces labor cost in peak periods
+  const breakAdjustmentSavings = avgWage * 0.5; // 30 min break savings
+  const breakRateImprovement = runRateSalesDaily > 0 
+    ? (breakAdjustmentSavings / runRateSalesDaily) * 100 
+    : 0;
+
+  if (guardrailSummary.deltaToGood > 0.02) { // More than 2pt over
+    const breakMeta: LaborInterventionMeta = {
+      targetRoleId: 'floor', // Floor staff usually have more flexibility
+      targetTimeBand: currentTimeBand === 'lunch' ? 'idle' : 'dinner',
+      projectedLaborRateImprovement: Math.round(breakRateImprovement * 10) / 10,
+      serviceRisk: 'low',
+      serviceRiskDescription: 'ピーク前に休憩を完了させるため、ピーク中の人員は維持',
+    };
+
+    proposals.push({
+      id: `labor-break-${now.getTime()}`,
+      type: 'break-adjustment',
+      title: '休憩前倒し提案',
+      description: `${currentTimeBand === 'lunch' ? 'ディナー' : 'ランチ'}ピーク前に休憩を前倒しし、ピーク時の人員を確保しながらコストを平準化します。`,
+      reason: `人件費率がGOODラインを${(guardrailSummary.deltaToGood * 100).toFixed(1)}pt超過中`,
+      triggeredBy: 'guardrail-check',
+      priority: guardrailSummary.status === 'danger' ? 'high' : 'medium',
+      createdAt: now.toISOString(),
+      targetMenuIds: [],
+      targetPrepItemIds: [],
+      quantity: 0,
+      distributedToRoles: ['manager'],
+      deadline: baseDeadline,
+      storeId,
+      timeBand: currentTimeBand,
+      expectedEffects: ['labor-savings'],
+      todoCount: 1,
+      status: 'pending',
+      laborMeta: breakMeta,
+    });
+  }
+
+  // 2. Early Leave Proposal
+  // Find star1 (lower skill) staff who can leave early with minimal impact
+  const star1Staff = activeStaff.filter(s => s.starLevel === 1);
+  if (star1Staff.length > 0 && guardrailSummary.deltaToGood > 0.03) { // More than 3pt over
+    const earlyLeaveCandidate = star1Staff[0];
+    const earlyLeaveSavings = earlyLeaveCandidate.wage * 2; // 2 hours early
+    const earlyLeaveRateImprovement = runRateSalesDaily > 0 
+      ? (earlyLeaveSavings / runRateSalesDaily) * 100 
+      : 0;
+
+    const earlyLeaveMeta: LaborInterventionMeta = {
+      targetStaffIds: [earlyLeaveCandidate.id],
+      projectedLaborRateImprovement: Math.round(earlyLeaveRateImprovement * 10) / 10,
+      serviceRisk: star1Staff.length > 1 ? 'low' : 'medium',
+      serviceRiskDescription: star1Staff.length > 1 
+        ? '他の新人スタッフでカバー可能' 
+        : 'サービス品質に若干影響の可能性',
+    };
+
+    proposals.push({
+      id: `labor-early-${now.getTime()}`,
+      type: 'early-leave',
+      title: '早上がり提案',
+      description: `${earlyLeaveCandidate.name}さんを2時間早上がりにし、人件費を削減します。`,
+      reason: `人件費率がGOODラインを${(guardrailSummary.deltaToGood * 100).toFixed(1)}pt超過中。売上見込みに対して人員過剰の可能性`,
+      triggeredBy: 'guardrail-check',
+      priority: guardrailSummary.status === 'danger' ? 'high' : 'medium',
+      createdAt: now.toISOString(),
+      targetMenuIds: [],
+      targetPrepItemIds: [],
+      quantity: 0,
+      distributedToRoles: ['manager'],
+      deadline: baseDeadline,
+      storeId,
+      timeBand: currentTimeBand,
+      expectedEffects: ['labor-savings'],
+      todoCount: 1,
+      status: 'pending',
+      laborMeta: earlyLeaveMeta,
+    });
+  }
+
+  // 3. Rotation Proposal
+  // Move star2/3 staff to peak times for efficiency
+  const skilledStaff = activeStaff.filter(s => s.starLevel >= 2);
+  if (skilledStaff.length > 0 && guardrailSummary.status !== 'safe') {
+    // Rotation improves efficiency by 5-10% during peak
+    const rotationEfficiencyGain = 0.05;
+    const rotationRateImprovement = guardrailSummary.projectedLaborRateEOD * rotationEfficiencyGain * 100;
+
+    const rotationMeta: LaborInterventionMeta = {
+      targetStaffIds: skilledStaff.slice(0, 2).map(s => s.id),
+      targetTimeBand: currentTimeBand === 'idle' ? 'dinner' : currentTimeBand,
+      projectedLaborRateImprovement: Math.round(rotationRateImprovement * 10) / 10,
+      serviceRisk: 'low',
+      serviceRiskDescription: 'ベテランをピークに集中配置し、生産性を向上',
+    };
+
+    proposals.push({
+      id: `labor-rotation-${now.getTime()}`,
+      type: 'rotation',
+      title: '配置ローテ提案',
+      description: `★2以上のスタッフをピーク時間帯に集中配置し、作業効率を向上させます。`,
+      reason: `売上予測に対して人件費率が高め。効率的な配置で改善可能`,
+      triggeredBy: 'guardrail-check',
+      priority: 'medium',
+      createdAt: now.toISOString(),
+      targetMenuIds: [],
+      targetPrepItemIds: [],
+      quantity: 0,
+      distributedToRoles: ['manager', 'kitchen'],
+      deadline: baseDeadline,
+      storeId,
+      timeBand: currentTimeBand,
+      expectedEffects: ['labor-savings'],
+      todoCount: skilledStaff.slice(0, 2).length,
+      status: 'pending',
+      laborMeta: rotationMeta,
+    });
+  }
+
+  return proposals;
 };

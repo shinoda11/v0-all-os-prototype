@@ -26,7 +26,11 @@ import {
   selectLaneEvents,
   selectShiftSummary,
   selectSupplyDemandMetrics,
+  selectStoreStaff,
+  selectStaffStates,
 } from '@/core/selectors';
+import { deriveLaborGuardrailSummary, deriveLaborInterventionProposals } from '@/core/derive';
+import { TodayBriefingModal, type OperationMode } from '@/components/cockpit/TodayBriefingModal';
 import type { TimeBand, Proposal, Role, ExceptionItem, RiskItem } from '@/core/types';
 import {
   TrendingUp,
@@ -42,6 +46,7 @@ import {
   Pause,
   SkipForward,
   RotateCcw,
+  Target,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -460,6 +465,8 @@ export default function CockpitPage() {
   const [timeBand, setTimeBand] = useState<TimeBand>('all');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingProposal, setEditingProposal] = useState<Proposal | null>(null);
+  const [briefingOpen, setBriefingOpen] = useState(false);
+  const [operationMode, setOperationMode] = useState<OperationMode>('sales');
 
   // Subscribe to state updates via event bus
   const { lastUpdateTime: busUpdateTime } = useStateSubscription([
@@ -510,6 +517,38 @@ export default function CockpitPage() {
   const actualHours = shiftSummary?.actualHours ?? laborMetrics?.totalHoursToday ?? 0;
   const breakCount = shiftSummary?.onBreakCount ?? laborMetrics?.onBreakCount ?? 0;
   
+  // Labor guardrail calculation
+  const dayOfWeek = now.getDay();
+  const dayType: 'weekday' | 'weekend' = (dayOfWeek === 0 || dayOfWeek === 6) ? 'weekend' : 'weekday';
+  const plannedLaborCostDaily = plannedHours * 1200; // Average wage assumption
+  const runRateSalesDaily = landingEstimate.min > 0 ? (landingEstimate.min + landingEstimate.max) / 2 : salesForecast;
+  
+  const guardrailSummary = deriveLaborGuardrailSummary({
+    businessDate: now.toISOString().split('T')[0],
+    dayType,
+    forecastSalesDaily: salesForecast,
+    runRateSalesDaily,
+    plannedLaborCostDaily,
+    actualLaborCostSoFar: laborCost,
+  });
+  
+  // Generate labor intervention proposals when guardrail is caution/danger
+  const storeStaff = selectStoreStaff(state);
+  const staffStates = selectStaffStates(state);
+  const activeStaff = storeStaff.filter(s => {
+    const staffState = staffStates.find(ss => ss.staffId === s.id);
+    return staffState?.isPresent && !staffState?.isOnBreak;
+  });
+  
+  const laborInterventionProposals = deriveLaborInterventionProposals({
+    storeId: selectedStoreId ?? '',
+    guardrailSummary,
+    activeStaff,
+    plannedLaborCostDaily,
+    runRateSalesDaily,
+    currentTimeBand: timeBand === 'all' ? 'lunch' : timeBand,
+  });
+  
   // Supply/Demand (dynamic)
   const stockoutRisk = supplyDemandMetrics?.stockoutRiskCount ?? 0;
   const excessRisk = supplyDemandMetrics?.excessRiskCount ?? 0;
@@ -525,6 +564,19 @@ export default function CockpitPage() {
   const criticalCount = exceptions.filter((e: ExceptionItem) => e.severity === 'critical').length;
   const warningCount = exceptions.filter((e: ExceptionItem) => e.severity === 'warning').length;
   const topException = exceptions[0] ?? null;
+  
+  // Time band forecasts for briefing modal
+  const timeBandForecasts = [
+    { band: 'lunch' as TimeBand, label: t('timeband.lunch'), salesForecast: Math.round(salesForecast * 0.35), weight: 35 },
+    { band: 'idle' as TimeBand, label: t('timeband.idle'), salesForecast: Math.round(salesForecast * 0.15), weight: 15 },
+    { band: 'dinner' as TimeBand, label: t('timeband.dinner'), salesForecast: Math.round(salesForecast * 0.50), weight: 50 },
+  ];
+  
+  // Initial todos for briefing (proposals converted to todos)
+  const initialTodos = state.proposals.filter((p) => 
+    p.storeId === selectedStoreId && 
+    (p.type === 'extra-prep' || p.type === 'prep-reorder')
+  );
 
   // Refresh proposals when events change
   useEffect(() => {
@@ -555,6 +607,16 @@ export default function CockpitPage() {
       setEditingProposal(null);
     }
   };
+  
+  // Briefing modal handlers
+  const handleDistributeTodos = (todos: Proposal[], mode: OperationMode) => {
+    setOperationMode(mode);
+    // Distribute todos by approving each one
+    for (const todo of todos) {
+      actions.approveProposal(todo);
+    }
+    setBriefingOpen(false);
+  };
 
   // Now we can have early returns after all hooks
   if (!currentStore) {
@@ -570,9 +632,34 @@ export default function CockpitPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <PageHeader title={t('cockpit.title')} subtitle={shortName} />
+        <div className="flex items-center gap-3">
+          <PageHeader title={t('cockpit.title')} subtitle={shortName} />
+          <Button
+            onClick={() => setBriefingOpen(true)}
+            variant="outline"
+            size="sm"
+            className="gap-2 bg-transparent"
+          >
+            <Target className="h-4 w-4" />
+            {t('briefing.button')}
+          </Button>
+        </div>
         <TimeBandTabs value={timeBand} onChange={setTimeBand} />
       </div>
+      
+      {/* Today's Briefing Modal */}
+      <TodayBriefingModal
+        open={briefingOpen}
+        onOpenChange={setBriefingOpen}
+        forecastSales={salesForecast}
+        timeBandForecasts={timeBandForecasts}
+        shiftSummary={shiftSummary}
+        guardrailSummary={guardrailSummary}
+        prepMetrics={prepMetrics}
+        initialTodos={initialTodos}
+        onDistributeTodos={handleDistributeTodos}
+        onClose={() => setBriefingOpen(false)}
+      />
 
       {/* ReplayControls - dev only */}
       {process.env.NODE_ENV === 'development' && <ReplayControls />}
@@ -600,29 +687,73 @@ export default function CockpitPage() {
           </div>
         </MetricCard>
 
-        {/* Labor Card - Cost Focused */}
+        {/* Labor Card - Cost Focused with Guardrail */}
         <MetricCard
           title={t('cockpit.labor')}
           value={formatCurrency(laborCost, locale)}
           subValue={`${t('cockpit.laborRate')} ${formatPercent(laborRate, locale)}`}
           icon={<DollarSign className="h-4 w-4" />}
-          status={laborRate <= 25 ? 'success' : laborRate <= 30 ? 'default' : 'warning'}
+          status={guardrailSummary.status === 'danger' ? 'error' : guardrailSummary.status === 'caution' ? 'warning' : 'success'}
           lastUpdate={lastUpdateTime}
         >
-          <div className="space-y-1 text-xs text-muted-foreground">
-            <div className="flex justify-between">
-              <span className="truncate">{t('cockpit.sales')}/{t('cockpit.laborCost')}</span>
-              <span className="font-medium">{formatRatio(salesPerLabor, locale)}</span>
+          <div className="space-y-2 text-xs">
+            {/* Guardrail Summary */}
+            <div className="bg-muted/50 rounded-md p-2 space-y-1.5">
+              <div className="flex items-center justify-between text-[10px] font-medium text-muted-foreground">
+                <span>{t('cockpit.guardrail')}</span>
+                <Badge variant="outline" className="text-[9px] px-1">
+                  {dayType === 'weekend' ? t('cockpit.weekend') : t('cockpit.weekday')}
+                </Badge>
+              </div>
+              {/* Good scenario */}
+              <div className="flex justify-between items-center">
+                <span className="text-green-600">{t('cockpit.goodScenario')}</span>
+                <span className="text-green-600 font-medium">
+                  {formatCurrency(guardrailSummary.goodRateSales, locale)} @ {formatPercent(guardrailSummary.selectedBracket.goodRate * 100, locale)}
+                </span>
+              </div>
+              {/* Bad scenario */}
+              <div className="flex justify-between items-center">
+                <span className="text-red-600">{t('cockpit.badScenario')}</span>
+                <span className="text-red-600 font-medium">
+                  {formatCurrency(guardrailSummary.badRateSales, locale)} @ {formatPercent(guardrailSummary.selectedBracket.badRate * 100, locale)}
+                </span>
+              </div>
+              {/* Current projection */}
+              <div className="flex justify-between items-center border-t border-muted pt-1.5">
+                <span className="font-medium">{t('cockpit.currentProjection')}</span>
+                <span className={cn(
+                  'font-medium',
+                  guardrailSummary.status === 'danger' ? 'text-red-600' : 
+                  guardrailSummary.status === 'caution' ? 'text-yellow-600' : 'text-green-600'
+                )}>
+                  {formatCurrency(runRateSalesDaily, locale)} @ {formatPercent(guardrailSummary.projectedLaborRateEOD * 100, locale)}
+                </span>
+              </div>
+              {/* Delta to good */}
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">{t('cockpit.deltaToGood')}</span>
+                <span className={cn(
+                  'font-medium',
+                  guardrailSummary.deltaToGood > 0 ? 'text-red-600' : 'text-green-600'
+                )}>
+                  {guardrailSummary.deltaToGood > 0 ? '+' : ''}{(guardrailSummary.deltaToGood * 100).toFixed(1)}pt
+                </span>
+              </div>
             </div>
-            <div className="flex justify-between">
-              <span>{t('shift.hours')}</span>
-              <span className={cn('font-medium', actualHours > plannedHours && 'text-red-600')}>
-                {formatHours(actualHours, locale)} / {formatHours(plannedHours, locale, 0)}
-              </span>
-            </div>
-            <div className="flex items-center gap-1">
-              <Coffee className="h-3 w-3" />
-              <span>{t('cockpit.onBreak')} {breakCount}</span>
+            
+            {/* Hours and break info */}
+            <div className="space-y-1 text-muted-foreground">
+              <div className="flex justify-between">
+                <span>{t('shift.hours')}</span>
+                <span className={cn('font-medium', actualHours > plannedHours && 'text-red-600')}>
+                  {formatHours(actualHours, locale)} / {formatHours(plannedHours, locale, 0)}
+                </span>
+              </div>
+              <div className="flex items-center gap-1">
+                <Coffee className="h-3 w-3" />
+                <span>{t('cockpit.onBreak')} {breakCount}</span>
+              </div>
             </div>
           </div>
         </MetricCard>
@@ -710,13 +841,14 @@ export default function CockpitPage() {
         </div>
       </div>
 
-      {/* Decision Queue */}
-      <DecisionQueue
-        proposals={state.proposals}
-        roles={state.roles}
-        onApprove={handleApprove}
-        onReject={handleReject}
-        onEdit={handleEdit}
+{/* Decision Queue */}
+<DecisionQueue
+  proposals={[...laborInterventionProposals, ...state.proposals.filter(p => p.status === 'pending')]}
+  roles={state.roles}
+  staff={storeStaff}
+  onApprove={handleApprove}
+  onReject={handleReject}
+  onEdit={handleEdit}
       />
 
       <Drawer

@@ -11,10 +11,34 @@ import type {
   PrepItem,
   DomainEvent,
   AppState,
+  LaborGuardrailBracket,
 } from '@/core/types';
 
 import mockSushiData from './mock_sushi_events.json';
 import { normalizeEvents, normalizeStaff } from './normalizer';
+
+// Re-export for convenience
+export type { LaborGuardrailBracket };
+
+// ------------------------------------------------------------
+// Labor Guardrails Configuration
+// (Will be replaced by All Management API later)
+// ------------------------------------------------------------
+
+export const LABOR_GUARDRAILS_CONFIG = {
+  weekday: [
+    { highSales: 200000, lowSales: 150000, cost: 28000, goodRate: 0.14, badRate: 0.19 },
+    { highSales: 300000, lowSales: 200000, cost: 36000, goodRate: 0.12, badRate: 0.18 },
+    { highSales: 400000, lowSales: 300000, cost: 42000, goodRate: 0.105, badRate: 0.14 },
+    { highSales: 500000, lowSales: 400000, cost: 48000, goodRate: 0.096, badRate: 0.12 },
+  ] as LaborGuardrailBracket[],
+  weekend: [
+    { highSales: 600000, lowSales: 450000, cost: 48000, goodRate: 0.08, badRate: 0.107 },
+    { highSales: 800000, lowSales: 600000, cost: 56000, goodRate: 0.07, badRate: 0.093 },
+    { highSales: 1000000, lowSales: 800000, cost: 62000, goodRate: 0.062, badRate: 0.078 },
+    { highSales: 1200000, lowSales: 1000000, cost: 68000, goodRate: 0.057, badRate: 0.068 },
+  ] as LaborGuardrailBracket[],
+};
 
 // ------------------------------------------------------------
 // Master Data (canonical IDs)
