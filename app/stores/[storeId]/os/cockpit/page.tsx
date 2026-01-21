@@ -1,11 +1,11 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { PageHeader } from '@/components/PageHeader';
-import { TimeBandTabs } from '@/components/TimeBandTabs';
-import { MetricCard } from '@/components/MetricCard';
-import { Timeline } from '@/components/Timeline';
-import { DecisionQueue } from '@/components/DecisionQueue';
+import { OSHeader } from '@/components/OSHeader';
+import { CockpitKPICards } from '@/components/cockpit/CockpitKPICards';
+import { LaneTimeline } from '@/components/cockpit/LaneTimeline';
+import { EnhancedDecisionQueue } from '@/components/cockpit/EnhancedDecisionQueue';
+import { ShiftPlanDisplay } from '@/components/cockpit/ShiftPlanDisplay';
 import { Drawer } from '@/components/Drawer';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,58 +14,19 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { useStore } from '@/state/store';
 import {
-  selectCockpitMetrics,
-  selectRecentEvents,
   selectCurrentStore,
-  selectIsHighlighted,
+  selectEnhancedCockpitMetrics,
+  selectRecentEvents,
+  selectStaffStates,
 } from '@/core/selectors';
-import { getEventCountsByType } from '@/data/mock';
 import type { TimeBand, Proposal, Role } from '@/core/types';
 import {
-  TrendingUp,
-  Users,
-  Package,
-  Gauge,
-  AlertTriangle,
   Play,
   Pause,
   SkipForward,
   RotateCcw,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
-function DebugInfo({ storeId }: { storeId: string }) {
-  const { state } = useStore();
-  const eventCounts = getEventCountsByType(state.events, storeId);
-
-  return (
-    <Card className="border-dashed border-amber-500/50 bg-amber-50/50">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm text-amber-700">Debug Info</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="flex flex-wrap gap-4 text-xs">
-          <div>
-            <span className="font-medium text-amber-700">storeId:</span>{' '}
-            <span className="font-mono">{storeId}</span>
-          </div>
-          <div>
-            <span className="font-medium text-amber-700">total events:</span>{' '}
-            <span className="font-mono">{state.events.length}</span>
-          </div>
-          <div className="flex gap-2">
-            <span className="font-medium text-amber-700">by type:</span>
-            {Object.entries(eventCounts).map(([type, count]) => (
-              <span key={type} className="font-mono">
-                {type}={count}
-              </span>
-            ))}
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
 
 function ReplayControls() {
   const { state, actions } = useStore();
@@ -76,9 +37,9 @@ function ReplayControls() {
     : 0;
 
   return (
-    <Card>
+    <Card className="border-dashed">
       <CardHeader className="pb-2">
-        <CardTitle className="text-base">リプレイ制御</CardTitle>
+        <CardTitle className="text-sm">リプレイ制御</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="flex flex-wrap items-center gap-4">
@@ -181,7 +142,7 @@ function ProposalEditor({ proposal, roles, onChange, onSave, onCancel }: Proposa
         <Input
           type="number"
           value={proposal.quantity}
-          onChange={(e) => onChange({ ...proposal, quantity: parseInt(e.target.value) || 0 })}
+          onChange={(e) => onChange({ ...proposal, quantity: Number.parseInt(e.target.value) || 0 })}
         />
       </div>
       <div>
@@ -254,12 +215,12 @@ export default function CockpitPage() {
   const actionsRef = useRef(actions);
   actionsRef.current = actions;
   
-  const metrics = selectCockpitMetrics(state, undefined, timeBand);
-  const recentEvents = selectRecentEvents(state, 15);
-  const salesHighlighted = selectIsHighlighted(state, 'cockpit-sales');
-  const laborHighlighted = selectIsHighlighted(state, 'cockpit-labor');
-  const operationsHighlighted = selectIsHighlighted(state, 'cockpit-operations');
-  const exceptionsHighlighted = selectIsHighlighted(state, 'cockpit-exceptions');
+  const enhancedMetrics = selectEnhancedCockpitMetrics(state, undefined, timeBand);
+  const recentEvents = selectRecentEvents(state, 50); // More events for lane view
+  const staffStates = selectStaffStates(state);
+  
+  // Get store staff for shift display
+  const storeStaff = state.staff.filter(s => s.storeId === selectedStoreId);
 
   // Refresh proposals when events change
   useEffect(() => {
@@ -270,11 +231,13 @@ export default function CockpitPage() {
     }
   }, [eventsLength, selectedStoreId]);
 
-  const handleApprove = (proposal: Proposal) => {
-    actions.approveProposal(proposal);
+  const handleApprove = (proposal: Proposal, selectedRoles: string[]) => {
+    actions.approveProposal({ ...proposal, distributedToRoles: selectedRoles });
   };
 
-  const handleReject = (proposal: Proposal) => {
+  const handleReject = (proposal: Proposal, reason: string) => {
+    // Log reason for analytics (simplified)
+    console.log(`Proposal ${proposal.id} rejected: ${reason}`);
     actions.rejectProposal(proposal);
   };
 
@@ -300,115 +263,53 @@ export default function CockpitPage() {
     );
   }
 
-  const shortName = currentStore.name.replace('Aburi TORA 熟成鮨と炙り鮨 ', '');
+  const lastUpdate = new Date().toISOString();
 
   return (
     <div className="space-y-6">
-      <PageHeader
+      <OSHeader
         title="運用コックピット"
-        subtitle={shortName}
-        actions={<TimeBandTabs value={timeBand} onChange={setTimeBand} />}
+        timeBand={timeBand}
+        onTimeBandChange={setTimeBand}
       />
 
-      <DebugInfo storeId={currentStore.id} />
-
+      {/* Replay controls (collapsible/debug) */}
       <ReplayControls />
 
-      <div className="grid gap-4 md:grid-cols-5">
-        <MetricCard
-          title="売上"
-          value={`¥${metrics.sales.actual.toLocaleString()}`}
-          subValue={`予測: ¥${metrics.sales.forecast.toLocaleString()}`}
-          trend={metrics.sales.trend}
-          trendValue={`${Math.round(metrics.sales.achievementRate)}%`}
-          icon={<TrendingUp className="h-5 w-5" />}
-          highlighted={salesHighlighted}
-          status={
-            metrics.sales.achievementRate >= 100
-              ? 'success'
-              : metrics.sales.achievementRate >= 80
-              ? 'warning'
-              : 'error'
-          }
-        />
-        <MetricCard
-          title="レーバー"
-          value={`${metrics.labor.activeStaffCount}名`}
-          subValue={`休憩中: ${metrics.labor.onBreakCount}名`}
-          icon={<Users className="h-5 w-5" />}
-          highlighted={laborHighlighted}
-          status={metrics.labor.activeStaffCount >= 3 ? 'success' : 'warning'}
-        />
-        <MetricCard
-          title="需給"
-          value={metrics.supplyDemand.status === 'balanced' ? 'バランス' : 
-                 metrics.supplyDemand.status === 'oversupply' ? '供給過多' : '需要過多'}
-          subValue={`スコア: ${metrics.supplyDemand.score}`}
-          icon={<Package className="h-5 w-5" />}
-          status={metrics.supplyDemand.status === 'balanced' ? 'success' : 'warning'}
-        />
-        <MetricCard
-          title="オペ進捗"
-          value={`${Math.round(metrics.operations.completionRate)}%`}
-          subValue={`完了: ${metrics.operations.completedCount}/${
-            metrics.operations.plannedCount + metrics.operations.inProgressCount + metrics.operations.completedCount
-          }`}
-          icon={<Gauge className="h-5 w-5" />}
-          highlighted={operationsHighlighted}
-          status={
-            metrics.operations.completionRate >= 80
-              ? 'success'
-              : metrics.operations.completionRate >= 50
-              ? 'warning'
-              : 'error'
-          }
-        />
-        <MetricCard
-          title="例外"
-          value={metrics.exceptions.count.toString()}
-          subValue={
-            metrics.exceptions.criticalCount > 0
-              ? `緊急: ${metrics.exceptions.criticalCount}`
-              : 'なし'
-          }
-          icon={<AlertTriangle className="h-5 w-5" />}
-          highlighted={exceptionsHighlighted}
-          status={
-            metrics.exceptions.count === 0
-              ? 'success'
-              : metrics.exceptions.criticalCount > 0
-              ? 'error'
-              : 'warning'
-          }
-        />
-      </div>
+      {/* KPI Cards - Enhanced with detailed metrics */}
+      <CockpitKPICards
+        sales={enhancedMetrics?.sales ?? null}
+        labor={enhancedMetrics?.labor ?? null}
+        supplyDemand={enhancedMetrics?.supplyDemand ?? null}
+        operations={enhancedMetrics?.operations ?? null}
+        exceptions={enhancedMetrics?.exceptions ?? null}
+      />
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>統合タイムライン</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Timeline events={recentEvents} maxItems={10} />
-          </CardContent>
-        </Card>
+      {/* Main content grid */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        {/* Lane Timeline - Takes 2 columns */}
+        <div className="lg:col-span-2 space-y-6">
+          <LaneTimeline events={recentEvents} lastUpdate={lastUpdate} />
+        </div>
 
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>意思決定キュー</CardTitle>
-              <Badge variant="secondary">{state.proposals.length}件</Badge>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <DecisionQueue
-              proposals={state.proposals}
-              onApprove={handleApprove}
-              onReject={handleReject}
-              onEdit={handleEdit}
-            />
-          </CardContent>
-        </Card>
+        {/* Right sidebar - Decision queue and shift plan */}
+        <div className="space-y-6">
+          <EnhancedDecisionQueue
+            proposals={state.proposals}
+            roles={state.roles}
+            onApprove={handleApprove}
+            onReject={handleReject}
+            onEdit={handleEdit}
+            lastUpdate={lastUpdate}
+          />
+
+          <ShiftPlanDisplay
+            staff={storeStaff}
+            roles={state.roles}
+            staffStates={staffStates}
+            lastUpdate={lastUpdate}
+          />
+        </div>
       </div>
 
       <Drawer

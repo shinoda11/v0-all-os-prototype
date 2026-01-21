@@ -85,22 +85,23 @@ const normalizedJsonEvents = normalizeEvents(mockSushiData.events as Array<Recor
 
 const generateInitialForecasts = (storeId: string): DomainEvent[] => {
   const forecasts: DomainEvent[] = [];
-  const year = new Date().getFullYear();
-  const month = new Date().getMonth() + 1;
-  const daysInMonth = new Date(year, month, 0).getDate();
-
-  for (let day = 1; day <= daysInMonth; day++) {
-    const date = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    const isWeekend = [0, 6].includes(new Date(date).getDay());
+  const today = new Date();
+  
+  // Generate forecasts for today and next 6 days only (1 week)
+  for (let i = 0; i < 7; i++) {
+    const date = new Date(today);
+    date.setDate(today.getDate() + i);
+    const dateStr = date.toISOString().split('T')[0];
+    const isWeekend = [0, 6].includes(date.getDay());
 
     // Lunch forecast
     forecasts.push({
-      id: `forecast-${storeId}-${date}-lunch`,
+      id: `forecast-${storeId}-${dateStr}-lunch`,
       type: 'forecast',
       storeId,
-      timestamp: new Date(`${date}T00:00:00`).toISOString(),
+      timestamp: new Date(`${dateStr}T06:00:00`).toISOString(),
       timeBand: 'lunch',
-      date,
+      date: dateStr,
       forecastCustomers: isWeekend ? 45 : 30,
       avgSpend: 3500,
       forecastSales: isWeekend ? 157500 : 105000,
@@ -108,12 +109,12 @@ const generateInitialForecasts = (storeId: string): DomainEvent[] => {
 
     // Dinner forecast
     forecasts.push({
-      id: `forecast-${storeId}-${date}-dinner`,
+      id: `forecast-${storeId}-${dateStr}-dinner`,
       type: 'forecast',
       storeId,
-      timestamp: new Date(`${date}T00:00:00`).toISOString(),
+      timestamp: new Date(`${dateStr}T06:00:00`).toISOString(),
       timeBand: 'dinner',
-      date,
+      date: dateStr,
       forecastCustomers: isWeekend ? 60 : 40,
       avgSpend: 5000,
       forecastSales: isWeekend ? 300000 : 200000,

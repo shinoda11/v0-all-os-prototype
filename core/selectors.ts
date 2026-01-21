@@ -18,11 +18,13 @@ import {
   deriveStaffStates,
   deriveCalendarData,
   deriveTodoStats,
+  deriveEnhancedCockpitMetrics,
   ForecastCell,
   StaffState,
   CalendarCell,
   TodoStats,
 } from './derive';
+import type { EnhancedCockpitMetrics } from './types';
 
 // ------------------------------------------------------------
 // Store Selectors
@@ -193,6 +195,26 @@ export const selectPrepMetrics = (state: AppState, date?: string) => {
   return derivePrepMetrics(state.events, storeId, targetDate);
 };
 
+export const selectEnhancedCockpitMetrics = (
+  state: AppState,
+  date?: string,
+  timeBand?: TimeBand
+): EnhancedCockpitMetrics | null => {
+  const storeId = state.selectedStoreId;
+  const targetDate = date ?? new Date().toISOString().split('T')[0];
+  const targetTimeBand = timeBand ?? state.selectedTimeBand;
+  
+  if (!storeId) return null;
+  
+  // Build prep item name map
+  const prepItemNames = new Map<string, string>();
+  for (const item of state.prepItems) {
+    prepItemNames.set(item.id, item.name);
+  }
+  
+  return deriveEnhancedCockpitMetrics(state.events, storeId, targetDate, targetTimeBand, prepItemNames);
+};
+
 // ------------------------------------------------------------
 // Exception Selectors
 // ------------------------------------------------------------
@@ -241,8 +263,28 @@ export const selectRecentEvents = (
   const storeId = state.selectedStoreId;
   if (!storeId) return [];
   
-  return state.events
-    .filter((e) => e.storeId === storeId)
+  // Prioritize non-forecast events to show more variety
+  const storeEvents = state.events.filter((e) => e.storeId === storeId);
+  
+  const nonForecastEvents = storeEvents
+    .filter((e) => e.type !== 'forecast')
+    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+  
+  const forecastEvents = storeEvents
+    .filter((e) => e.type === 'forecast')
+    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+  
+  // Take non-forecast events first, then fill remaining with forecast
+  const nonForecastLimit = Math.min(limit - 5, nonForecastEvents.length);
+  const forecastLimit = Math.max(5, limit - nonForecastLimit);
+  
+  const result = [
+    ...nonForecastEvents.slice(0, nonForecastLimit),
+    ...forecastEvents.slice(0, forecastLimit),
+  ];
+  
+  // Sort combined result by timestamp
+  return result
     .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
     .slice(0, limit);
 };

@@ -100,7 +100,7 @@ export interface DeliveryEvent extends BaseEvent {
 export interface DecisionEvent extends BaseEvent {
   type: 'decision';
   proposalId: string;
-  action: 'approved' | 'rejected' | 'pending' | 'started' | 'completed';
+  action: 'approved' | 'rejected' | 'pending' | 'started' | 'paused' | 'completed';
   title: string;
   description: string;
   distributedToRoles: string[]; // Role IDs
@@ -109,6 +109,14 @@ export interface DecisionEvent extends BaseEvent {
   quantity?: number;
   deadline?: string;
   priority: 'low' | 'medium' | 'high' | 'critical';
+  estimatedMinutes?: number;
+  linkedExceptionId?: string;
+  // Completion result fields
+  actualQuantity?: number;
+  actualMinutes?: number;
+  delayReason?: string;
+  hasIssue?: boolean;
+  issueNote?: string;
 }
 
 export interface ForecastEvent extends BaseEvent {
@@ -186,6 +194,17 @@ export interface PrepMetrics {
   completionRate: number;
 }
 
+export type ExceptionStatus = 'unhandled' | 'proposal-created' | 'ongoing' | 'resolved';
+export type ImpactType = 'stockout' | 'delay' | 'excess' | 'quality';
+export type ImpactSeverity = 'high' | 'medium' | 'low';
+
+export interface ExceptionImpact {
+  timeBand: TimeBand;
+  affectedItems: Array<{ id: string; name: string; type: 'prep' | 'menu' }>;
+  impactType: ImpactType;
+  impactSeverity: ImpactSeverity;
+}
+
 export interface ExceptionItem {
   id: string;
   type: 'delivery-delay' | 'staff-shortage' | 'demand-surge' | 'prep-behind';
@@ -195,6 +214,9 @@ export interface ExceptionItem {
   relatedEventId: string;
   detectedAt: string;
   resolved: boolean;
+  status: ExceptionStatus;
+  impact: ExceptionImpact;
+  linkedProposalId?: string;
 }
 
 export interface CockpitMetrics {
@@ -214,6 +236,81 @@ export interface CockpitMetrics {
     count: number;
     criticalCount: number;
   };
+}
+
+// ------------------------------------------------------------
+// Enhanced Cockpit Types
+// ------------------------------------------------------------
+
+export interface SalesKPI {
+  actual: number;
+  forecast: number;
+  diff: number;
+  landingEstimate: { min: number; max: number };
+  achievementRate: number;
+  trend: 'up' | 'down' | 'stable';
+  lastUpdate: string;
+}
+
+export interface LaborKPI {
+  actualCost: number;
+  estimatedLaborRate: number;
+  salesPerLaborCost: number;
+  plannedHours: number;
+  actualHours: number;
+  breakCount: number;
+  lastUpdate: string;
+}
+
+export interface SupplyDemandKPI {
+  stockoutRisk: number;
+  excessRisk: number;
+  topItems: Array<{ name: string; risk: 'stockout' | 'excess' }>;
+  lastUpdate: string;
+}
+
+export interface OperationsKPI {
+  delayedCount: number;
+  completionRate: number;
+  bottleneck: { task: string; reason: string } | null;
+  lastUpdate: string;
+}
+
+export interface ExceptionsKPI {
+  criticalCount: number;
+  warningCount: number;
+  topException: { title: string; impact: string; impactType: 'sales' | 'stockout' } | null;
+  lastUpdate: string;
+}
+
+export interface EnhancedCockpitMetrics {
+  sales: SalesKPI;
+  labor: LaborKPI;
+  supplyDemand: SupplyDemandKPI;
+  operations: OperationsKPI;
+  exceptions: ExceptionsKPI;
+}
+
+export type TimelineLane = 'sales' | 'forecast' | 'prep' | 'delivery' | 'labor' | 'decision';
+
+export interface TimelineEvent {
+  id: string;
+  lane: TimelineLane;
+  timestamp: string;
+  title: string;
+  description: string;
+  status?: 'normal' | 'warning' | 'critical' | 'success';
+  originalEvent: DomainEvent;
+}
+
+export interface ShiftPlanEntry {
+  staffId: string;
+  staffName: string;
+  roleId: string;
+  roleName: string;
+  startTime: string;
+  endTime: string;
+  status: 'scheduled' | 'active' | 'completed';
 }
 
 // ------------------------------------------------------------

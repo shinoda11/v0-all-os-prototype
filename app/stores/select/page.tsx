@@ -1,19 +1,12 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { useStore } from '@/state/store';
 import { Store, MapPin, ArrowRight, Loader2 } from 'lucide-react';
 
 export default function StoreSelectPage() {
-  const router = useRouter();
-  const { state, actions } = useStore();
-
-  const handleSelectStore = (storeId: string) => {
-    actions.setStore(storeId);
-    router.push(`/stores/${storeId}/os/cockpit`);
-  };
+  const { state } = useStore();
 
   // Short name for display
   const getShortName = (name: string) => name.replace('Aburi TORA 熟成鮨と炙り鮨 ', '');
@@ -45,20 +38,12 @@ export default function StoreSelectPage() {
 
         <div className="grid gap-4 sm:grid-cols-2">
           {state.stores.map((store) => (
-            <div
+            <Link
               key={store.id}
-              role="button"
-              tabIndex={0}
-              className="cursor-pointer"
-              onClick={() => handleSelectStore(store.id)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  handleSelectStore(store.id);
-                }
-              }}
+              href={`/stores/${store.id}/os/cockpit`}
+              className="block"
             >
-              <Card className="transition-all hover:shadow-lg hover:border-primary/50 h-full">
+              <Card className="cursor-pointer transition-all hover:shadow-lg hover:border-primary/50 h-full">
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -81,14 +66,14 @@ export default function StoreSelectPage() {
                     <span className="text-muted-foreground">
                       スタッフ: {state.staff.filter((s) => s.storeId === store.id).length}名
                     </span>
-                    <Button variant="ghost" size="sm" className="gap-1 pointer-events-none">
+                    <span className="flex items-center gap-1 text-primary font-medium">
                       選択
                       <ArrowRight className="h-4 w-4" />
-                    </Button>
+                    </span>
                   </div>
                 </CardContent>
               </Card>
-            </div>
+            </Link>
           ))}
         </div>
       </div>

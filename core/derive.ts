@@ -17,6 +17,12 @@ import {
   PrepMetrics,
   ExceptionItem,
   CockpitMetrics,
+  SalesKPI,
+  LaborKPI,
+  SupplyDemandKPI,
+  OperationsKPI,
+  ExceptionsKPI,
+  EnhancedCockpitMetrics,
 } from './types';
 
 // ------------------------------------------------------------
@@ -192,8 +198,13 @@ export const deriveLaborMetrics = (
     (e) => e.storeId === storeId && e.timestamp.startsWith(date)
   );
 
-  // Track staff states
-  const staffStates = new Map<string, { checkedIn: boolean; onBreak: boolean; checkInTime?: Date }>();
+  // Track staff states with check-out time
+  const staffStates = new Map<string, { 
+    checkedIn: boolean; 
+    onBreak: boolean; 
+    checkInTime?: Date;
+    checkOutTime?: Date;
+  }>();
 
   for (const event of filtered.sort((a, b) => 
     new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
@@ -204,9 +215,11 @@ export const deriveLaborMetrics = (
       case 'check-in':
         state.checkedIn = true;
         state.checkInTime = new Date(event.timestamp);
+        state.checkOutTime = undefined;
         break;
       case 'check-out':
         state.checkedIn = false;
+        state.checkOutTime = new Date(event.timestamp);
         break;
       case 'break-start':
         state.onBreak = true;
@@ -228,8 +241,15 @@ export const deriveLaborMetrics = (
     if (state.checkedIn) {
       activeStaffCount++;
       if (state.onBreak) onBreakCount++;
-      if (state.checkInTime) {
-        totalHours += (now.getTime() - state.checkInTime.getTime()) / (1000 * 60 * 60);
+    }
+    
+    // Calculate hours for both active and checked-out staff
+    if (state.checkInTime) {
+      const endTime = state.checkOutTime ?? now;
+      const hours = (endTime.getTime() - state.checkInTime.getTime()) / (1000 * 60 * 60);
+      // Only add positive hours to prevent negative values
+      if (hours > 0) {
+        totalHours += hours;
       }
     }
   }
@@ -304,6 +324,8 @@ export const deriveExceptions = (
   date: string
 ): ExceptionItem[] => {
   const exceptions: ExceptionItem[] = [];
+  const currentHour = new Date().getHours();
+  const currentTimeBand: TimeBand = currentHour < 14 ? 'lunch' : currentHour < 17 ? 'idle' : 'dinner';
 
   // Check delivery delays
   const deliveryEvents = filterByType(events, 'delivery') as DeliveryEvent[];
@@ -312,21 +334,33 @@ export const deriveExceptions = (
   );
 
   for (const delivery of delayedDeliveries) {
+    const delayMinutes = delivery.delayMinutes ?? 0;
+    const impactSeverity = delayMinutes > 60 ? 'high' : delayMinutes > 30 ? 'medium' : 'low';
+    
     exceptions.push({
       id: `exc-${delivery.id}`,
       type: 'delivery-delay',
-      severity: (delivery.delayMinutes ?? 0) > 30 ? 'critical' : 'warning',
+      severity: delayMinutes > 30 ? 'critical' : 'warning',
       title: `配送遅延: ${delivery.itemName}`,
-      description: `${delivery.delayMinutes}分遅延中`,
+      description: `${delayMinutes}分遅延中`,
       relatedEventId: delivery.id,
       detectedAt: delivery.timestamp,
       resolved: false,
+      status: 'unhandled',
+      impact: {
+        timeBand: currentTimeBand,
+        affectedItems: [{ id: delivery.id, name: delivery.itemName, type: 'prep' }],
+        impactType: 'delay',
+        impactSeverity,
+      },
     });
   }
 
   // Check staff shortage (simplified: less than 3 active staff is a shortage)
   const laborMetrics = deriveLaborMetrics(events, storeId, date);
   if (laborMetrics.activeStaffCount < 3) {
+    const impactSeverity = laborMetrics.activeStaffCount < 2 ? 'high' : 'medium';
+    
     exceptions.push({
       id: `exc-labor-${date}`,
       type: 'staff-shortage',
@@ -336,12 +370,21 @@ export const deriveExceptions = (
       relatedEventId: '',
       detectedAt: new Date().toISOString(),
       resolved: false,
+      status: 'unhandled',
+      impact: {
+        timeBand: currentTimeBand,
+        affectedItems: [],
+        impactType: 'delay',
+        impactSeverity,
+      },
     });
   }
 
   // Check prep behind schedule
   const prepMetrics = derivePrepMetrics(events, storeId, date);
   if (prepMetrics.completionRate < 50 && prepMetrics.plannedCount > 0) {
+    const impactSeverity = prepMetrics.completionRate < 30 ? 'high' : 'medium';
+    
     exceptions.push({
       id: `exc-prep-${date}`,
       type: 'prep-behind',
@@ -351,12 +394,21 @@ export const deriveExceptions = (
       relatedEventId: '',
       detectedAt: new Date().toISOString(),
       resolved: false,
+      status: 'unhandled',
+      impact: {
+        timeBand: currentTimeBand,
+        affectedItems: [],
+        impactType: 'stockout',
+        impactSeverity,
+      },
     });
   }
 
   // Check demand surge (actual > 120% of forecast)
   const salesMetrics = deriveDailySalesMetrics(events, storeId, date, 'all');
   if (salesMetrics.achievementRate > 120) {
+    const impactSeverity = salesMetrics.achievementRate > 150 ? 'high' : 'medium';
+    
     exceptions.push({
       id: `exc-demand-${date}`,
       type: 'demand-surge',
@@ -366,6 +418,13 @@ export const deriveExceptions = (
       relatedEventId: '',
       detectedAt: new Date().toISOString(),
       resolved: false,
+      status: 'unhandled',
+      impact: {
+        timeBand: currentTimeBand,
+        affectedItems: [],
+        impactType: 'stockout',
+        impactSeverity,
+      },
     });
   }
 
@@ -478,7 +537,7 @@ export const deriveCompletedTodos = (
 // Staff State Derivation (for Timeclock)
 // ------------------------------------------------------------
 
-export type StaffStatus = 'out' | 'in' | 'break';
+export type StaffStatus = 'out' | 'working' | 'break';
 
 export interface StaffState {
   status: StaffStatus;
@@ -511,7 +570,7 @@ export const deriveStaffStates = (
     switch (event.action) {
       case 'check-in':
         states.set(event.staffId, { 
-          status: 'in', 
+          status: 'working', 
           lastAction: event.timestamp,
           checkInTime: new Date(event.timestamp)
         });
@@ -529,7 +588,7 @@ export const deriveStaffStates = (
       case 'break-end':
         states.set(event.staffId, { 
           ...current,
-          status: 'in', 
+          status: 'working', 
           lastAction: event.timestamp 
         });
         break;
@@ -626,5 +685,125 @@ export const deriveTodoStats = (
     pendingCount: activeTodos.filter((t) => t.action === 'approved').length,
     inProgressCount: activeTodos.filter((t) => t.action === 'started').length,
     completedCount: completedTodos.length,
+  };
+};
+
+// ------------------------------------------------------------
+// Enhanced Cockpit KPI Derivation
+// ------------------------------------------------------------
+
+export const deriveEnhancedCockpitMetrics = (
+  events: DomainEvent[],
+  storeId: string,
+  date: string,
+  timeBand: TimeBand,
+  prepItemNames: Map<string, string> = new Map()
+): EnhancedCockpitMetrics => {
+  const now = new Date();
+  const salesMetrics = deriveDailySalesMetrics(events, storeId, date, timeBand);
+  const laborMetrics = deriveLaborMetrics(events, storeId, date);
+  const prepMetrics = derivePrepMetrics(events, storeId, date);
+  const exceptions = deriveExceptions(events, storeId, date);
+
+  // Sales KPI with landing estimate
+  const currentHour = now.getHours();
+  const remainingRatio = currentHour < 17 ? 0.6 : currentHour < 20 ? 0.3 : 0.1;
+  const landingMin = salesMetrics.actualSales + (salesMetrics.forecastSales * remainingRatio * 0.8);
+  const landingMax = salesMetrics.actualSales + (salesMetrics.forecastSales * remainingRatio * 1.2);
+
+  const sales: SalesKPI = {
+    actual: salesMetrics.actualSales,
+    forecast: salesMetrics.forecastSales,
+    diff: salesMetrics.actualSales - salesMetrics.forecastSales,
+    landingEstimate: {
+      min: Math.round(landingMin),
+      max: Math.round(landingMax),
+    },
+    achievementRate: salesMetrics.achievementRate,
+    trend: salesMetrics.achievementRate > 100 ? 'up' : salesMetrics.achievementRate < 80 ? 'down' : 'stable',
+    lastUpdate: now.toISOString(),
+  };
+
+  // Labor KPI
+  const estimatedLaborRate = salesMetrics.actualSales > 0
+    ? (laborMetrics.laborCostEstimate / salesMetrics.actualSales) * 100
+    : 0;
+  const salesPerLaborCost = laborMetrics.laborCostEstimate > 0
+    ? salesMetrics.actualSales / laborMetrics.laborCostEstimate
+    : 0;
+
+  const labor: LaborKPI = {
+    actualCost: laborMetrics.laborCostEstimate,
+    estimatedLaborRate: Math.round(estimatedLaborRate * 10) / 10,
+    salesPerLaborCost: Math.round(salesPerLaborCost * 10) / 10,
+    plannedHours: 40, // Placeholder: should come from shift plan
+    actualHours: laborMetrics.totalHoursToday,
+    breakCount: laborMetrics.onBreakCount,
+    lastUpdate: now.toISOString(),
+  };
+
+  // Supply Demand KPI - analyze prep and delivery events
+  const prepEvents = filterByType(events, 'prep') as PrepEvent[];
+  const todayPrep = prepEvents.filter(e => e.storeId === storeId && e.timestamp.startsWith(date));
+  
+  const stockoutItems: Array<{ name: string; risk: 'stockout' | 'excess' }> = [];
+  const excessItems: Array<{ name: string; risk: 'stockout' | 'excess' }> = [];
+
+  // Simplified: mark items with low completion as stockout risk
+  const prepStatus = new Map<string, PrepEvent['status']>();
+  for (const e of todayPrep) {
+    prepStatus.set(e.prepItemId, e.status);
+  }
+  
+  for (const [itemId, status] of prepStatus) {
+    const itemName = prepItemNames.get(itemId) ?? itemId;
+    if (status === 'planned') {
+      stockoutItems.push({ name: itemName, risk: 'stockout' });
+    }
+  }
+
+  const supplyDemand: SupplyDemandKPI = {
+    stockoutRisk: stockoutItems.length,
+    excessRisk: excessItems.length,
+    topItems: [...stockoutItems, ...excessItems].slice(0, 3),
+    lastUpdate: now.toISOString(),
+  };
+
+  // Operations KPI
+  const delayedCount = prepMetrics.plannedCount; // Simplified: planned = potentially delayed
+  const bottleneck = delayedCount > 0 ? {
+    task: '仕込み未着手',
+    reason: `${delayedCount}件の仕込みが未開始`,
+  } : null;
+
+  const operations: OperationsKPI = {
+    delayedCount,
+    completionRate: prepMetrics.completionRate,
+    bottleneck,
+    lastUpdate: now.toISOString(),
+  };
+
+  // Exceptions KPI
+  const criticalCount = exceptions.filter(e => e.severity === 'critical').length;
+  const warningCount = exceptions.filter(e => e.severity === 'warning').length;
+  const topException = exceptions[0] ? {
+    title: exceptions[0].title,
+    impact: exceptions[0].description,
+    impactType: exceptions[0].type === 'delivery-delay' || exceptions[0].type === 'prep-behind' ? 'stockout' as const : 'sales' as const,
+  } : null;
+
+  const exceptionsKPI: ExceptionsKPI = {
+    criticalCount,
+    warningCount,
+    topException,
+    lastUpdate: now.toISOString(),
+  };
+
+  return {
+    sales,
+    labor,
+    supplyDemand,
+    operations,
+    exceptions: exceptionsKPI,
   };
 };

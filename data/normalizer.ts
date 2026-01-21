@@ -55,12 +55,34 @@ export function normalizeStaff(
 }
 
 /**
+ * Adjust timestamp to today's date while preserving the time
+ */
+function adjustTimestampToToday(timestamp: string): string {
+  const originalDate = new Date(timestamp);
+  const today = new Date();
+  
+  // Preserve the time portion, but use today's date
+  const adjustedDate = new Date(
+    today.getFullYear(),
+    today.getMonth(),
+    today.getDate(),
+    originalDate.getHours(),
+    originalDate.getMinutes(),
+    originalDate.getSeconds()
+  );
+  
+  return adjustedDate.toISOString();
+}
+
+/**
  * Normalize a single event from JSON format to internal format
  */
 export function normalizeEvent(event: Record<string, unknown>): DomainEvent {
   const base = {
     ...event,
     storeId: normalizeStoreId(event.storeId as string),
+    // Adjust timestamp to today's date for realistic demo
+    timestamp: adjustTimestampToToday(event.timestamp as string),
   };
 
   // Handle labor events with staffId
