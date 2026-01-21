@@ -101,6 +101,11 @@ const osSection: NavSection = {
       path: '/os/exceptions',
       icon: <AlertTriangle className="h-4 w-4" />,
     },
+    {
+      label: '週次労務レビュー',
+      path: '/os/labor-weekly',
+      icon: <Clock className="h-4 w-4" />,
+    },
   ],
 };
 

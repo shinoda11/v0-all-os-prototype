@@ -4,7 +4,7 @@
 // UI components should ONLY use selectors, never derive directly
 // ============================================================
 
-import { AppState, TimeBand, DailySalesMetrics, CockpitMetrics, ExceptionItem, DecisionEvent } from './types';
+import { AppState, TimeBand, DailySalesMetrics, CockpitMetrics, ExceptionItem, DecisionEvent, ShiftSummary, SupplyDemandMetrics } from './types';
 import {
   deriveForecastTable,
   deriveForecastForDate,
@@ -19,6 +19,8 @@ import {
   deriveCalendarData,
   deriveTodoStats,
   deriveEnhancedCockpitMetrics,
+  deriveShiftSummary,
+  deriveSupplyDemandMetrics,
   ForecastCell,
   StaffState,
   CalendarCell,
@@ -406,4 +408,62 @@ export const selectTodoStats = (
   }
   
   return deriveTodoStats(state.events, storeId, roleId);
+};
+
+// ------------------------------------------------------------
+// Shift Summary Selector (Dynamic, replaces MOCK_SHIFT_SUMMARY)
+// ------------------------------------------------------------
+
+export const selectShiftSummary = (
+  state: AppState,
+  date?: string
+): ShiftSummary => {
+  const storeId = state.selectedStoreId;
+  const targetDate = date ?? new Date().toISOString().split('T')[0];
+  
+  if (!storeId) {
+    return {
+      plannedHours: 0,
+      actualHours: 0,
+      skillMix: { star3: 0, star2: 0, star1: 0 },
+      roleMix: { kitchen: 0, floor: 0, delivery: 0 },
+      onBreakCount: 0,
+      lastUpdate: new Date().toISOString(),
+      isCalculating: true,
+    };
+  }
+  
+  return deriveShiftSummary(state.events, state.staff, state.roles, storeId, targetDate);
+};
+
+// ------------------------------------------------------------
+// Supply/Demand Metrics Selector
+// ------------------------------------------------------------
+
+export const selectSupplyDemandMetrics = (
+  state: AppState,
+  date?: string,
+  timeBand?: TimeBand
+): SupplyDemandMetrics => {
+  const storeId = state.selectedStoreId;
+  const targetDate = date ?? new Date().toISOString().split('T')[0];
+  const targetTimeBand = timeBand ?? state.selectedTimeBand;
+  
+  if (!storeId) {
+    return {
+      status: 'normal',
+      stockoutRiskCount: 0,
+      excessRiskCount: 0,
+      topRiskItems: [],
+      lastUpdate: new Date().toISOString(),
+    };
+  }
+  
+  // Build prep item name map
+  const prepItemNames = new Map<string, string>();
+  for (const item of state.prepItems) {
+    prepItemNames.set(item.id, item.name);
+  }
+  
+  return deriveSupplyDemandMetrics(state.events, storeId, targetDate, targetTimeBand, prepItemNames);
 };

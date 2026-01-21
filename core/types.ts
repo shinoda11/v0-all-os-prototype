@@ -20,6 +20,8 @@ export interface Staff {
   name: string;
   roleId: string;
   storeId: string;
+  starLevel: 1 | 2 | 3; // Skill level
+  wage: number; // Hourly wage in yen
 }
 
 export interface Role {
@@ -272,6 +274,38 @@ export interface SupplyDemandKPI {
   stockoutRisk: number;
   excessRisk: number;
   topItems: Array<{ name: string; risk: 'stockout' | 'excess' }>;
+  lastUpdate: string;
+}
+
+// Dynamic Shift Summary (replaces MOCK_SHIFT_SUMMARY)
+export interface ShiftSummary {
+  plannedHours: number;
+  actualHours: number;
+  skillMix: { star3: number; star2: number; star1: number };
+  roleMix: { kitchen: number; floor: number; delivery: number };
+  onBreakCount: number;
+  lastUpdate: string;
+  isCalculating: boolean; // True when data is incomplete
+}
+
+// Enhanced Supply/Demand Metrics
+export type RiskType = 'stockout' | 'excess';
+export type RiskLevel = 'high' | 'medium' | 'low';
+
+export interface RiskItem {
+  itemId: string;
+  itemName: string;
+  riskType: RiskType;
+  riskLevel: RiskLevel;
+  impact: string; // e.g., "ディナー帯影響"
+  recommendedAction: string; // e.g., "メニュー制限提案"
+}
+
+export interface SupplyDemandMetrics {
+  status: 'normal' | 'caution' | 'danger';
+  stockoutRiskCount: number;
+  excessRiskCount: number;
+  topRiskItems: RiskItem[];
   lastUpdate: string;
 }
 

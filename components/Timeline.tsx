@@ -20,11 +20,13 @@ import {
   Truck,
   CheckCircle,
   BarChart3,
-  X,
   Clock,
   Package,
   AlertTriangle,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
+import { FreshnessBadge, getFreshnessStatus, type FreshnessStatus } from '@/components/FreshnessBadge';
 
 // Lane definitions
 export type TimelineLane = 'sales' | 'forecast' | 'prep' | 'delivery' | 'labor' | 'decision';
@@ -285,11 +287,41 @@ interface LaneTimelineProps {
   maxPerLane?: number;
 }
 
+const MAX_EXPANDED = 20;
+
 export function LaneTimeline({ laneEvents, maxPerLane = 5 }: LaneTimelineProps) {
   const [selectedEvent, setSelectedEvent] = useState<DomainEvent | null>(null);
+  const [expandedLanes, setExpandedLanes] = useState<Set<TimelineLane>>(new Set());
 
   // Get all unique timestamps for the time axis
   const allEvents = laneEvents.flatMap(l => l.events);
+  
+  // Calculate time range for the time axis
+  const timestamps = allEvents.map(e => new Date(e.timestamp).getTime());
+  const minTime = timestamps.length > 0 ? Math.min(...timestamps) : 0;
+  const maxTime = timestamps.length > 0 ? Math.max(...timestamps) : 0;
+  
+  // Generate time markers (hourly)
+  const timeMarkers: { hour: number; label: string }[] = [];
+  if (minTime && maxTime) {
+    const startHour = new Date(minTime).getHours();
+    const endHour = new Date(maxTime).getHours();
+    for (let h = startHour; h <= endHour; h++) {
+      timeMarkers.push({ hour: h, label: `${h.toString().padStart(2, '0')}:00` });
+    }
+  }
+
+  const toggleLaneExpand = (lane: TimelineLane) => {
+    setExpandedLanes(prev => {
+      const next = new Set(prev);
+      if (next.has(lane)) {
+        next.delete(lane);
+      } else {
+        next.add(lane);
+      }
+      return next;
+    });
+  };
   
   if (allEvents.length === 0) {
     return (
@@ -304,24 +336,79 @@ export function LaneTimeline({ laneEvents, maxPerLane = 5 }: LaneTimelineProps) 
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium">統合タイムライン</CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-sm font-medium">統合タイムライン</CardTitle>
+          {/* Time axis header */}
+          {timeMarkers.length > 1 && (
+            <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+              <Clock className="h-3 w-3" />
+              <span>{timeMarkers[0]?.label} 〜 {timeMarkers[timeMarkers.length - 1]?.label}</span>
+            </div>
+          )}
+        </div>
       </CardHeader>
+      
+      {/* Simple time axis */}
+      {timeMarkers.length > 1 && (
+        <div className="px-6 pb-2">
+          <div className="flex items-center ml-20 border-b border-border/50 relative">
+            {timeMarkers.map((marker, i) => (
+              <div 
+                key={marker.hour} 
+                className="flex-1 text-center relative"
+                style={{ minWidth: '40px' }}
+              >
+                <div className="absolute left-0 top-0 w-px h-2 bg-border/50" />
+                <span className="text-[9px] text-muted-foreground">{marker.label}</span>
+              </div>
+            ))}
+            <div className="absolute right-0 top-0 w-px h-2 bg-border/50" />
+          </div>
+        </div>
+      )}
+      
       <CardContent className="space-y-3">
         {/* Lane rows */}
         {laneEvents.map(({ lane, events }) => {
           const config = LANE_CONFIG[lane];
-          const displayEvents = events.slice(0, maxPerLane);
+          const isExpanded = expandedLanes.has(lane);
+          const limit = isExpanded ? MAX_EXPANDED : maxPerLane;
+          const displayEvents = events.slice(0, limit);
+          const hasMore = events.length > maxPerLane;
+          const remainingCount = events.length - maxPerLane;
+          
+          // Get latest event timestamp for this lane
+          const latestEvent = events[0];
+          const laneFreshness: FreshnessStatus | null = latestEvent 
+            ? getFreshnessStatus(latestEvent.timestamp) 
+            : null;
           
           return (
-            <div key={lane} className="flex items-start gap-3">
-              {/* Lane label */}
-              <div className={cn(
-                'flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium w-20 shrink-0',
-                config.bgColor,
-                config.color
-              )}>
-                {config.icon}
-                <span>{config.label}</span>
+            <div 
+              key={lane} 
+              className={cn(
+                'flex items-start gap-3',
+                laneFreshness === 'stale' && 'opacity-70'
+              )}
+            >
+              {/* Lane label with freshness */}
+              <div className="flex flex-col gap-0.5 w-20 shrink-0">
+                <div className={cn(
+                  'flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium',
+                  config.bgColor,
+                  config.color
+                )}>
+                  {config.icon}
+                  <span>{config.label}</span>
+                </div>
+                {/* Lane freshness indicator */}
+                {latestEvent && (
+                  <FreshnessBadge 
+                    lastUpdate={latestEvent.timestamp} 
+                    compact 
+                    className="justify-center"
+                  />
+                )}
               </div>
               
               {/* Events in lane */}
@@ -336,6 +423,35 @@ export function LaneTimeline({ laneEvents, maxPerLane = 5 }: LaneTimelineProps) 
                   ))
                 ) : (
                   <span className="text-xs text-muted-foreground">-</span>
+                )}
+                
+                {/* More/Less button */}
+                {hasMore && !isExpanded && (
+                  <button
+                    type="button"
+                    onClick={() => toggleLaneExpand(lane)}
+                    className="flex items-center gap-0.5 px-2 py-0.5 rounded text-[10px] text-muted-foreground hover:bg-muted transition-colors"
+                  >
+                    <span>+{remainingCount}件</span>
+                    <ChevronDown className="h-3 w-3" />
+                  </button>
+                )}
+                {isExpanded && (
+                  <button
+                    type="button"
+                    onClick={() => toggleLaneExpand(lane)}
+                    className="flex items-center gap-0.5 px-2 py-0.5 rounded text-[10px] text-muted-foreground hover:bg-muted transition-colors"
+                  >
+                    <span>閉じる</span>
+                    <ChevronUp className="h-3 w-3" />
+                  </button>
+                )}
+                
+                {/* Stale warning */}
+                {laneFreshness === 'stale' && displayEvents.length > 0 && (
+                  <Badge variant="outline" className="text-[9px] text-red-600 border-red-200 bg-red-50">
+                    古いデータ
+                  </Badge>
                 )}
               </div>
             </div>

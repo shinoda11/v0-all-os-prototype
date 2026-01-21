@@ -872,3 +872,285 @@ export const deriveEnhancedCockpitMetrics = (
     exceptions: exceptionsKPI,
   };
 };
+
+// ------------------------------------------------------------
+// Shift Summary Derivation (replaces MOCK_SHIFT_SUMMARY)
+// ------------------------------------------------------------
+
+import type { ShiftSummary, SupplyDemandMetrics, RiskItem, Staff, Role } from './types';
+
+export const deriveShiftSummary = (
+  events: DomainEvent[],
+  staff: Staff[],
+  roles: Role[],
+  storeId: string,
+  date: string
+): ShiftSummary => {
+  const now = new Date();
+  const laborEvents = filterByType(events, 'labor') as LaborEvent[];
+  const filtered = laborEvents.filter(
+    (e) => e.storeId === storeId && e.timestamp.startsWith(date)
+  );
+
+  // Get store staff
+  const storeStaff = staff.filter((s) => s.storeId === storeId);
+  const staffMap = new Map(storeStaff.map((s) => [s.id, s]));
+  
+  // Get role code map
+  const roleCodeMap = new Map(roles.map((r) => [r.id, r.code]));
+
+  // Track sessions
+  interface Session {
+    staffId: string;
+    checkInTime: Date;
+    checkOutTime?: Date;
+    breakPeriods: Array<{ start: Date; end?: Date }>;
+    isActive: boolean;
+    isOnBreak: boolean;
+  }
+  
+  const sessions = new Map<string, Session>();
+  
+  // Sort and process events
+  const sortedEvents = filtered.sort((a, b) => 
+    new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+  );
+
+  for (const event of sortedEvents) {
+    const eventTime = new Date(event.timestamp);
+    let session = sessions.get(event.staffId);
+    
+    switch (event.action) {
+      case 'check-in':
+        session = {
+          staffId: event.staffId,
+          checkInTime: eventTime,
+          checkOutTime: undefined,
+          breakPeriods: [],
+          isActive: true,
+          isOnBreak: false,
+        };
+        sessions.set(event.staffId, session);
+        break;
+      case 'check-out':
+        if (session && session.isActive) {
+          session.checkOutTime = eventTime;
+          session.isActive = false;
+          session.isOnBreak = false;
+        }
+        break;
+      case 'break-start':
+        if (session && session.isActive && !session.isOnBreak) {
+          session.breakPeriods.push({ start: eventTime, end: undefined });
+          session.isOnBreak = true;
+        }
+        break;
+      case 'break-end':
+        if (session && session.isActive && session.isOnBreak) {
+          const currentBreak = session.breakPeriods[session.breakPeriods.length - 1];
+          if (currentBreak && !currentBreak.end) {
+            currentBreak.end = eventTime;
+          }
+          session.isOnBreak = false;
+        }
+        break;
+    }
+  }
+
+  // Calculate metrics
+  let actualHours = 0;
+  let onBreakCount = 0;
+  const skillMix = { star3: 0, star2: 0, star1: 0 };
+  const roleMix = { kitchen: 0, floor: 0, delivery: 0 };
+
+  for (const [staffId, session] of sessions) {
+    const staffMember = staffMap.get(staffId);
+    if (!staffMember) continue;
+    
+    // Count active staff for skill/role mix
+    if (session.isActive) {
+      if (session.isOnBreak) onBreakCount++;
+      
+      // Skill mix
+      if (staffMember.starLevel === 3) skillMix.star3++;
+      else if (staffMember.starLevel === 2) skillMix.star2++;
+      else skillMix.star1++;
+      
+      // Role mix
+      const roleCode = roleCodeMap.get(staffMember.roleId);
+      if (roleCode === 'kitchen' || roleCode === 'manager') roleMix.kitchen++;
+      else if (roleCode === 'floor') roleMix.floor++;
+      else if (roleCode === 'delivery') roleMix.delivery++;
+    }
+    
+    // Calculate worked hours
+    if (session.checkInTime.getTime() <= now.getTime()) {
+      let endTime: Date;
+      if (session.checkOutTime) {
+        endTime = session.checkOutTime;
+      } else if (session.isActive) {
+        endTime = now;
+      } else {
+        continue;
+      }
+      
+      if (endTime.getTime() < session.checkInTime.getTime()) continue;
+      
+      const grossHours = (endTime.getTime() - session.checkInTime.getTime()) / (1000 * 60 * 60);
+      let breakHours = 0;
+      for (const bp of session.breakPeriods) {
+        const breakEnd = bp.end ?? (session.isOnBreak ? now : bp.start);
+        if (breakEnd.getTime() > bp.start.getTime()) {
+          breakHours += (breakEnd.getTime() - bp.start.getTime()) / (1000 * 60 * 60);
+        }
+      }
+      actualHours += Math.max(0, grossHours - breakHours);
+    }
+  }
+
+  // Planned hours: 8h/person as default (would come from shift plan)
+  const plannedHours = storeStaff.length * 8;
+  
+  // Check if we have enough data
+  const isCalculating = sessions.size === 0;
+
+  return {
+    plannedHours,
+    actualHours: Math.max(0, Math.round(actualHours * 10) / 10),
+    skillMix,
+    roleMix,
+    onBreakCount,
+    lastUpdate: now.toISOString(),
+    isCalculating,
+  };
+};
+
+// ------------------------------------------------------------
+// Supply/Demand Metrics Derivation
+// ------------------------------------------------------------
+
+export const deriveSupplyDemandMetrics = (
+  events: DomainEvent[],
+  storeId: string,
+  date: string,
+  timeBand: TimeBand,
+  prepItemNames: Map<string, string>
+): SupplyDemandMetrics => {
+  const now = new Date();
+  
+  // Get prep events
+  const prepEvents = filterByType(events, 'prep') as PrepEvent[];
+  const todayPrepEvents = prepEvents.filter(
+    (e) => e.storeId === storeId && e.timestamp.startsWith(date)
+  );
+  
+  // Get forecast events
+  const forecastEvents = filterByType(events, 'forecast') as ForecastEvent[];
+  const todayForecast = forecastEvents.find(
+    (e) => e.storeId === storeId && (e.date === date || e.timestamp.startsWith(date)) &&
+      (timeBand === 'all' || e.timeBand === timeBand)
+  );
+  
+  // Get delivery events
+  const deliveryEvents = filterByType(events, 'delivery') as DeliveryEvent[];
+  const todayDeliveries = deliveryEvents.filter(
+    (e) => e.storeId === storeId && e.timestamp.startsWith(date)
+  );
+  
+  // Calculate prep status per item
+  const prepStatus = new Map<string, { planned: number; completed: number; inProgress: number }>();
+  
+  for (const event of todayPrepEvents) {
+    const current = prepStatus.get(event.prepItemId) ?? { planned: 0, completed: 0, inProgress: 0 };
+    if (event.status === 'planned') current.planned += event.quantity;
+    else if (event.status === 'completed') current.completed += event.quantity;
+    else if (event.status === 'started') current.inProgress += event.quantity;
+    prepStatus.set(event.prepItemId, current);
+  }
+  
+  // Identify stockout risks (not enough prep for expected demand)
+  const riskItems: RiskItem[] = [];
+  let stockoutRiskCount = 0;
+  let excessRiskCount = 0;
+  
+  // Check for delayed deliveries causing stockout
+  const delayedDeliveries = todayDeliveries.filter((d) => d.status === 'delayed');
+  for (const d of delayedDeliveries) {
+    stockoutRiskCount++;
+    riskItems.push({
+      itemId: d.id,
+      itemName: d.itemName,
+      riskType: 'stockout',
+      riskLevel: (d.delayMinutes ?? 0) > 60 ? 'high' : 'medium',
+      impact: timeBand === 'all' ? '本日影響' : timeBandLabel(timeBand) + '帯影響',
+      recommendedAction: 'メニュー制限提案',
+    });
+  }
+  
+  // Check prep items for stockout/excess risk
+  for (const [prepItemId, status] of prepStatus) {
+    const itemName = prepItemNames.get(prepItemId) ?? prepItemId;
+    const totalAvailable = status.completed + status.inProgress;
+    const totalPlanned = status.planned + status.completed + status.inProgress;
+    
+    // Simple heuristic: if completed < 50% of planned, it's a stockout risk
+    if (status.planned > 0 && status.completed < status.planned * 0.5) {
+      stockoutRiskCount++;
+      riskItems.push({
+        itemId: prepItemId,
+        itemName,
+        riskType: 'stockout',
+        riskLevel: status.completed < status.planned * 0.3 ? 'high' : 'medium',
+        impact: timeBand === 'all' ? '本日影響' : timeBandLabel(timeBand) + '帯影響',
+        recommendedAction: '追加仕込み提案',
+      });
+    }
+    
+    // Simple heuristic: if completed > planned * 1.5, it's excess risk
+    if (status.completed > totalPlanned * 1.5) {
+      excessRiskCount++;
+      riskItems.push({
+        itemId: prepItemId,
+        itemName,
+        riskType: 'excess',
+        riskLevel: status.completed > totalPlanned * 2 ? 'high' : 'medium',
+        impact: '廃棄リスク',
+        recommendedAction: '仕込み量調整提案',
+      });
+    }
+  }
+  
+  // Sort by risk level (high first) and take top 3
+  const sortedRisks = riskItems.sort((a, b) => {
+    const levelOrder = { high: 0, medium: 1, low: 2 };
+    return levelOrder[a.riskLevel] - levelOrder[b.riskLevel];
+  });
+  
+  const topRiskItems = sortedRisks.slice(0, 3);
+  
+  // Determine overall status
+  let status: 'normal' | 'caution' | 'danger' = 'normal';
+  if (riskItems.some((r) => r.riskLevel === 'high')) {
+    status = 'danger';
+  } else if (riskItems.length > 0) {
+    status = 'caution';
+  }
+  
+  return {
+    status,
+    stockoutRiskCount,
+    excessRiskCount,
+    topRiskItems,
+    lastUpdate: now.toISOString(),
+  };
+};
+
+// Helper to get time band label
+function timeBandLabel(timeBand: TimeBand): string {
+  switch (timeBand) {
+    case 'lunch': return 'ランチ';
+    case 'idle': return 'アイドル';
+    case 'dinner': return 'ディナー';
+    default: return '全日';
+  }
+}

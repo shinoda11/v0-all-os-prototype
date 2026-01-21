@@ -6,6 +6,7 @@ import { TimeBandTabs } from '@/components/TimeBandTabs';
 import { MetricCard } from '@/components/MetricCard';
 import { LaneTimeline } from '@/components/Timeline';
 import { DecisionQueue } from '@/components/DecisionQueue';
+import { FreshnessBadge } from '@/components/FreshnessBadge';
 import { Drawer } from '@/components/Drawer';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -20,8 +21,10 @@ import {
   selectPrepMetrics,
   selectLaborMetrics,
   selectLaneEvents,
+  selectShiftSummary,
+  selectSupplyDemandMetrics,
 } from '@/core/selectors';
-import type { TimeBand, Proposal, Role, ExceptionItem } from '@/core/types';
+import type { TimeBand, Proposal, Role, ExceptionItem, RiskItem } from '@/core/types';
 import {
   TrendingUp,
   TrendingDown,
@@ -38,13 +41,6 @@ import {
   RotateCcw,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
-// Mock shift plan data for prototype
-const MOCK_SHIFT_SUMMARY = {
-  plannedHours: 48,
-  skillMix: { star3: 2, star2: 3, star1: 2 },
-  roleComposition: { kitchen: 4, hall: 3 },
-};
 
 function ReplayControls() {
   const { state, actions } = useStore();
@@ -133,50 +129,84 @@ function ReplayControls() {
   );
 }
 
-// Shift Summary Component (Read-only)
-function ShiftSummary() {
-  const summary = MOCK_SHIFT_SUMMARY;
+// Shift Summary Component (Read-only, dynamically calculated)
+function DynamicShiftSummary() {
+  const { state } = useStore();
+  const summary = selectShiftSummary(state);
   
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium flex items-center gap-2">
-          <Clock className="h-4 w-4" />
-          本日のシフト概要
-        </CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-sm font-medium flex items-center gap-2">
+            <Clock className="h-4 w-4" />
+            本日のシフト概要
+            {summary.isCalculating && (
+              <Badge variant="outline" className="text-[10px] text-muted-foreground">計算中</Badge>
+            )}
+          </CardTitle>
+          <FreshnessBadge lastUpdate={summary.lastUpdate} />
+        </div>
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="flex justify-between items-center text-sm">
-          <span className="text-muted-foreground">予定人時</span>
-          <span className="font-medium">{summary.plannedHours}h</span>
+          <span className="text-muted-foreground">人時</span>
+          <span className={cn('font-medium', summary.actualHours > summary.plannedHours && 'text-red-600')}>
+            {summary.actualHours.toFixed(1)}h / {summary.plannedHours}h
+          </span>
         </div>
         <div className="flex justify-between items-center text-sm">
           <span className="text-muted-foreground">スキルミックス</span>
           <div className="flex gap-2">
-            <Badge variant="outline" className="text-xs gap-1">
-              <Star className="h-2.5 w-2.5 fill-yellow-400 text-yellow-400" />
-              <Star className="h-2.5 w-2.5 fill-yellow-400 text-yellow-400" />
-              <Star className="h-2.5 w-2.5 fill-yellow-400 text-yellow-400" />
-              {summary.skillMix.star3}
-            </Badge>
-            <Badge variant="outline" className="text-xs gap-1">
-              <Star className="h-2.5 w-2.5 fill-yellow-400 text-yellow-400" />
-              <Star className="h-2.5 w-2.5 fill-yellow-400 text-yellow-400" />
-              {summary.skillMix.star2}
-            </Badge>
-            <Badge variant="outline" className="text-xs gap-1">
-              <Star className="h-2.5 w-2.5 fill-yellow-400 text-yellow-400" />
-              {summary.skillMix.star1}
-            </Badge>
+            {summary.skillMix.star3 > 0 && (
+              <Badge variant="outline" className="text-xs gap-1">
+                <Star className="h-2.5 w-2.5 fill-yellow-400 text-yellow-400" />
+                <Star className="h-2.5 w-2.5 fill-yellow-400 text-yellow-400" />
+                <Star className="h-2.5 w-2.5 fill-yellow-400 text-yellow-400" />
+                {summary.skillMix.star3}
+              </Badge>
+            )}
+            {summary.skillMix.star2 > 0 && (
+              <Badge variant="outline" className="text-xs gap-1">
+                <Star className="h-2.5 w-2.5 fill-yellow-400 text-yellow-400" />
+                <Star className="h-2.5 w-2.5 fill-yellow-400 text-yellow-400" />
+                {summary.skillMix.star2}
+              </Badge>
+            )}
+            {summary.skillMix.star1 > 0 && (
+              <Badge variant="outline" className="text-xs gap-1">
+                <Star className="h-2.5 w-2.5 fill-yellow-400 text-yellow-400" />
+                {summary.skillMix.star1}
+              </Badge>
+            )}
+            {summary.skillMix.star3 === 0 && summary.skillMix.star2 === 0 && summary.skillMix.star1 === 0 && (
+              <span className="text-xs text-muted-foreground">--</span>
+            )}
           </div>
         </div>
         <div className="flex justify-between items-center text-sm">
           <span className="text-muted-foreground">役割構成</span>
           <div className="flex gap-2">
-            <Badge variant="secondary" className="text-xs">厨房 {summary.roleComposition.kitchen}</Badge>
-            <Badge variant="secondary" className="text-xs">ホール {summary.roleComposition.hall}</Badge>
+            {summary.roleMix.kitchen > 0 && (
+              <Badge variant="secondary" className="text-xs">厨房 {summary.roleMix.kitchen}</Badge>
+            )}
+            {summary.roleMix.floor > 0 && (
+              <Badge variant="secondary" className="text-xs">ホール {summary.roleMix.floor}</Badge>
+            )}
+            {summary.roleMix.delivery > 0 && (
+              <Badge variant="secondary" className="text-xs">配達 {summary.roleMix.delivery}</Badge>
+            )}
+            {summary.roleMix.kitchen === 0 && summary.roleMix.floor === 0 && summary.roleMix.delivery === 0 && (
+              <span className="text-xs text-muted-foreground">--</span>
+            )}
           </div>
         </div>
+        {summary.onBreakCount > 0 && (
+          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+            <Coffee className="h-3 w-3" />
+            <span>休憩中 {summary.onBreakCount}名</span>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
@@ -273,6 +303,153 @@ function ProposalEditor({ proposal, roles, onChange, onSave, onCancel }: Proposa
   );
 }
 
+// Time band sales distribution by store (can be customized per store)
+const STORE_SALES_DISTRIBUTION: Record<string, { lunch: number; idle: number; dinner: number }> = {
+  '1': { lunch: 0.35, idle: 0.10, dinner: 0.55 }, // 二子玉川 - dinner heavy
+  '2': { lunch: 0.40, idle: 0.10, dinner: 0.50 }, // 自由が丘 - balanced
+  '3': { lunch: 0.30, idle: 0.15, dinner: 0.55 }, // 豊洲 - office area, lunch lighter
+  '4': { lunch: 0.35, idle: 0.10, dinner: 0.55 }, // 駒沢 - default
+};
+
+const DEFAULT_DISTRIBUTION = { lunch: 0.35, idle: 0.10, dinner: 0.55 };
+
+// Time band hours definition
+const TIME_BAND_HOURS = {
+  lunch: { start: 11, end: 14 },
+  idle: { start: 14, end: 17 },
+  dinner: { start: 17, end: 22 },
+};
+
+// Calculate current time band and progress within it
+function getCurrentTimeBandInfo(now: Date) {
+  const hour = now.getHours();
+  const minute = now.getMinutes();
+  const currentMinutes = hour * 60 + minute;
+  
+  let currentBand: 'lunch' | 'idle' | 'dinner' | 'before' | 'after' = 'before';
+  let progress = 0;
+  let bandMinutesElapsed = 0;
+  let bandTotalMinutes = 0;
+  
+  if (hour >= TIME_BAND_HOURS.lunch.start && hour < TIME_BAND_HOURS.lunch.end) {
+    currentBand = 'lunch';
+    const bandStart = TIME_BAND_HOURS.lunch.start * 60;
+    const bandEnd = TIME_BAND_HOURS.lunch.end * 60;
+    bandMinutesElapsed = currentMinutes - bandStart;
+    bandTotalMinutes = bandEnd - bandStart;
+    progress = bandMinutesElapsed / bandTotalMinutes;
+  } else if (hour >= TIME_BAND_HOURS.idle.start && hour < TIME_BAND_HOURS.idle.end) {
+    currentBand = 'idle';
+    const bandStart = TIME_BAND_HOURS.idle.start * 60;
+    const bandEnd = TIME_BAND_HOURS.idle.end * 60;
+    bandMinutesElapsed = currentMinutes - bandStart;
+    bandTotalMinutes = bandEnd - bandStart;
+    progress = bandMinutesElapsed / bandTotalMinutes;
+  } else if (hour >= TIME_BAND_HOURS.dinner.start && hour < TIME_BAND_HOURS.dinner.end) {
+    currentBand = 'dinner';
+    const bandStart = TIME_BAND_HOURS.dinner.start * 60;
+    const bandEnd = TIME_BAND_HOURS.dinner.end * 60;
+    bandMinutesElapsed = currentMinutes - bandStart;
+    bandTotalMinutes = bandEnd - bandStart;
+    progress = bandMinutesElapsed / bandTotalMinutes;
+  } else if (hour >= TIME_BAND_HOURS.dinner.end) {
+    currentBand = 'after';
+    progress = 1;
+  }
+  
+  return { currentBand, progress, bandMinutesElapsed, bandTotalMinutes };
+}
+
+// Calculate landing estimate with time band curve
+function calculateLandingEstimate(
+  storeId: string,
+  salesActual: number,
+  salesForecast: number,
+  now: Date
+): {
+  min: number;
+  max: number;
+  pace: number;
+  explanation: string;
+  currentBand: string;
+  bandProgress: number;
+} {
+  const distribution = STORE_SALES_DISTRIBUTION[storeId] ?? DEFAULT_DISTRIBUTION;
+  const { currentBand, progress } = getCurrentTimeBandInfo(now);
+  
+  // Calculate expected sales up to current point based on time band curve
+  let expectedSalesRatio = 0;
+  let completedBandsRatio = 0;
+  let currentBandExpectedRatio = 0;
+  
+  if (currentBand === 'before') {
+    // Before lunch - no sales expected yet
+    expectedSalesRatio = 0;
+  } else if (currentBand === 'lunch') {
+    currentBandExpectedRatio = distribution.lunch * progress;
+    expectedSalesRatio = currentBandExpectedRatio;
+    completedBandsRatio = 0;
+  } else if (currentBand === 'idle') {
+    completedBandsRatio = distribution.lunch;
+    currentBandExpectedRatio = distribution.idle * progress;
+    expectedSalesRatio = completedBandsRatio + currentBandExpectedRatio;
+  } else if (currentBand === 'dinner') {
+    completedBandsRatio = distribution.lunch + distribution.idle;
+    currentBandExpectedRatio = distribution.dinner * progress;
+    expectedSalesRatio = completedBandsRatio + currentBandExpectedRatio;
+  } else {
+    // After closing
+    expectedSalesRatio = 1;
+    completedBandsRatio = 1;
+  }
+  
+  // Calculate pace: actual vs expected at this point
+  const expectedSales = salesForecast * expectedSalesRatio;
+  const pace = expectedSales > 0 ? salesActual / expectedSales : 1;
+  
+  // Calculate remaining sales based on pace
+  const remainingRatio = 1 - expectedSalesRatio;
+  const projectedRemaining = salesForecast * remainingRatio * pace;
+  
+  // Landing estimate with confidence range
+  const landing = salesActual + projectedRemaining;
+  const min = Math.round(landing * 0.92); // -8% variance
+  const max = Math.round(landing * 1.08); // +8% variance
+  
+  // Generate explanation
+  const bandLabels: Record<string, string> = {
+    lunch: 'ランチ',
+    idle: 'アイドル',
+    dinner: 'ディナー',
+    before: '営業前',
+    after: '営業終了',
+  };
+  
+  const bandLabel = bandLabels[currentBand] ?? currentBand;
+  const progressPercent = Math.round(progress * 100);
+  const paceText = pace >= 1.05 ? '好調' : pace >= 0.95 ? '計画通り' : pace >= 0.85 ? 'やや遅れ' : '遅れ';
+  const paceSign = pace >= 1 ? '+' : '';
+  const pacePercent = Math.round((pace - 1) * 100);
+  
+  let explanation = '';
+  if (currentBand === 'before') {
+    explanation = '営業前';
+  } else if (currentBand === 'after') {
+    explanation = `本日終了 ペース${paceSign}${pacePercent}%`;
+  } else {
+    explanation = `${bandLabel}${progressPercent}% ${paceText}(${paceSign}${pacePercent}%)`;
+  }
+  
+  return {
+    min,
+    max,
+    pace,
+    explanation,
+    currentBand,
+    bandProgress: progress,
+  };
+}
+
 export default function CockpitPage() {
   const { state, actions } = useStore();
   const currentStore = selectCurrentStore(state);
@@ -292,6 +469,8 @@ export default function CockpitPage() {
   const prepMetrics = selectPrepMetrics(state);
   const exceptions = selectExceptions(state);
   const laneEvents = selectLaneEvents(state, 5, timeBand);
+  const shiftSummary = selectShiftSummary(state);
+  const supplyDemandMetrics = selectSupplyDemandMetrics(state, undefined, timeBand);
 
   // Calculate enhanced metrics
   const now = new Date();
@@ -303,26 +482,30 @@ export default function CockpitPage() {
   const salesDiff = salesActual - salesForecast;
   const salesAchievementRate = metrics?.sales?.achievementRate ?? 0;
   
-  // Landing estimate (simplified projection)
-  const currentHour = now.getHours();
-  const remainingRatio = currentHour < 14 ? 0.6 : currentHour < 17 ? 0.3 : currentHour < 20 ? 0.15 : 0.05;
-  const landingMin = Math.round(salesActual + (salesForecast * remainingRatio * 0.85));
-  const landingMax = Math.round(salesActual + (salesForecast * remainingRatio * 1.15));
+  // Landing estimate with time band curve
+  const landingEstimate = calculateLandingEstimate(
+    selectedStoreId ?? '1',
+    salesActual,
+    salesForecast,
+    now
+  );
+  const landingMin = landingEstimate.min;
+  const landingMax = landingEstimate.max;
+  const landingExplanation = landingEstimate.explanation;
   
-  // Labor calculations
+  // Labor calculations (using dynamic shift summary)
   const laborCost = laborMetrics?.laborCostEstimate ?? 0;
   const laborRate = salesActual > 0 ? (laborCost / salesActual) * 100 : 0;
   const salesPerLabor = laborCost > 0 ? salesActual / laborCost : 0;
-  const plannedHours = MOCK_SHIFT_SUMMARY.plannedHours;
-  const actualHours = laborMetrics?.totalHoursToday ?? 0;
-  const breakCount = laborMetrics?.onBreakCount ?? 0;
+  const plannedHours = shiftSummary?.plannedHours ?? 48;
+  const actualHours = shiftSummary?.actualHours ?? laborMetrics?.totalHoursToday ?? 0;
+  const breakCount = shiftSummary?.onBreakCount ?? laborMetrics?.onBreakCount ?? 0;
   
-  // Supply/Demand (from prep metrics)
-  const stockoutRisk = prepMetrics?.plannedCount ?? 0; // Items not started
-  const excessRisk = 0; // Placeholder
-  const topRiskItems = stockoutRisk > 0 
-    ? [{ name: '仕込み未着手あり', risk: 'stockout' as const }]
-    : [];
+  // Supply/Demand (dynamic)
+  const stockoutRisk = supplyDemandMetrics?.stockoutRiskCount ?? 0;
+  const excessRisk = supplyDemandMetrics?.excessRiskCount ?? 0;
+  const topRiskItems = supplyDemandMetrics?.topRiskItems ?? [];
+  const supplyDemandStatus = supplyDemandMetrics?.status ?? 'normal';
   
   // Operations
   const delayedCount = prepMetrics?.plannedCount ?? 0;
@@ -398,8 +581,13 @@ export default function CockpitPage() {
           status={salesAchievementRate >= 100 ? 'success' : salesAchievementRate >= 80 ? 'default' : 'warning'}
           lastUpdate={lastUpdateTime}
         >
-          <div className="text-xs text-muted-foreground">
-            着地見込: ¥{landingMin.toLocaleString()} 〜 ¥{landingMax.toLocaleString()}
+          <div className="space-y-1">
+            <div className="text-xs text-muted-foreground">
+              着地見込: ¥{landingMin.toLocaleString()} 〜 ¥{landingMax.toLocaleString()}
+            </div>
+            <div className="text-[10px] text-muted-foreground/80 bg-muted/50 px-1.5 py-0.5 rounded">
+              {landingExplanation}
+            </div>
           </div>
         </MetricCard>
 
@@ -430,28 +618,43 @@ export default function CockpitPage() {
           </div>
         </MetricCard>
 
-        {/* Supply/Demand Card */}
+        {/* Supply/Demand Card - Enhanced */}
         <MetricCard
           title="需給"
-          value={stockoutRisk > 0 ? `欠品リスク ${stockoutRisk}` : '正常'}
-          subValue={excessRisk > 0 ? `過剰リスク ${excessRisk}` : undefined}
+          value={
+            supplyDemandStatus === 'danger' ? '危険' :
+            supplyDemandStatus === 'caution' ? '要注意' : '正常'
+          }
+          subValue={
+            stockoutRisk > 0 || excessRisk > 0 
+              ? `欠品 ${stockoutRisk} / 過剰 ${excessRisk}`
+              : undefined
+          }
           icon={<Package className="h-4 w-4" />}
-          status={stockoutRisk > 0 ? 'warning' : 'success'}
-          lastUpdate={lastUpdateTime}
+          status={
+            supplyDemandStatus === 'danger' ? 'error' :
+            supplyDemandStatus === 'caution' ? 'warning' : 'success'
+          }
+          lastUpdate={supplyDemandMetrics?.lastUpdate ?? lastUpdateTime}
         >
           {topRiskItems.length > 0 && (
-            <div className="space-y-1">
-              {topRiskItems.slice(0, 3).map((item, i) => (
-                <Badge 
-                  key={i} 
-                  variant="outline" 
-                  className={cn(
-                    'text-[10px]',
-                    item.risk === 'stockout' ? 'border-red-200 text-red-700' : 'border-yellow-200 text-yellow-700'
-                  )}
-                >
-                  {item.name}
-                </Badge>
+            <div className="space-y-1.5 pt-1">
+              {topRiskItems.map((item: RiskItem, i: number) => (
+                <div key={i} className="text-[10px] flex flex-col gap-0.5">
+                  <div className="flex items-center gap-1">
+                    <Badge 
+                      variant="outline" 
+                      className={cn(
+                        'text-[9px] px-1',
+                        item.riskType === 'stockout' ? 'border-red-200 text-red-700 bg-red-50' : 'border-yellow-200 text-yellow-700 bg-yellow-50'
+                      )}
+                    >
+                      {item.riskType === 'stockout' ? '欠品' : '過剰'}{item.riskLevel === 'high' ? '高' : '中'}
+                    </Badge>
+                    <span className="font-medium truncate">{item.itemName}</span>
+                  </div>
+                  <span className="text-muted-foreground pl-1">→ {item.recommendedAction}</span>
+                </div>
               ))}
             </div>
           )}
@@ -490,9 +693,9 @@ export default function CockpitPage() {
         </MetricCard>
       </div>
 
-      {/* Shift Summary + Lane Timeline */}
+      {/* Shift Summary (Dynamic) + Lane Timeline */}
       <div className="grid gap-6 lg:grid-cols-4">
-        <ShiftSummary />
+        <DynamicShiftSummary />
         <div className="lg:col-span-3">
           <LaneTimeline laneEvents={laneEvents} maxPerLane={5} />
         </div>

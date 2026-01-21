@@ -35,24 +35,25 @@ export const ROLES: Role[] = [
 ];
 
 export const STAFF: Staff[] = [
-  { id: 'staff-1', name: '田中 太郎', roleId: 'role-manager', storeId: '1' },
-  { id: 'staff-2', name: '鈴木 花子', roleId: 'role-kitchen', storeId: '1' },
-  { id: 'staff-3', name: '佐藤 一郎', roleId: 'role-kitchen', storeId: '1' },
-  { id: 'staff-4', name: '山田 美咲', roleId: 'role-floor', storeId: '1' },
-  { id: 'staff-5', name: '高橋 健太', roleId: 'role-floor', storeId: '1' },
-  { id: 'staff-6', name: '伊藤 愛', roleId: 'role-delivery', storeId: '1' },
+  // 二子玉川店
+  { id: 'staff-1', name: '田中 太郎', roleId: 'role-manager', storeId: '1', starLevel: 3, wage: 1800 },
+  { id: 'staff-2', name: '鈴木 花子', roleId: 'role-kitchen', storeId: '1', starLevel: 3, wage: 1500 },
+  { id: 'staff-3', name: '佐藤 一郎', roleId: 'role-kitchen', storeId: '1', starLevel: 2, wage: 1300 },
+  { id: 'staff-4', name: '山田 美咲', roleId: 'role-floor', storeId: '1', starLevel: 2, wage: 1200 },
+  { id: 'staff-5', name: '高橋 健太', roleId: 'role-floor', storeId: '1', starLevel: 1, wage: 1100 },
+  { id: 'staff-6', name: '伊藤 愛', roleId: 'role-delivery', storeId: '1', starLevel: 1, wage: 1100 },
   // 自由が丘店
-  { id: 'staff-7', name: '中村 裕子', roleId: 'role-manager', storeId: '2' },
-  { id: 'staff-8', name: '小林 誠', roleId: 'role-kitchen', storeId: '2' },
-  { id: 'staff-9', name: '加藤 恵', roleId: 'role-floor', storeId: '2' },
+  { id: 'staff-7', name: '中村 裕子', roleId: 'role-manager', storeId: '2', starLevel: 3, wage: 1800 },
+  { id: 'staff-8', name: '小林 誠', roleId: 'role-kitchen', storeId: '2', starLevel: 2, wage: 1300 },
+  { id: 'staff-9', name: '加藤 恵', roleId: 'role-floor', storeId: '2', starLevel: 2, wage: 1200 },
   // 豊洲店
-  { id: 'staff-10', name: '渡辺 大輔', roleId: 'role-manager', storeId: '3' },
-  { id: 'staff-11', name: '松本 由美', roleId: 'role-kitchen', storeId: '3' },
-  { id: 'staff-12', name: '井上 健', roleId: 'role-floor', storeId: '3' },
+  { id: 'staff-10', name: '渡辺 大輔', roleId: 'role-manager', storeId: '3', starLevel: 3, wage: 1800 },
+  { id: 'staff-11', name: '松本 由美', roleId: 'role-kitchen', storeId: '3', starLevel: 2, wage: 1300 },
+  { id: 'staff-12', name: '井上 健', roleId: 'role-floor', storeId: '3', starLevel: 1, wage: 1100 },
   // 駒沢店
-  { id: 'staff-13', name: '木村 直樹', roleId: 'role-manager', storeId: '4' },
-  { id: 'staff-14', name: '林 美穂', roleId: 'role-kitchen', storeId: '4' },
-  { id: 'staff-15', name: '斎藤 翔', roleId: 'role-floor', storeId: '4' },
+  { id: 'staff-13', name: '木村 直樹', roleId: 'role-manager', storeId: '4', starLevel: 3, wage: 1800 },
+  { id: 'staff-14', name: '林 美穂', roleId: 'role-kitchen', storeId: '4', starLevel: 2, wage: 1300 },
+  { id: 'staff-15', name: '斎藤 翔', roleId: 'role-floor', storeId: '4', starLevel: 1, wage: 1100 },
 ];
 
 export const MENUS: Menu[] = [

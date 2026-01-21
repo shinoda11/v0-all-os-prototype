@@ -4,7 +4,8 @@ import React from "react"
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import { TrendingUp, TrendingDown, Minus, Clock } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { FreshnessBadge, getFreshnessStatus } from '@/components/FreshnessBadge';
 
 interface MetricCardProps {
   title: string;
@@ -46,28 +47,26 @@ export function MetricCard({
     stable: 'text-muted-foreground',
   };
 
-  const formatTime = (isoString: string) => {
-    try {
-      const date = new Date(isoString);
-      return date.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
-    } catch {
-      return '--:--';
-    }
-  };
+  // Check if data is stale for visual warning
+  const freshness = lastUpdate ? getFreshnessStatus(lastUpdate) : null;
 
   return (
     <Card
       className={cn(
         'transition-all duration-300',
         statusColors[status],
-        highlighted && 'ring-2 ring-primary ring-offset-2 animate-pulse'
+        highlighted && 'ring-2 ring-primary ring-offset-2 animate-pulse',
+        freshness === 'stale' && 'opacity-80'
       )}
     >
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium text-muted-foreground">
           {title}
         </CardTitle>
-        {icon && <div className="text-muted-foreground">{icon}</div>}
+        <div className="flex items-center gap-2">
+          {lastUpdate && <FreshnessBadge lastUpdate={lastUpdate} />}
+          {icon && <div className="text-muted-foreground">{icon}</div>}
+        </div>
       </CardHeader>
       <CardContent className="space-y-2">
         <div className="text-2xl font-bold">{value}</div>
@@ -83,12 +82,6 @@ export function MetricCard({
           )}
         </div>
         {children}
-        {lastUpdate && (
-          <div className="flex items-center gap-1 text-[10px] text-muted-foreground pt-1 border-t border-border/50">
-            <Clock className="h-2.5 w-2.5" />
-            <span>更新 {formatTime(lastUpdate)}</span>
-          </div>
-        )}
       </CardContent>
     </Card>
   );
