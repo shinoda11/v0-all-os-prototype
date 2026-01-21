@@ -1,0 +1,69 @@
+{
+  "_comment": "Sample events for replay demo. Replace with larger dataset as needed.",
+  "_instructions": "To add more events: 1) Add to this array 2) Ensure IDs match master data in mock.ts",
+  "events": [
+    {
+      "id": "evt-1",
+      "type": "labor",
+      "storeId": "store-1",
+      "timestamp": "2026-01-21T09:00:00.000Z",
+      "timeBand": "lunch",
+      "staffId": "staff-1",
+      "action": "check-in"
+    },
+    {
+      "id": "evt-2",
+      "type": "labor",
+      "storeId": "store-1",
+      "timestamp": "2026-01-21T09:05:00.000Z",
+      "timeBand": "lunch",
+      "staffId": "staff-2",
+      "action": "check-in"
+    },
+    {
+      "id": "evt-3",
+      "type": "prep",
+      "storeId": "store-1",
+      "timestamp": "2026-01-21T09:15:00.000Z",
+      "timeBand": "lunch",
+      "prepItemId": "prep-1",
+      "quantity": 20,
+      "status": "started",
+      "assignedStaffId": "staff-2"
+    },
+    {
+      "id": "evt-4",
+      "type": "delivery",
+      "storeId": "store-1",
+      "timestamp": "2026-01-21T10:00:00.000Z",
+      "timeBand": "lunch",
+      "supplierId": "supplier-1",
+      "itemName": "豚バラ肉",
+      "expectedAt": "2026-01-21T09:30:00.000Z",
+      "status": "delayed",
+      "delayMinutes": 45
+    },
+    {
+      "id": "evt-5",
+      "type": "sales",
+      "storeId": "store-1",
+      "timestamp": "2026-01-21T11:00:00.000Z",
+      "timeBand": "lunch",
+      "menuId": "menu-1",
+      "quantity": 2,
+      "unitPrice": 980,
+      "total": 1960
+    },
+    {
+      "id": "evt-6",
+      "type": "sales",
+      "storeId": "store-1",
+      "timestamp": "2026-01-21T11:15:00.000Z",
+      "timeBand": "lunch",
+      "menuId": "menu-2",
+      "quantity": 3,
+      "unitPrice": 880,
+      "total": 2640
+    }
+  ]
+}

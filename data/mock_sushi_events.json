@@ -1,0 +1,336 @@
+{
+  "stores": [
+    { "id": "store_futakotamagawa", "name": "二子玉川店", "code": "FUTAKO" },
+    { "id": "store_jiyugaoka", "name": "自由が丘店", "code": "JIYUGAOKA" },
+    { "id": "store_toyosu", "name": "豊洲店", "code": "TOYOSU" },
+    { "id": "store_komazawa", "name": "駒沢店", "code": "KOMAZAWA" }
+  ],
+  "staff": [
+    { "id": "staff_tanaka", "name": "田中 太郎", "roleId": "role-manager", "storeId": "store_futakotamagawa" },
+    { "id": "staff_suzuki", "name": "鈴木 花子", "roleId": "role-kitchen", "storeId": "store_futakotamagawa" },
+    { "id": "staff_sato", "name": "佐藤 一郎", "roleId": "role-kitchen", "storeId": "store_futakotamagawa" },
+    { "id": "staff_yamada", "name": "山田 美咲", "roleId": "role-floor", "storeId": "store_futakotamagawa" },
+    { "id": "staff_takahashi", "name": "高橋 健太", "roleId": "role-floor", "storeId": "store_futakotamagawa" },
+    { "id": "staff_ito", "name": "伊藤 愛", "roleId": "role-delivery", "storeId": "store_futakotamagawa" },
+    { "id": "staff_nakamura", "name": "中村 裕子", "roleId": "role-manager", "storeId": "store_jiyugaoka" },
+    { "id": "staff_kobayashi", "name": "小林 誠", "roleId": "role-kitchen", "storeId": "store_jiyugaoka" },
+    { "id": "staff_kato", "name": "加藤 恵", "roleId": "role-floor", "storeId": "store_jiyugaoka" }
+  ],
+  "events": [
+    {
+      "id": "evt-sales-001",
+      "type": "sales",
+      "storeId": "store_futakotamagawa",
+      "timestamp": "2026-01-21T11:30:00.000Z",
+      "timeBand": "lunch",
+      "menuId": "menu-1",
+      "quantity": 2,
+      "unitPrice": 2800,
+      "total": 5600
+    },
+    {
+      "id": "evt-sales-002",
+      "type": "sales",
+      "storeId": "store_futakotamagawa",
+      "timestamp": "2026-01-21T11:45:00.000Z",
+      "timeBand": "lunch",
+      "menuId": "menu-2",
+      "quantity": 3,
+      "unitPrice": 3200,
+      "total": 9600
+    },
+    {
+      "id": "evt-sales-003",
+      "type": "sales",
+      "storeId": "store_futakotamagawa",
+      "timestamp": "2026-01-21T12:00:00.000Z",
+      "timeBand": "lunch",
+      "menuId": "menu-3",
+      "quantity": 1,
+      "unitPrice": 4500,
+      "total": 4500
+    },
+    {
+      "id": "evt-sales-004",
+      "type": "sales",
+      "storeId": "store_futakotamagawa",
+      "timestamp": "2026-01-21T12:15:00.000Z",
+      "timeBand": "lunch",
+      "menuId": "menu-1",
+      "quantity": 4,
+      "unitPrice": 2800,
+      "total": 11200
+    },
+    {
+      "id": "evt-sales-005",
+      "type": "sales",
+      "storeId": "store_futakotamagawa",
+      "timestamp": "2026-01-21T12:30:00.000Z",
+      "timeBand": "lunch",
+      "menuId": "menu-4",
+      "quantity": 2,
+      "unitPrice": 1800,
+      "total": 3600
+    },
+    {
+      "id": "evt-sales-006",
+      "type": "sales",
+      "storeId": "store_futakotamagawa",
+      "timestamp": "2026-01-21T18:00:00.000Z",
+      "timeBand": "dinner",
+      "menuId": "menu-5",
+      "quantity": 3,
+      "unitPrice": 5800,
+      "total": 17400
+    },
+    {
+      "id": "evt-sales-007",
+      "type": "sales",
+      "storeId": "store_futakotamagawa",
+      "timestamp": "2026-01-21T18:30:00.000Z",
+      "timeBand": "dinner",
+      "menuId": "menu-2",
+      "quantity": 2,
+      "unitPrice": 3200,
+      "total": 6400
+    },
+    {
+      "id": "evt-sales-008",
+      "type": "sales",
+      "storeId": "store_jiyugaoka",
+      "timestamp": "2026-01-21T12:00:00.000Z",
+      "timeBand": "lunch",
+      "menuId": "menu-1",
+      "quantity": 3,
+      "unitPrice": 2800,
+      "total": 8400
+    },
+    {
+      "id": "evt-sales-009",
+      "type": "sales",
+      "storeId": "store_jiyugaoka",
+      "timestamp": "2026-01-21T12:30:00.000Z",
+      "timeBand": "lunch",
+      "menuId": "menu-3",
+      "quantity": 2,
+      "unitPrice": 4500,
+      "total": 9000
+    },
+    {
+      "id": "evt-labor-001",
+      "type": "labor",
+      "storeId": "store_futakotamagawa",
+      "timestamp": "2026-01-21T09:00:00.000Z",
+      "timeBand": "lunch",
+      "staffId": "staff_tanaka",
+      "action": "check-in"
+    },
+    {
+      "id": "evt-labor-002",
+      "type": "labor",
+      "storeId": "store_futakotamagawa",
+      "timestamp": "2026-01-21T09:15:00.000Z",
+      "timeBand": "lunch",
+      "staffId": "staff_suzuki",
+      "action": "check-in"
+    },
+    {
+      "id": "evt-labor-003",
+      "type": "labor",
+      "storeId": "store_futakotamagawa",
+      "timestamp": "2026-01-21T09:30:00.000Z",
+      "timeBand": "lunch",
+      "staffId": "staff_sato",
+      "action": "check-in"
+    },
+    {
+      "id": "evt-labor-004",
+      "type": "labor",
+      "storeId": "store_futakotamagawa",
+      "timestamp": "2026-01-21T10:00:00.000Z",
+      "timeBand": "lunch",
+      "staffId": "staff_yamada",
+      "action": "check-in"
+    },
+    {
+      "id": "evt-labor-005",
+      "type": "labor",
+      "storeId": "store_futakotamagawa",
+      "timestamp": "2026-01-21T14:00:00.000Z",
+      "timeBand": "idle",
+      "staffId": "staff_suzuki",
+      "action": "break-start"
+    },
+    {
+      "id": "evt-labor-006",
+      "type": "labor",
+      "storeId": "store_futakotamagawa",
+      "timestamp": "2026-01-21T14:30:00.000Z",
+      "timeBand": "idle",
+      "staffId": "staff_suzuki",
+      "action": "break-end"
+    },
+    {
+      "id": "evt-labor-007",
+      "type": "labor",
+      "storeId": "store_jiyugaoka",
+      "timestamp": "2026-01-21T09:00:00.000Z",
+      "timeBand": "lunch",
+      "staffId": "staff_nakamura",
+      "action": "check-in"
+    },
+    {
+      "id": "evt-labor-008",
+      "type": "labor",
+      "storeId": "store_jiyugaoka",
+      "timestamp": "2026-01-21T09:15:00.000Z",
+      "timeBand": "lunch",
+      "staffId": "staff_kobayashi",
+      "action": "check-in"
+    },
+    {
+      "id": "evt-prep-001",
+      "type": "prep",
+      "storeId": "store_futakotamagawa",
+      "timestamp": "2026-01-21T09:30:00.000Z",
+      "timeBand": "lunch",
+      "prepItemId": "prep-1",
+      "quantity": 30,
+      "status": "started",
+      "assignedStaffId": "staff_suzuki"
+    },
+    {
+      "id": "evt-prep-002",
+      "type": "prep",
+      "storeId": "store_futakotamagawa",
+      "timestamp": "2026-01-21T10:30:00.000Z",
+      "timeBand": "lunch",
+      "prepItemId": "prep-1",
+      "quantity": 30,
+      "status": "completed",
+      "assignedStaffId": "staff_suzuki"
+    },
+    {
+      "id": "evt-prep-003",
+      "type": "prep",
+      "storeId": "store_futakotamagawa",
+      "timestamp": "2026-01-21T10:00:00.000Z",
+      "timeBand": "lunch",
+      "prepItemId": "prep-2",
+      "quantity": 20,
+      "status": "started",
+      "assignedStaffId": "staff_sato"
+    },
+    {
+      "id": "evt-prep-004",
+      "type": "prep",
+      "storeId": "store_futakotamagawa",
+      "timestamp": "2026-01-21T11:00:00.000Z",
+      "timeBand": "lunch",
+      "prepItemId": "prep-2",
+      "quantity": 20,
+      "status": "completed",
+      "assignedStaffId": "staff_sato"
+    },
+    {
+      "id": "evt-delivery-001",
+      "type": "delivery",
+      "storeId": "store_futakotamagawa",
+      "timestamp": "2026-01-21T08:00:00.000Z",
+      "timeBand": "lunch",
+      "supplierId": "supplier-toyosu",
+      "itemName": "本日の鮮魚セット",
+      "expectedAt": "2026-01-21T07:00:00.000Z",
+      "actualAt": "2026-01-21T08:00:00.000Z",
+      "status": "arrived",
+      "delayMinutes": 60
+    },
+    {
+      "id": "evt-delivery-002",
+      "type": "delivery",
+      "storeId": "store_futakotamagawa",
+      "timestamp": "2026-01-21T10:30:00.000Z",
+      "timeBand": "lunch",
+      "supplierId": "supplier-rice",
+      "itemName": "特選シャリ用米",
+      "expectedAt": "2026-01-21T09:00:00.000Z",
+      "status": "delayed",
+      "delayMinutes": 90
+    },
+    {
+      "id": "evt-delivery-003",
+      "type": "delivery",
+      "storeId": "store_jiyugaoka",
+      "timestamp": "2026-01-21T07:30:00.000Z",
+      "timeBand": "lunch",
+      "supplierId": "supplier-toyosu",
+      "itemName": "本日の鮮魚セット",
+      "expectedAt": "2026-01-21T07:30:00.000Z",
+      "status": "arrived"
+    },
+    {
+      "id": "evt-decision-001",
+      "type": "decision",
+      "storeId": "store_futakotamagawa",
+      "timestamp": "2026-01-21T11:00:00.000Z",
+      "timeBand": "lunch",
+      "proposalId": "prop-001",
+      "action": "approved",
+      "title": "炙りサーモン追加仕込み",
+      "description": "ランチの需要増加に対応するため、炙りサーモンを追加で20貫分仕込みます",
+      "distributedToRoles": ["role-kitchen"],
+      "targetMenuIds": ["menu-2"],
+      "targetPrepItemIds": ["prep-2"],
+      "quantity": 20,
+      "deadline": "2026-01-21T12:00:00.000Z",
+      "priority": "high"
+    },
+    {
+      "id": "evt-decision-002",
+      "type": "decision",
+      "storeId": "store_futakotamagawa",
+      "timestamp": "2026-01-21T11:30:00.000Z",
+      "timeBand": "lunch",
+      "proposalId": "prop-001",
+      "action": "started",
+      "title": "炙りサーモン追加仕込み",
+      "description": "作業開始",
+      "distributedToRoles": ["role-kitchen"],
+      "targetMenuIds": ["menu-2"],
+      "targetPrepItemIds": ["prep-2"],
+      "quantity": 20,
+      "priority": "high"
+    },
+    {
+      "id": "evt-decision-003",
+      "type": "decision",
+      "storeId": "store_futakotamagawa",
+      "timestamp": "2026-01-21T17:00:00.000Z",
+      "timeBand": "dinner",
+      "proposalId": "prop-002",
+      "action": "approved",
+      "title": "ディナー特上盛り合わせ増産",
+      "description": "予約状況を踏まえ、特上盛り合わせの仕込みを追加",
+      "distributedToRoles": ["role-kitchen", "role-manager"],
+      "targetMenuIds": ["menu-5"],
+      "targetPrepItemIds": ["prep-1", "prep-3"],
+      "quantity": 15,
+      "deadline": "2026-01-21T18:00:00.000Z",
+      "priority": "medium"
+    }
+  ],
+  "menus": [
+    { "id": "menu-1", "name": "熟成まぐろ握り", "price": 2800, "category": "main", "prepTimeMinutes": 5 },
+    { "id": "menu-2", "name": "炙りサーモン握り", "price": 3200, "category": "main", "prepTimeMinutes": 6 },
+    { "id": "menu-3", "name": "特選うに軍艦", "price": 4500, "category": "main", "prepTimeMinutes": 3 },
+    { "id": "menu-4", "name": "玉子焼き", "price": 1800, "category": "side", "prepTimeMinutes": 8 },
+    { "id": "menu-5", "name": "特上盛り合わせ", "price": 5800, "category": "main", "prepTimeMinutes": 15 }
+  ],
+  "prepItems": [
+    { "id": "prep-1", "name": "熟成まぐろ", "menuIds": ["menu-1", "menu-5"], "defaultQuantity": 30, "unit": "貫" },
+    { "id": "prep-2", "name": "炙りサーモン", "menuIds": ["menu-2", "menu-5"], "defaultQuantity": 25, "unit": "貫" },
+    { "id": "prep-3", "name": "うに", "menuIds": ["menu-3", "menu-5"], "defaultQuantity": 15, "unit": "貫" },
+    { "id": "prep-4", "name": "シャリ", "menuIds": ["menu-1", "menu-2", "menu-3", "menu-4", "menu-5"], "defaultQuantity": 100, "unit": "個" },
+    { "id": "prep-5", "name": "玉子焼き", "menuIds": ["menu-4"], "defaultQuantity": 20, "unit": "本" }
+  ]
+}
