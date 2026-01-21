@@ -9,12 +9,8 @@ export default function TodoRedirect() {
   const { state } = useStore();
 
   useEffect(() => {
-    if (state.selectedStoreId) {
-      router.replace(`/stores/${state.selectedStoreId}/floor/todo`);
-    } else {
-      router.replace('/stores/select');
-    }
-  }, [state.selectedStoreId, router]);
+    router.replace('/stores/1/floor/todo');
+  }, [router]);
 
   return (
     <div className="flex items-center justify-center h-screen">

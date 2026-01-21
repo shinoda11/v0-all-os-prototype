@@ -9,12 +9,9 @@ export default function CockpitRedirect() {
   const { state } = useStore();
 
   useEffect(() => {
-    if (state.selectedStoreId) {
-      router.replace(`/stores/${state.selectedStoreId}/os/cockpit`);
-    } else {
-      router.replace('/stores/select');
-    }
-  }, [state.selectedStoreId, router]);
+    // Always redirect to store 1 for prototype
+    router.replace('/stores/1/os/cockpit');
+  }, [router]);
 
   return (
     <div className="flex items-center justify-center h-screen">

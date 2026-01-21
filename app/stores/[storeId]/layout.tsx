@@ -27,7 +27,7 @@ export default function StoreLayout({ children, params }: StoreLayoutProps) {
 
   // Validate storeId and redirect if invalid
   if (!VALID_STORE_IDS.includes(storeId)) {
-    router.replace('/stores/select');
+    router.replace('/stores/1/os/cockpit');
     return null;
   }
   return <AppShell storeId={storeId}>{children}</AppShell>;

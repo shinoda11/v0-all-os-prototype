@@ -9,12 +9,8 @@ export default function SalesForecastRedirect() {
   const { state } = useStore();
 
   useEffect(() => {
-    if (state.selectedStoreId) {
-      router.replace(`/stores/${state.selectedStoreId}/sales-forecast`);
-    } else {
-      router.replace('/stores/select');
-    }
-  }, [state.selectedStoreId, router]);
+    router.replace('/stores/1/food-service/stores/sales-forecast');
+  }, [router]);
 
   return (
     <div className="flex items-center justify-center h-screen">

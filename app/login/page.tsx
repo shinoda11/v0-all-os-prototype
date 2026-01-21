@@ -23,8 +23,8 @@ export default function LoginPage() {
     // Simulate login delay (no real auth)
     await new Promise((resolve) => setTimeout(resolve, 500));
     
-    // Navigate to store selection
-    router.push('/stores/select');
+    // Navigate directly to cockpit (skip store selection for prototype)
+    router.push('/stores/1/os/cockpit');
   };
 
   return (

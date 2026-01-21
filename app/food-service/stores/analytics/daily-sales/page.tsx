@@ -9,12 +9,8 @@ export default function DailySalesRedirect() {
   const { state } = useStore();
 
   useEffect(() => {
-    if (state.selectedStoreId) {
-      router.replace(`/stores/${state.selectedStoreId}/analytics/daily-sales`);
-    } else {
-      router.replace('/stores/select');
-    }
-  }, [state.selectedStoreId, router]);
+    router.replace('/stores/1/food-service/stores/analytics/daily-sales');
+  }, [router]);
 
   return (
     <div className="flex items-center justify-center h-screen">

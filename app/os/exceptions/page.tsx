@@ -9,12 +9,8 @@ export default function ExceptionsRedirect() {
   const { state } = useStore();
 
   useEffect(() => {
-    if (state.selectedStoreId) {
-      router.replace(`/stores/${state.selectedStoreId}/os/exceptions`);
-    } else {
-      router.replace('/stores/select');
-    }
-  }, [state.selectedStoreId, router]);
+    router.replace('/stores/1/os/exceptions');
+  }, [router]);
 
   return (
     <div className="flex items-center justify-center h-screen">

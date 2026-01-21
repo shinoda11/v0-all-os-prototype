@@ -276,30 +276,30 @@ export default function CockpitPage() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <MetricCard
           title="売上"
-          value={`¥${metrics.sales.actualSales.toLocaleString()}`}
-          subValue={`予測: ¥${metrics.sales.forecastSales.toLocaleString()}`}
-          trend={metrics.sales.achievementRate >= 100 ? 'up' : 'down'}
-          trendValue={`${Math.round(metrics.sales.achievementRate)}%`}
+          value={`¥${(metrics?.sales?.actualSales ?? 0).toLocaleString()}`}
+          subValue={`予測: ¥${(metrics?.sales?.forecastSales ?? 0).toLocaleString()}`}
+          trend={(metrics?.sales?.achievementRate ?? 0) >= 100 ? 'up' : 'down'}
+          trendValue={`${Math.round(metrics?.sales?.achievementRate ?? 0)}%`}
           icon={<TrendingUp className="h-4 w-4" />}
         />
         <MetricCard
           title="稼働人数"
-          value={`${metrics.labor.activeStaffCount}名`}
-          subValue={`休憩中: ${metrics.labor.onBreakCount}名`}
+          value={`${metrics?.labor?.activeStaffCount ?? 0}名`}
+          subValue={`休憩中: ${metrics?.labor?.onBreakCount ?? 0}名`}
           icon={<Users className="h-4 w-4" />}
         />
         <MetricCard
           title="仕込み進捗"
-          value={`${Math.round(metrics.prep.completionRate)}%`}
-          subValue={`${metrics.prep.completedCount}/${metrics.prep.plannedCount + metrics.prep.inProgressCount + metrics.prep.completedCount}件完了`}
-          trend={metrics.prep.completionRate >= 80 ? 'up' : 'down'}
+          value={`${Math.round(metrics?.prep?.completionRate ?? 0)}%`}
+          subValue={`${metrics?.prep?.completedCount ?? 0}/${(metrics?.prep?.plannedCount ?? 0) + (metrics?.prep?.inProgressCount ?? 0) + (metrics?.prep?.completedCount ?? 0)}件完了`}
+          trend={(metrics?.prep?.completionRate ?? 0) >= 80 ? 'up' : 'down'}
           icon={<Package className="h-4 w-4" />}
         />
         <MetricCard
           title="例外"
-          value={`${metrics.exceptions.length}件`}
-          subValue={metrics.exceptions.filter((e) => e.severity === 'critical').length > 0 ? '要対応あり' : '正常'}
-          trend={metrics.exceptions.length > 0 ? 'down' : 'up'}
+          value={`${metrics?.exceptions?.length ?? 0}件`}
+          subValue={(metrics?.exceptions ?? []).filter((e) => e.severity === 'critical').length > 0 ? '要対応あり' : '正常'}
+          trend={(metrics?.exceptions?.length ?? 0) > 0 ? 'down' : 'up'}
           icon={<AlertTriangle className="h-4 w-4" />}
         />
       </div>
