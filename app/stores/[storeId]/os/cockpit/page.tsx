@@ -1,11 +1,11 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { OSHeader } from '@/components/OSHeader';
-import { CockpitKPICards } from '@/components/cockpit/CockpitKPICards';
-import { LaneTimeline } from '@/components/cockpit/LaneTimeline';
-import { EnhancedDecisionQueue } from '@/components/cockpit/EnhancedDecisionQueue';
-import { ShiftPlanDisplay } from '@/components/cockpit/ShiftPlanDisplay';
+import { PageHeader } from '@/components/PageHeader';
+import { TimeBandTabs } from '@/components/TimeBandTabs';
+import { MetricCard } from '@/components/MetricCard';
+import { Timeline } from '@/components/Timeline';
+import { DecisionQueue } from '@/components/DecisionQueue';
 import { Drawer } from '@/components/Drawer';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,13 +14,17 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { useStore } from '@/state/store';
 import {
-  selectCurrentStore,
-  selectEnhancedCockpitMetrics,
+  selectCockpitMetrics,
   selectRecentEvents,
-  selectStaffStates,
+  selectCurrentStore,
 } from '@/core/selectors';
 import type { TimeBand, Proposal, Role } from '@/core/types';
 import {
+  TrendingUp,
+  Users,
+  Package,
+  Gauge,
+  AlertTriangle,
   Play,
   Pause,
   SkipForward,
@@ -207,20 +211,16 @@ export default function CockpitPage() {
   const [timeBand, setTimeBand] = useState<TimeBand>('all');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingProposal, setEditingProposal] = useState<Proposal | null>(null);
-  
+
   // All hooks must be called before any early returns
   const eventsLength = state.events.length;
   const selectedStoreId = state.selectedStoreId;
   const lastRefreshKey = useRef('');
   const actionsRef = useRef(actions);
   actionsRef.current = actions;
-  
-  const enhancedMetrics = selectEnhancedCockpitMetrics(state, undefined, timeBand);
-  const recentEvents = selectRecentEvents(state, 50); // More events for lane view
-  const staffStates = selectStaffStates(state);
-  
-  // Get store staff for shift display
-  const storeStaff = state.staff.filter(s => s.storeId === selectedStoreId);
+
+  const metrics = selectCockpitMetrics(state, undefined, timeBand);
+  const recentEvents = selectRecentEvents(state, 20);
 
   // Refresh proposals when events change
   useEffect(() => {
@@ -231,13 +231,11 @@ export default function CockpitPage() {
     }
   }, [eventsLength, selectedStoreId]);
 
-  const handleApprove = (proposal: Proposal, selectedRoles: string[]) => {
-    actions.approveProposal({ ...proposal, distributedToRoles: selectedRoles });
+  const handleApprove = (proposal: Proposal) => {
+    actions.approveProposal(proposal);
   };
 
-  const handleReject = (proposal: Proposal, reason: string) => {
-    // Log reason for analytics (simplified)
-    console.log(`Proposal ${proposal.id} rejected: ${reason}`);
+  const handleReject = (proposal: Proposal) => {
     actions.rejectProposal(proposal);
   };
 
@@ -263,51 +261,60 @@ export default function CockpitPage() {
     );
   }
 
-  const lastUpdate = new Date().toISOString();
+  const shortName = currentStore.name.replace('Aburi TORA 熟成鮨と炙り鮨 ', '');
 
   return (
     <div className="space-y-6">
-      <OSHeader
-        title="運用コックピット"
-        timeBand={timeBand}
-        onTimeBandChange={setTimeBand}
-      />
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <PageHeader title="運用コックピット" subtitle={shortName} />
+        <TimeBandTabs value={timeBand} onChange={setTimeBand} />
+      </div>
 
-      {/* Replay controls (collapsible/debug) */}
       <ReplayControls />
 
-      {/* KPI Cards - Enhanced with detailed metrics */}
-      <CockpitKPICards
-        sales={enhancedMetrics?.sales ?? null}
-        labor={enhancedMetrics?.labor ?? null}
-        supplyDemand={enhancedMetrics?.supplyDemand ?? null}
-        operations={enhancedMetrics?.operations ?? null}
-        exceptions={enhancedMetrics?.exceptions ?? null}
-      />
+      {/* KPI Cards */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <MetricCard
+          title="売上"
+          value={`¥${metrics.sales.actualSales.toLocaleString()}`}
+          subValue={`予測: ¥${metrics.sales.forecastSales.toLocaleString()}`}
+          trend={metrics.sales.achievementRate >= 100 ? 'up' : 'down'}
+          trendValue={`${Math.round(metrics.sales.achievementRate)}%`}
+          icon={<TrendingUp className="h-4 w-4" />}
+        />
+        <MetricCard
+          title="稼働人数"
+          value={`${metrics.labor.activeStaffCount}名`}
+          subValue={`休憩中: ${metrics.labor.onBreakCount}名`}
+          icon={<Users className="h-4 w-4" />}
+        />
+        <MetricCard
+          title="仕込み進捗"
+          value={`${Math.round(metrics.prep.completionRate)}%`}
+          subValue={`${metrics.prep.completedCount}/${metrics.prep.plannedCount + metrics.prep.inProgressCount + metrics.prep.completedCount}件完了`}
+          trend={metrics.prep.completionRate >= 80 ? 'up' : 'down'}
+          icon={<Package className="h-4 w-4" />}
+        />
+        <MetricCard
+          title="例外"
+          value={`${metrics.exceptions.length}件`}
+          subValue={metrics.exceptions.filter((e) => e.severity === 'critical').length > 0 ? '要対応あり' : '正常'}
+          trend={metrics.exceptions.length > 0 ? 'down' : 'up'}
+          icon={<AlertTriangle className="h-4 w-4" />}
+        />
+      </div>
 
-      {/* Main content grid */}
+      {/* Main content */}
       <div className="grid gap-6 lg:grid-cols-3">
-        {/* Lane Timeline - Takes 2 columns */}
-        <div className="lg:col-span-2 space-y-6">
-          <LaneTimeline events={recentEvents} lastUpdate={lastUpdate} />
+        <div className="lg:col-span-2">
+          <Timeline events={recentEvents} />
         </div>
-
-        {/* Right sidebar - Decision queue and shift plan */}
-        <div className="space-y-6">
-          <EnhancedDecisionQueue
+        <div>
+          <DecisionQueue
             proposals={state.proposals}
-            roles={state.roles}
             onApprove={handleApprove}
             onReject={handleReject}
             onEdit={handleEdit}
-            lastUpdate={lastUpdate}
-          />
-
-          <ShiftPlanDisplay
-            staff={storeStaff}
-            roles={state.roles}
-            staffStates={staffStates}
-            lastUpdate={lastUpdate}
           />
         </div>
       </div>
