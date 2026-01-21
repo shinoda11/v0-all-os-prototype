@@ -27,7 +27,6 @@ import {
   selectCurrentStore,
   selectWeeklyLaborMetrics,
 } from '@/core/selectors';
-import { evaluateDailyGuardrail, type DailyGuardrailResult } from '@/core/derive';
 import { FreshnessBadge } from '@/components/FreshnessBadge';
 import {
   TrendingUp,
@@ -40,9 +39,6 @@ import {
   DollarSign,
   Calendar,
   Lightbulb,
-  CheckCircle,
-  XCircle,
-  MinusCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
@@ -58,112 +54,99 @@ const TARGETS = {
 
 interface LaborProposal {
   id: string;
-  type: 'bad-days-warning' | 'skill-shortage' | 'timeband-focus' | 'overstaffing';
+  type: 'skill-shortage' | 'break-imbalance' | 'overstaffing' | 'understaffing' | 'cost-overrun';
   title: string;
   description: string;
   timeBand?: 'lunch' | 'idle' | 'dinner';
-  affectedDays?: string[];
   impact: string;
   priority: 'high' | 'medium' | 'low';
 }
 
-interface DailyGuardrailInfo {
-  date: string;
-  dayLabel: string;
-  dayOfWeek: number;
-  guardrail: DailyGuardrailResult | null;
-}
-
-// Generate labor improvement proposals based on guardrail analysis
-function generateProposals(
-  metrics: WeeklyLaborMetrics,
-  dailyGuardrails: DailyGuardrailInfo[]
-): LaborProposal[] {
+// Generate labor improvement proposals based on metrics
+function generateProposals(metrics: WeeklyLaborMetrics): LaborProposal[] {
   const proposals: LaborProposal[] = [];
+  const { weekSummary, dailyRows } = metrics;
   
-  // Count BAD and CAUTION days
-  const badDays = dailyGuardrails.filter(d => d.guardrail?.status === 'bad');
-  const cautionDays = dailyGuardrails.filter(d => d.guardrail?.status === 'caution');
-  const goodDays = dailyGuardrails.filter(d => d.guardrail?.status === 'good');
-  
-  // 1. BAD days warning (highest priority)
-  if (badDays.length > 0) {
-    const avgDeltaToBad = badDays.reduce((sum, d) => sum + (d.guardrail?.deltaToBad ?? 0), 0) / badDays.length;
+  // Check for labor rate overrun
+  if (weekSummary.avgLaborRate !== null && weekSummary.avgLaborRate > TARGETS.laborRate) {
+    const diff = weekSummary.avgLaborRate - TARGETS.laborRate;
     proposals.push({
-      id: 'bad-days-1',
-      type: 'bad-days-warning',
-      title: `${badDays.length}日がBADゾーン`,
-      description: `${badDays.map(d => d.dayLabel).join('・')}曜日で人件費率がBADラインを超過。売上見込み下振れ時の対応を準備してください。`,
-      affectedDays: badDays.map(d => d.dayLabel),
-      impact: `平均${(avgDeltaToBad * 100).toFixed(1)}pt超過 → 次週は休憩調整・早上がり検討`,
-      priority: 'high',
+      id: 'cost-1',
+      type: 'cost-overrun',
+      title: '人件費率の超過',
+      description: `人件費率${weekSummary.avgLaborRate.toFixed(1)}%が目標${TARGETS.laborRate.toFixed(1)}%を${diff.toFixed(1)}pt超過しています。`,
+      impact: weekSummary.totalSales 
+        ? `月間利益への影響: 約¥${Math.round(diff * weekSummary.totalSales / 100 * 4).toLocaleString()}減`
+        : '利益への影響あり',
+      priority: diff > 3 ? 'high' : 'medium',
     });
   }
   
-  // 2. CAUTION days focus (if no BAD days or as secondary)
-  if (cautionDays.length >= 2 && proposals.length < 2) {
-    // Identify which time band is most problematic
-    // For simplicity, assume weekdays = lunch risk, weekends = dinner risk
-    const weekdayCaution = cautionDays.filter(d => d.dayOfWeek >= 1 && d.dayOfWeek <= 5);
-    const weekendCaution = cautionDays.filter(d => d.dayOfWeek === 0 || d.dayOfWeek === 6);
+  // Check for skill mix imbalance
+  const totalStaff = weekSummary.starMixTotal.star3 + weekSummary.starMixTotal.star2 + weekSummary.starMixTotal.star1;
+  if (totalStaff > 0) {
+    const star3Ratio = weekSummary.starMixTotal.star3 / totalStaff;
+    const star1Ratio = weekSummary.starMixTotal.star1 / totalStaff;
     
-    if (weekdayCaution.length > weekendCaution.length) {
+    if (star3Ratio < TARGETS.star3Ratio * 0.8) {
       proposals.push({
-        id: 'timeband-1',
-        type: 'timeband-focus',
-        title: '平日ランチ帯の人件費注意',
-        description: `平日${weekdayCaution.length}日でCAUTIONゾーン。ランチ帯の人員配置を見直してください。`,
-        timeBand: 'lunch',
-        affectedDays: weekdayCaution.map(d => d.dayLabel),
-        impact: '売上下振れ時にBADゾーンに転落するリスク',
-        priority: 'medium',
-      });
-    } else if (weekendCaution.length > 0) {
-      proposals.push({
-        id: 'timeband-2',
-        type: 'timeband-focus',
-        title: '土日ディナー帯の人件費注意',
-        description: `土日${weekendCaution.length}日でCAUTIONゾーン。ディナー帯のスキルミックスを確認してください。`,
+        id: 'skill-1',
+        type: 'skill-shortage',
+        title: 'ディナー帯の★3スタッフ不足',
+        description: `★3スタッフの配置が目標比${Math.round((1 - star3Ratio / TARGETS.star3Ratio) * 100)}%不足しています。`,
         timeBand: 'dinner',
-        affectedDays: weekendCaution.map(d => d.dayLabel),
-        impact: '繁忙期に人件費率が悪化する可能性',
+        impact: 'サービス品質低下、クレーム増加の可能性',
+        priority: 'high',
+      });
+    }
+    
+    if (star1Ratio > TARGETS.star1Ratio * 1.3) {
+      proposals.push({
+        id: 'skill-2',
+        type: 'understaffing',
+        title: '★1スタッフへの依存過多',
+        description: `★1スタッフが目標比${Math.round((star1Ratio / TARGETS.star1Ratio - 1) * 100)}%過多です。`,
+        impact: '教育負荷増加、ミス発生率上昇',
         priority: 'medium',
       });
     }
   }
   
-  // 3. Overstaffing check based on hours variance
-  const { weekSummary, dailyRows } = metrics;
+  // Check for overstaffing on specific days
   const avgDailyHours = weekSummary.totalHours / 7;
   const highHoursDays = dailyRows.filter(r => r.hours > avgDailyHours * 1.3);
-  if (highHoursDays.length >= 2 && proposals.length < 3) {
+  if (highHoursDays.length >= 2) {
     proposals.push({
       id: 'over-1',
       type: 'overstaffing',
-      title: '人時配分の偏り',
-      description: `${highHoursDays.map(d => d.dayLabel).join('・')}曜日の人時が週平均の130%超。アイドル帯に余剰がないか確認してください。`,
+      title: 'アイドル帯の過剰人時',
+      description: `${highHoursDays.map(d => d.dayLabel).join('・')}曜日の人時が週平均を大きく上回っています。`,
       timeBand: 'idle',
-      affectedDays: highHoursDays.map(d => d.dayLabel),
-      impact: `週間${Math.round((highHoursDays.reduce((s, d) => s + d.hours, 0) - avgDailyHours * highHoursDays.length)).toFixed(1)}h過剰`,
-      priority: goodDays.length >= 5 ? 'low' : 'medium',
+      impact: `週間で約${Math.round((highHoursDays.reduce((s, d) => s + d.hours, 0) - avgDailyHours * highHoursDays.length) * 1200).toLocaleString()}円の超過`,
+      priority: 'medium',
     });
   }
   
-  // Limit to 3 proposals max
-  return proposals.slice(0, 3);
+  // Always add break distribution suggestion
+  proposals.push({
+    id: 'break-1',
+    type: 'break-imbalance',
+    title: '休憩配置の確認推奨',
+    description: 'ランチ後(13:30-14:00)に休憩が集中していないか確認してください。',
+    timeBand: 'lunch',
+    impact: 'ディナー仕込み開始の遅延リスク',
+    priority: 'low',
+  });
+  
+  return proposals.slice(0, 5);
 }
 
 const proposalTypeConfig: Record<LaborProposal['type'], { icon: React.ReactNode; color: string; bgColor: string }> = {
-  'bad-days-warning': { icon: <XCircle className="h-4 w-4" />, color: 'text-red-700', bgColor: 'bg-red-50' },
   'skill-shortage': { icon: <Star className="h-4 w-4" />, color: 'text-yellow-700', bgColor: 'bg-yellow-50' },
-  'timeband-focus': { icon: <Clock className="h-4 w-4" />, color: 'text-amber-700', bgColor: 'bg-amber-50' },
+  'break-imbalance': { icon: <Clock className="h-4 w-4" />, color: 'text-blue-700', bgColor: 'bg-blue-50' },
   'overstaffing': { icon: <Users className="h-4 w-4" />, color: 'text-orange-700', bgColor: 'bg-orange-50' },
-};
-
-const guardrailStatusConfig: Record<string, { icon: React.ReactNode; color: string; bgColor: string; label: string }> = {
-  good: { icon: <CheckCircle className="h-4 w-4" />, color: 'text-green-600', bgColor: 'bg-green-50', label: 'GOOD' },
-  caution: { icon: <MinusCircle className="h-4 w-4" />, color: 'text-yellow-600', bgColor: 'bg-yellow-50', label: 'CAUTION' },
-  bad: { icon: <XCircle className="h-4 w-4" />, color: 'text-red-600', bgColor: 'bg-red-50', label: 'BAD' },
+  'understaffing': { icon: <Users className="h-4 w-4" />, color: 'text-red-700', bgColor: 'bg-red-50' },
+  'cost-overrun': { icon: <DollarSign className="h-4 w-4" />, color: 'text-red-700', bgColor: 'bg-red-50' },
 };
 
 const timeBandLabels: Record<string, string> = {
@@ -215,25 +198,9 @@ export default function LaborWeeklyPage() {
   
   // Get metrics for selected week
   const metrics = selectWeeklyLaborMetrics(state, selectedWeek);
+  const proposals = useMemo(() => generateProposals(metrics), [metrics]);
   
   const { weekSummary, dailyRows } = metrics;
-  
-  // Calculate guardrail status for each day
-  const dailyGuardrails = useMemo((): DailyGuardrailInfo[] => {
-    return dailyRows.map((row) => {
-      const date = new Date(row.date);
-      const dayOfWeek = date.getDay();
-      const guardrail = evaluateDailyGuardrail(row.sales, row.laborCost, dayOfWeek);
-      return {
-        date: row.date,
-        dayLabel: row.dayLabel,
-        dayOfWeek,
-        guardrail,
-      };
-    });
-  }, [dailyRows]);
-  
-  const proposals = useMemo(() => generateProposals(metrics, dailyGuardrails), [metrics, dailyGuardrails]);
   
   // Calculate diffs from targets
   const laborRateDiff = weekSummary.avgLaborRate !== null 
@@ -380,99 +347,65 @@ export default function LaborWeeklyPage() {
             <TableHeader>
               <TableRow>
                 <TableHead className="w-[80px]">{t('laborWeekly.date')}</TableHead>
-                <TableHead className="text-center w-[90px]">{t('laborWeekly.guardrail')}</TableHead>
-                <TableHead className="text-right">{t('laborWeekly.sales')}</TableHead>
-                <TableHead className="text-right">{t('laborWeekly.laborCost')}</TableHead>
-                <TableHead className="text-right">{t('laborWeekly.laborRate')}</TableHead>
                 <TableHead className="text-right">{t('laborWeekly.hours')}</TableHead>
+                <TableHead className="text-right">{t('laborWeekly.laborCost')}</TableHead>
+                <TableHead className="text-right">{t('laborWeekly.sales')}</TableHead>
+                <TableHead className="text-right">{t('laborWeekly.laborRate')}</TableHead>
+                <TableHead className="text-right">{t('laborWeekly.staffCount')}</TableHead>
                 <TableHead>{t('laborWeekly.skillMix')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {dailyRows.map((row, idx) => {
-                const guardrailInfo = dailyGuardrails[idx];
-                const guardrail = guardrailInfo?.guardrail;
-                const statusConfig = guardrail ? guardrailStatusConfig[guardrail.status] : null;
-                
-                return (
-                  <TableRow key={row.date} className={cn(
-                    guardrail?.status === 'bad' && 'bg-red-50/50',
-                    guardrail?.status === 'caution' && 'bg-yellow-50/30'
+              {dailyRows.map((row) => (
+                <TableRow key={row.date}>
+                  <TableCell className="font-medium">
+                    {row.date.slice(5).replace('-', '/')} ({row.dayLabel})
+                  </TableCell>
+                  <TableCell className="text-right">{formatHours(row.hours, locale)}</TableCell>
+                  <TableCell className="text-right">{formatCurrency(row.laborCost, locale)}</TableCell>
+                  <TableCell className="text-right">
+                    {row.sales !== null 
+                      ? formatCurrency(row.sales, locale)
+                      : <span className="text-muted-foreground">--</span>
+                    }
+                  </TableCell>
+                  <TableCell className={cn(
+                    'text-right',
+                    row.laborRate !== null && row.laborRate > TARGETS.laborRate && 'text-red-600 font-medium'
                   )}>
-                    <TableCell className="font-medium">
-                      {row.date.slice(5).replace('-', '/')} ({row.dayLabel})
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {statusConfig ? (
-                        <Badge 
-                          variant="outline" 
-                          className={cn('gap-1 text-[10px]', statusConfig.color, statusConfig.bgColor)}
-                        >
-                          {statusConfig.icon}
-                          {statusConfig.label}
+                    {row.laborRate !== null ? formatPercent(row.laborRate, locale) : '--'}
+                  </TableCell>
+                  <TableCell className="text-right">{row.staffCount}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1">
+                      {row.starMix.star3 > 0 && (
+                        <Badge variant="outline" className="text-[10px] gap-0.5">
+                          <Star className="h-2.5 w-2.5 fill-yellow-400 text-yellow-400" />
+                          <Star className="h-2.5 w-2.5 fill-yellow-400 text-yellow-400" />
+                          <Star className="h-2.5 w-2.5 fill-yellow-400 text-yellow-400" />
+                          {row.starMix.star3}
                         </Badge>
-                      ) : (
+                      )}
+                      {row.starMix.star2 > 0 && (
+                        <Badge variant="outline" className="text-[10px] gap-0.5">
+                          <Star className="h-2.5 w-2.5 fill-yellow-400 text-yellow-400" />
+                          <Star className="h-2.5 w-2.5 fill-yellow-400 text-yellow-400" />
+                          {row.starMix.star2}
+                        </Badge>
+                      )}
+                      {row.starMix.star1 > 0 && (
+                        <Badge variant="outline" className="text-[10px] gap-0.5">
+                          <Star className="h-2.5 w-2.5 fill-yellow-400 text-yellow-400" />
+                          {row.starMix.star1}
+                        </Badge>
+                      )}
+                      {row.staffCount === 0 && (
                         <span className="text-xs text-muted-foreground">--</span>
                       )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {row.sales !== null 
-                        ? formatCurrency(row.sales, locale)
-                        : <span className="text-muted-foreground">--</span>
-                      }
-                    </TableCell>
-                    <TableCell className="text-right">{formatCurrency(row.laborCost, locale)}</TableCell>
-                    <TableCell className={cn(
-                      'text-right',
-                      guardrail?.status === 'bad' && 'text-red-600 font-medium',
-                      guardrail?.status === 'caution' && 'text-yellow-600 font-medium'
-                    )}>
-                      {row.laborRate !== null ? (
-                        <div className="flex flex-col items-end">
-                          <span>{formatPercent(row.laborRate, locale)}</span>
-                          {guardrail && guardrail.deltaToGood !== 0 && (
-                            <span className={cn(
-                              'text-[10px]',
-                              guardrail.deltaToGood > 0 ? 'text-red-500' : 'text-green-500'
-                            )}>
-                              {guardrail.deltaToGood > 0 ? '+' : ''}{(guardrail.deltaToGood * 100).toFixed(1)}pt
-                            </span>
-                          )}
-                        </div>
-                      ) : '--'}
-                    </TableCell>
-                    <TableCell className="text-right">{formatHours(row.hours, locale)}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        {row.starMix.star3 > 0 && (
-                          <Badge variant="outline" className="text-[10px] gap-0.5">
-                            <Star className="h-2.5 w-2.5 fill-yellow-400 text-yellow-400" />
-                            <Star className="h-2.5 w-2.5 fill-yellow-400 text-yellow-400" />
-                            <Star className="h-2.5 w-2.5 fill-yellow-400 text-yellow-400" />
-                            {row.starMix.star3}
-                          </Badge>
-                        )}
-                        {row.starMix.star2 > 0 && (
-                          <Badge variant="outline" className="text-[10px] gap-0.5">
-                            <Star className="h-2.5 w-2.5 fill-yellow-400 text-yellow-400" />
-                            <Star className="h-2.5 w-2.5 fill-yellow-400 text-yellow-400" />
-                            {row.starMix.star2}
-                          </Badge>
-                        )}
-                        {row.starMix.star1 > 0 && (
-                          <Badge variant="outline" className="text-[10px] gap-0.5">
-                            <Star className="h-2.5 w-2.5 fill-yellow-400 text-yellow-400" />
-                            {row.starMix.star1}
-                          </Badge>
-                        )}
-                        {row.staffCount === 0 && (
-                          <span className="text-xs text-muted-foreground">--</span>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
             </TableBody>
           </Table>
         </CardContent>
@@ -579,17 +512,8 @@ export default function LaborWeeklyPage() {
                       <p className="text-sm text-muted-foreground mt-1">
                         {proposal.description}
                       </p>
-                      {proposal.affectedDays && proposal.affectedDays.length > 0 && (
-                        <div className="flex items-center gap-1.5 mt-2">
-                          {proposal.affectedDays.map(day => (
-                            <Badge key={day} variant="secondary" className="text-[10px]">
-                              {day}
-                            </Badge>
-                          ))}
-                        </div>
-                      )}
                       <div className="flex items-center gap-1 mt-2 text-xs text-muted-foreground">
-                        <TrendingDown className="h-3 w-3" />
+                        <AlertTriangle className="h-3 w-3" />
                         <span>{t('laborWeekly.impact')}: {proposal.impact}</span>
                       </div>
                     </div>

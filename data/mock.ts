@@ -11,19 +11,23 @@ import type {
   PrepItem,
   DomainEvent,
   AppState,
-  LaborGuardrailBracket,
 } from '@/core/types';
 
 import mockSushiData from './mock_sushi_events.json';
 import { normalizeEvents, normalizeStaff } from './normalizer';
 
-// Re-export for convenience
-export type { LaborGuardrailBracket };
-
 // ------------------------------------------------------------
 // Labor Guardrails Configuration
 // (Will be replaced by All Management API later)
 // ------------------------------------------------------------
+
+export interface LaborGuardrailBracket {
+  highSales: number;
+  lowSales: number;
+  cost: number;
+  goodRate: number;  // 良好な人件費率（これ以下なら安心）
+  badRate: number;   // 危険な人件費率（これ以上なら要対応）
+}
 
 export const LABOR_GUARDRAILS_CONFIG = {
   weekday: [

@@ -38,9 +38,6 @@ export const selectCurrentStore = (state: AppState) =>
 
 export const selectStoreId = (state: AppState) => state.selectedStoreId;
 
-export const selectStoreStaff = (state: AppState) =>
-  state.staff.filter((s) => s.storeId === state.selectedStoreId);
-
 // ------------------------------------------------------------
 // Forecast Selectors
 // ------------------------------------------------------------

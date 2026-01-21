@@ -167,17 +167,6 @@ export const ja = {
   'briefing.distributing': '配布中...',
   'briefing.button': '今日の作戦',
 
-  // Labor Interventions
-  'labor.breakAdjustment': '休憩調整',
-  'labor.earlyLeave': '早上がり',
-  'labor.rotation': '配置ローテ',
-  'labor.effectEstimate': '効果見込',
-  'labor.serviceRisk': 'サービスリスク',
-  'labor.riskLow': '低',
-  'labor.riskMedium': '中',
-  'labor.riskHigh': '高',
-  'labor.targetStaff': '対象スタッフ',
-
   // ToDo
   'todo.title': '現場ToDo',
   'todo.pending': '待機中',
@@ -229,19 +218,13 @@ export const ja = {
   'timeclock.dataError': 'データ不整合',
   'timeclock.calculating': '計算中',
 
-  // Timeclock status and actions
-  'timeclock.status.out': '未出勤',
-  'timeclock.status.working': '出勤中',
-  'timeclock.status.break': '休憩中',
-  'timeclock.status.unknown': '不明',
-  'timeclock.action.checkIn': '出勤',
-  'timeclock.action.checkOut': '退勤',
-  'timeclock.action.break': '休憩',
-  'timeclock.action.breakStart': '休憩開始',
-  'timeclock.action.breakEnd': '休憩終了',
-  'timeclock.confirmTitle': '操作確認',
-  'timeclock.confirmMessage': '{name}さんの{action}を実行しますか？',
-  'timeclock.endTime': '終了予定',
+  // Timeclock actions
+  'action.checkIn': '出勤',
+  'action.checkOut': '退勤',
+  'action.break': '休憩',
+  'action.breakEnd': '休憩終了',
+  'action.confirm': '操作確認',
+  'action.confirmMessage': '{name}さんの{action}を実行しますか？',
 
   // Completion Modal
   'completion.title': 'タスク完了',
@@ -285,7 +268,6 @@ export const ja = {
   'laborWeekly.notCalculated': '未計算',
   'laborWeekly.dailyBreakdown': '日別実績',
   'laborWeekly.date': '日付',
-  'laborWeekly.guardrail': '判定',
   'laborWeekly.hours': '人時',
   'laborWeekly.laborCost': '人件費',
   'laborWeekly.sales': '売上',

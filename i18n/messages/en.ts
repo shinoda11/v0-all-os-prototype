@@ -167,17 +167,6 @@ export const en = {
   'briefing.distributing': 'Distributing...',
   'briefing.button': "Today's Strategy",
 
-  // Labor Interventions
-  'labor.breakAdjustment': 'Break Adjustment',
-  'labor.earlyLeave': 'Early Leave',
-  'labor.rotation': 'Rotation',
-  'labor.effectEstimate': 'Expected Effect',
-  'labor.serviceRisk': 'Service Risk',
-  'labor.riskLow': 'Low',
-  'labor.riskMedium': 'Medium',
-  'labor.riskHigh': 'High',
-  'labor.targetStaff': 'Target Staff',
-
   // ToDo
   'todo.title': 'Floor ToDo',
   'todo.pending': 'Pending',
@@ -279,7 +268,6 @@ export const en = {
   'laborWeekly.notCalculated': 'N/A',
   'laborWeekly.dailyBreakdown': 'Daily Breakdown',
   'laborWeekly.date': 'Date',
-  'laborWeekly.guardrail': 'Status',
   'laborWeekly.hours': 'Hours',
   'laborWeekly.laborCost': 'Labor Cost',
   'laborWeekly.sales': 'Sales',

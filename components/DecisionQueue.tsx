@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import type { Proposal, Role, ExpectedEffect, TimeBand, Staff } from '@/core/types';
+import type { Proposal, Role, ExpectedEffect, TimeBand } from '@/core/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -18,20 +18,15 @@ import {
   Users,
   Target,
   TrendingUp,
-  TrendingDown,
   ShieldAlert,
   Trash2,
   Wrench,
   ListTodo,
-  Coffee,
-  LogOut,
-  RefreshCw,
 } from 'lucide-react';
 
 interface DecisionQueueProps {
   proposals: Proposal[];
   roles: Role[];
-  staff?: Staff[];
   onApprove: (proposal: Proposal) => void;
   onReject: (proposal: Proposal) => void;
   onEdit: (proposal: Proposal) => void;
@@ -95,31 +90,6 @@ const timeBandLabelKeys: Record<TimeBand, string> = {
 
 const timeBandLabels = timeBandLabelKeys;
 
-// Labor intervention type config
-const laborInterventionConfig: Record<string, { icon: React.ReactNode; labelKey: string; color: string }> = {
-  'break-adjustment': {
-    icon: <Coffee className="h-4 w-4" />,
-    labelKey: 'labor.breakAdjustment',
-    color: 'bg-blue-100 text-blue-800 border-blue-200',
-  },
-  'early-leave': {
-    icon: <LogOut className="h-4 w-4" />,
-    labelKey: 'labor.earlyLeave',
-    color: 'bg-purple-100 text-purple-800 border-purple-200',
-  },
-  'rotation': {
-    icon: <RefreshCw className="h-4 w-4" />,
-    labelKey: 'labor.rotation',
-    color: 'bg-teal-100 text-teal-800 border-teal-200',
-  },
-};
-
-const serviceRiskConfig: Record<string, { color: string; labelKey: string }> = {
-  low: { color: 'text-green-600', labelKey: 'labor.riskLow' },
-  medium: { color: 'text-yellow-600', labelKey: 'labor.riskMedium' },
-  high: { color: 'text-red-600', labelKey: 'labor.riskHigh' },
-};
-
 function formatDeadline(deadline: string): string {
   try {
     const date = new Date(deadline);
@@ -146,20 +116,11 @@ function getRoleNames(roleIds: string[], roles: Role[]): string {
 export function DecisionQueue({
   proposals,
   roles,
-  staff = [],
   onApprove,
   onReject,
   onEdit,
 }: DecisionQueueProps) {
   const { t } = useI18n();
-  
-  const getStaffName = (staffId: string) => {
-    const s = staff.find(st => st.id === staffId);
-    return s?.name ?? staffId;
-  };
-  
-  const isLaborIntervention = (type: string) => 
-    ['break-adjustment', 'early-leave', 'rotation'].includes(type);
   
   if (proposals.length === 0) {
     return (
@@ -198,17 +159,7 @@ export function DecisionQueue({
                       {priority.icon}
                       {t(priority.labelKey)}
                     </Badge>
-                    {isLaborIntervention(proposal.type) ? (
-                      <Badge 
-                        variant="outline" 
-                        className={cn('gap-1', laborInterventionConfig[proposal.type]?.color)}
-                      >
-                        {laborInterventionConfig[proposal.type]?.icon}
-                        {t(laborInterventionConfig[proposal.type]?.labelKey ?? proposal.type)}
-                      </Badge>
-                    ) : (
-                      <Badge variant="secondary">{proposal.type}</Badge>
-                    )}
+                    <Badge variant="secondary">{proposal.type}</Badge>
                     <Badge
                       variant="outline"
                       className={cn(
@@ -252,38 +203,6 @@ export function DecisionQueue({
                   );
                 })}
               </div>
-              
-              {/* Labor Intervention Effect Estimate */}
-              {isLaborIntervention(proposal.type) && proposal.laborMeta && (
-                <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-3 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <TrendingDown className="h-4 w-4 text-green-600" />
-                      <span className="text-sm font-medium text-green-800">{t('labor.effectEstimate')}</span>
-                    </div>
-                    <span className="text-lg font-bold text-green-700">
-                      -{proposal.laborMeta.projectedLaborRateImprovement.toFixed(1)}pt
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-1">
-                      <AlertTriangle className={cn('h-3 w-3', serviceRiskConfig[proposal.laborMeta.serviceRisk]?.color)} />
-                      <span className={serviceRiskConfig[proposal.laborMeta.serviceRisk]?.color}>
-                        {t('labor.serviceRisk')}: {t(serviceRiskConfig[proposal.laborMeta.serviceRisk]?.labelKey ?? '')}
-                      </span>
-                    </div>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {proposal.laborMeta.serviceRiskDescription}
-                  </p>
-                  {proposal.laborMeta.targetStaffIds && proposal.laborMeta.targetStaffIds.length > 0 && (
-                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <Users className="h-3 w-3" />
-                      <span>{t('labor.targetStaff')}: {proposal.laborMeta.targetStaffIds.map(getStaffName).join(', ')}</span>
-                    </div>
-                  )}
-                </div>
-              )}
 
               {/* Impact Scope */}
               <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">

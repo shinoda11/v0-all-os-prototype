@@ -26,10 +26,8 @@ import {
   selectLaneEvents,
   selectShiftSummary,
   selectSupplyDemandMetrics,
-  selectStoreStaff,
-  selectStaffStates,
 } from '@/core/selectors';
-import { deriveLaborGuardrailSummary, deriveLaborInterventionProposals } from '@/core/derive';
+import { deriveLaborGuardrailSummary } from '@/core/derive';
 import { TodayBriefingModal, type OperationMode } from '@/components/cockpit/TodayBriefingModal';
 import type { TimeBand, Proposal, Role, ExceptionItem, RiskItem } from '@/core/types';
 import {
@@ -532,23 +530,6 @@ export default function CockpitPage() {
     actualLaborCostSoFar: laborCost,
   });
   
-  // Generate labor intervention proposals when guardrail is caution/danger
-  const storeStaff = selectStoreStaff(state);
-  const staffStates = selectStaffStates(state);
-  const activeStaff = storeStaff.filter(s => {
-    const staffState = staffStates.find(ss => ss.staffId === s.id);
-    return staffState?.isPresent && !staffState?.isOnBreak;
-  });
-  
-  const laborInterventionProposals = deriveLaborInterventionProposals({
-    storeId: selectedStoreId ?? '',
-    guardrailSummary,
-    activeStaff,
-    plannedLaborCostDaily,
-    runRateSalesDaily,
-    currentTimeBand: timeBand === 'all' ? 'lunch' : timeBand,
-  });
-  
   // Supply/Demand (dynamic)
   const stockoutRisk = supplyDemandMetrics?.stockoutRiskCount ?? 0;
   const excessRisk = supplyDemandMetrics?.excessRiskCount ?? 0;
@@ -841,14 +822,13 @@ export default function CockpitPage() {
         </div>
       </div>
 
-{/* Decision Queue */}
-<DecisionQueue
-  proposals={[...laborInterventionProposals, ...state.proposals.filter(p => p.status === 'pending')]}
-  roles={state.roles}
-  staff={storeStaff}
-  onApprove={handleApprove}
-  onReject={handleReject}
-  onEdit={handleEdit}
+      {/* Decision Queue */}
+      <DecisionQueue
+        proposals={state.proposals}
+        roles={state.roles}
+        onApprove={handleApprove}
+        onReject={handleReject}
+        onEdit={handleEdit}
       />
 
       <Drawer

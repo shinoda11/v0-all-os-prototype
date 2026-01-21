@@ -147,23 +147,9 @@ export type ProposalType =
   | 'help-request'
   | 'scope-reduction'
   | 'high-margin-priority'
-  | 'extra-prep'
-  // Labor intervention types
-  | 'break-adjustment'
-  | 'early-leave'
-  | 'rotation';
+  | 'extra-prep';
 
 export type ExpectedEffect = 'sales-impact' | 'stockout-avoidance' | 'waste-reduction' | 'labor-savings';
-
-// Labor intervention metadata for proposals
-export interface LaborInterventionMeta {
-  targetStaffIds?: string[];
-  targetRoleId?: string;
-  targetTimeBand?: TimeBand;
-  projectedLaborRateImprovement: number; // percentage points improvement
-  serviceRisk: 'low' | 'medium' | 'high';
-  serviceRiskDescription: string;
-}
 
 export interface Proposal {
   id: string;
@@ -186,8 +172,6 @@ export interface Proposal {
   expectedEffects: ExpectedEffect[];
   todoCount: number; // Number of todos that will be generated on approval
   status: 'pending' | 'approved' | 'rejected';
-  // Labor intervention metadata (for break-adjustment, early-leave, rotation)
-  laborMeta?: LaborInterventionMeta;
 }
 
 // ------------------------------------------------------------
@@ -397,18 +381,6 @@ export interface ShiftPlanEntry {
   startTime: string;
   endTime: string;
   status: 'scheduled' | 'active' | 'completed';
-}
-
-// ------------------------------------------------------------
-// Labor Guardrail Types
-// ------------------------------------------------------------
-
-export interface LaborGuardrailBracket {
-  highSales: number;
-  lowSales: number;
-  cost: number;
-  goodRate: number;  // 良好な人件費率（これ以下なら安心）
-  badRate: number;   // 危険な人件費率（これ以上なら要対応）
 }
 
 // ------------------------------------------------------------
