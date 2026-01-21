@@ -20,21 +20,15 @@ export default function StoreLayout({ children, params }: StoreLayoutProps) {
   const actionsRef = useRef(actions);
   actionsRef.current = actions;
 
-  console.log('[v0] StoreLayout render', { storeId, params, isValid: VALID_STORE_IDS.includes(storeId) });
-
   // Sync route param to context - use useLayoutEffect for synchronous update
   useLayoutEffect(() => {
-    console.log('[v0] StoreLayout setStore', storeId);
     actionsRef.current.setStore(storeId);
   }, [storeId]);
 
   // Validate storeId and redirect if invalid
   if (!VALID_STORE_IDS.includes(storeId)) {
-    console.log('[v0] StoreLayout invalid storeId, redirecting to select');
     router.replace('/stores/select');
     return null;
   }
-  
-  console.log('[v0] StoreLayout rendering AppShell with children');
   return <AppShell storeId={storeId}>{children}</AppShell>;
 }

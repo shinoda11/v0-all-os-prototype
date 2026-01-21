@@ -247,13 +247,6 @@ export default function CockpitPage() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingProposal, setEditingProposal] = useState<Proposal | null>(null);
   
-  console.log('[v0] CockpitPage render', { 
-    selectedStoreId: state.selectedStoreId,
-    currentStoreId: currentStore?.id,
-    storesCount: state.stores.length,
-    eventsCount: state.events.length
-  });
-  
   // All hooks must be called before any early returns
   const eventsLength = state.events.length;
   const selectedStoreId = state.selectedStoreId;
