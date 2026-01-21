@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useLayoutEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import { useStore } from '@/state/store';
 import { AppShell } from '@/components/AppShell';
 
@@ -10,11 +10,11 @@ const VALID_STORE_IDS = ['1', '2', '3', '4'];
 
 interface StoreLayoutProps {
   children: React.ReactNode;
-  params: { storeId: string };
 }
 
-export default function StoreLayout({ children, params }: StoreLayoutProps) {
-  const { storeId } = params;
+export default function StoreLayout({ children }: StoreLayoutProps) {
+  const params = useParams();
+  const storeId = params.storeId as string;
   const router = useRouter();
   const { actions } = useStore();
   const actionsRef = useRef(actions);
