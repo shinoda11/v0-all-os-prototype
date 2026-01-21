@@ -297,9 +297,9 @@ export default function CockpitPage() {
         />
         <MetricCard
           title="例外"
-          value={`${metrics?.exceptions?.length ?? 0}件`}
-          subValue={(metrics?.exceptions ?? []).filter((e) => e.severity === 'critical').length > 0 ? '要対応あり' : '正常'}
-          trend={(metrics?.exceptions?.length ?? 0) > 0 ? 'down' : 'up'}
+          value={`${metrics?.exceptions?.count ?? 0}件`}
+          subValue={(metrics?.exceptions?.criticalCount ?? 0) > 0 ? '要対応あり' : '正常'}
+          trend={(metrics?.exceptions?.count ?? 0) > 0 ? 'down' : 'up'}
           icon={<AlertTriangle className="h-4 w-4" />}
         />
       </div>
