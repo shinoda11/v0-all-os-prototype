@@ -107,6 +107,12 @@ export const appReducer = (state: AppState, action: AppAction): AppState => {
         proposals: action.proposals,
       };
 
+    case 'ADD_PROPOSAL':
+      return {
+        ...state,
+        proposals: [...state.proposals, action.proposal],
+      };
+
     case 'UPDATE_PROPOSAL':
       return {
         ...state,

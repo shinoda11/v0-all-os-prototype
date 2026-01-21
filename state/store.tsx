@@ -190,12 +190,29 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       dispatch({ type: 'ADD_EVENT', event });
     },
 
-    // Decision
+    // Decision - creates decision event and distributes todos
     approveProposal: (proposal: Proposal) => {
       const storeId = storeIdRef.current;
       if (!storeId) return;
-      const event = commands.approveProposal(storeId, proposal);
-      dispatch({ type: 'ADD_EVENT', event });
+      
+      // Create the approval decision event
+      const decisionEvent = commands.approveProposal(storeId, proposal);
+      dispatch({ type: 'ADD_EVENT', event: decisionEvent });
+      
+      // Generate todo events for each distributed role (simulating todo distribution)
+      // Each todo is a 'pending' decision event that will appear in floor/todo
+      const todoCount = proposal.todoCount ?? 1;
+      for (let i = 0; i < todoCount; i++) {
+        const todoEvent: DomainEvent = {
+          ...decisionEvent,
+          id: `${decisionEvent.id}-todo-${i}`,
+          action: 'pending',
+          title: `[ToDo] ${proposal.title}`,
+          description: `${proposal.description} (${i + 1}/${todoCount})`,
+        };
+        dispatch({ type: 'ADD_EVENT', event: todoEvent });
+      }
+      
       dispatch({ type: 'REMOVE_PROPOSAL', proposalId: proposal.id });
     },
 
@@ -214,15 +231,37 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       dispatch({ type: 'ADD_EVENT', event });
     },
 
+    // Complete decision - marks todo as done and records prep event if applicable
     completeDecision: (proposal: Proposal) => {
       const storeId = storeIdRef.current;
       if (!storeId) return;
-      const event = commands.completeDecision(storeId, proposal);
-      dispatch({ type: 'ADD_EVENT', event });
+      
+      // Create the completion decision event
+      const completionEvent = commands.completeDecision(storeId, proposal);
+      dispatch({ type: 'ADD_EVENT', event: completionEvent });
+      
+      // If proposal has prep items, record prep completion events
+      // This closes the loop and updates cockpit metrics
+      if (proposal.targetPrepItemIds && proposal.targetPrepItemIds.length > 0) {
+        for (const prepItemId of proposal.targetPrepItemIds) {
+          const prepEvent = commands.completePrep(
+            storeId,
+            prepItemId,
+            proposal.quantity || 1,
+            undefined, // staffId
+            completionEvent.id // link to decision
+          );
+          dispatch({ type: 'ADD_EVENT', event: prepEvent });
+        }
+      }
     },
 
     updateProposal: (proposal: Proposal) => {
       dispatch({ type: 'UPDATE_PROPOSAL', proposal });
+    },
+
+    addProposal: (proposal: Proposal) => {
+      dispatch({ type: 'ADD_PROPOSAL', proposal });
     },
 
     // Replay

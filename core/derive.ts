@@ -188,6 +188,14 @@ export const deriveDailySalesMetrics = (
 // Labor Derivation
 // ------------------------------------------------------------
 
+interface StaffWorkSession {
+  checkInTime: Date;
+  checkOutTime?: Date;
+  breakPeriods: Array<{ start: Date; end?: Date }>;
+  isActive: boolean;
+  isOnBreak: boolean;
+}
+
 export const deriveLaborMetrics = (
   events: DomainEvent[],
   storeId: string,
@@ -198,67 +206,124 @@ export const deriveLaborMetrics = (
     (e) => e.storeId === storeId && e.timestamp.startsWith(date)
   );
 
-  // Track staff states with check-out time
-  const staffStates = new Map<string, { 
-    checkedIn: boolean; 
-    onBreak: boolean; 
-    checkInTime?: Date;
-    checkOutTime?: Date;
-  }>();
+  // Track complete work sessions per staff
+  const staffSessions = new Map<string, StaffWorkSession>();
 
-  for (const event of filtered.sort((a, b) => 
+  // Sort events chronologically
+  const sortedEvents = filtered.sort((a, b) => 
     new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-  )) {
-    const state = staffStates.get(event.staffId) ?? { checkedIn: false, onBreak: false };
+  );
+
+  for (const event of sortedEvents) {
+    const eventTime = new Date(event.timestamp);
+    let session = staffSessions.get(event.staffId);
     
     switch (event.action) {
       case 'check-in':
-        state.checkedIn = true;
-        state.checkInTime = new Date(event.timestamp);
-        state.checkOutTime = undefined;
+        // Start a new session
+        session = {
+          checkInTime: eventTime,
+          checkOutTime: undefined,
+          breakPeriods: [],
+          isActive: true,
+          isOnBreak: false,
+        };
+        staffSessions.set(event.staffId, session);
         break;
+        
       case 'check-out':
-        state.checkedIn = false;
-        state.checkOutTime = new Date(event.timestamp);
+        if (session && session.isActive) {
+          session.checkOutTime = eventTime;
+          session.isActive = false;
+          session.isOnBreak = false;
+          // Close any open break period
+          const lastBreak = session.breakPeriods[session.breakPeriods.length - 1];
+          if (lastBreak && !lastBreak.end) {
+            lastBreak.end = eventTime;
+          }
+        }
         break;
+        
       case 'break-start':
-        state.onBreak = true;
+        if (session && session.isActive && !session.isOnBreak) {
+          session.breakPeriods.push({ start: eventTime, end: undefined });
+          session.isOnBreak = true;
+        }
         break;
+        
       case 'break-end':
-        state.onBreak = false;
+        if (session && session.isActive && session.isOnBreak) {
+          const currentBreak = session.breakPeriods[session.breakPeriods.length - 1];
+          if (currentBreak && !currentBreak.end) {
+            currentBreak.end = eventTime;
+          }
+          session.isOnBreak = false;
+        }
         break;
     }
-    
-    staffStates.set(event.staffId, state);
   }
 
+  // Calculate metrics
   let activeStaffCount = 0;
   let onBreakCount = 0;
-  let totalHours = 0;
+  let totalWorkHours = 0;
   const now = new Date();
 
-  for (const [, state] of staffStates) {
-    if (state.checkedIn) {
+  for (const [, session] of staffSessions) {
+    // Count active staff
+    if (session.isActive) {
       activeStaffCount++;
-      if (state.onBreak) onBreakCount++;
+      if (session.isOnBreak) onBreakCount++;
     }
     
-    // Calculate hours for both active and checked-out staff
-    if (state.checkInTime) {
-      const endTime = state.checkOutTime ?? now;
-      const hours = (endTime.getTime() - state.checkInTime.getTime()) / (1000 * 60 * 60);
-      // Only add positive hours to prevent negative values
-      if (hours > 0) {
-        totalHours += hours;
+    // Calculate worked hours
+    // Only count time if check-in is in the past
+    if (session.checkInTime.getTime() <= now.getTime()) {
+      // End time is either check-out time, or now (if still active), but not future
+      let endTime: Date;
+      if (session.checkOutTime) {
+        endTime = session.checkOutTime;
+      } else if (session.isActive) {
+        // For active staff, use current time but not earlier than check-in
+        endTime = now;
+      } else {
+        // Inactive without checkout - shouldn't happen, skip
+        continue;
       }
+      
+      // Ensure end time is not before check-in (guard against edge cases)
+      if (endTime.getTime() < session.checkInTime.getTime()) {
+        continue;
+      }
+      
+      // Gross working hours
+      const grossHours = (endTime.getTime() - session.checkInTime.getTime()) / (1000 * 60 * 60);
+      
+      // Calculate break hours
+      let breakHours = 0;
+      for (const breakPeriod of session.breakPeriods) {
+        const breakEnd = breakPeriod.end ?? (session.isOnBreak ? now : breakPeriod.start);
+        // Only count break if it's within valid time range
+        if (breakEnd.getTime() > breakPeriod.start.getTime()) {
+          breakHours += (breakEnd.getTime() - breakPeriod.start.getTime()) / (1000 * 60 * 60);
+        }
+      }
+      
+      // Net working hours = gross - breaks
+      const netHours = Math.max(0, grossHours - breakHours);
+      totalWorkHours += netHours;
     }
   }
+
+  // Ensure non-negative values
+  const safeHours = Math.max(0, Math.round(totalWorkHours * 10) / 10);
+  const safeCost = Math.max(0, Math.round(totalWorkHours * 1200));
 
   return {
     activeStaffCount,
     onBreakCount,
-    totalHoursToday: Math.round(totalHours * 10) / 10,
-    laborCostEstimate: Math.round(totalHours * 1200), // Simplified: 1200 yen/hour
+    totalHoursToday: safeHours,
+    laborCostEstimate: safeCost,
   };
 };
 
@@ -502,9 +567,9 @@ export const deriveActiveTodos = (
     proposalStatuses.set(event.proposalId, event);
   }
 
-  // Filter to approved/started decisions (active todos)
+  // Filter to pending/approved/started/paused decisions (active todos)
   const activeTodos = Array.from(proposalStatuses.values()).filter(
-    (e) => e.action === 'approved' || e.action === 'started'
+    (e) => e.action === 'pending' || e.action === 'approved' || e.action === 'started' || e.action === 'paused'
   );
 
   // Filter by role if specified

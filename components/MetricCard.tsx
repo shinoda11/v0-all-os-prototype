@@ -4,7 +4,7 @@ import React from "react"
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, Clock } from 'lucide-react';
 
 interface MetricCardProps {
   title: string;
@@ -15,6 +15,8 @@ interface MetricCardProps {
   icon?: React.ReactNode;
   highlighted?: boolean;
   status?: 'success' | 'warning' | 'error' | 'default';
+  lastUpdate?: string;
+  children?: React.ReactNode;
 }
 
 export function MetricCard({
@@ -26,6 +28,8 @@ export function MetricCard({
   icon,
   highlighted = false,
   status = 'default',
+  lastUpdate,
+  children,
 }: MetricCardProps) {
   const statusColors = {
     success: 'border-green-500/50 bg-green-50/50',
@@ -42,6 +46,15 @@ export function MetricCard({
     stable: 'text-muted-foreground',
   };
 
+  const formatTime = (isoString: string) => {
+    try {
+      const date = new Date(isoString);
+      return date.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+    } catch {
+      return '--:--';
+    }
+  };
+
   return (
     <Card
       className={cn(
@@ -56,9 +69,9 @@ export function MetricCard({
         </CardTitle>
         {icon && <div className="text-muted-foreground">{icon}</div>}
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-2">
         <div className="text-2xl font-bold">{value}</div>
-        <div className="flex items-center gap-2 mt-1">
+        <div className="flex items-center gap-2">
           {subValue && (
             <p className="text-xs text-muted-foreground">{subValue}</p>
           )}
@@ -69,6 +82,13 @@ export function MetricCard({
             </div>
           )}
         </div>
+        {children}
+        {lastUpdate && (
+          <div className="flex items-center gap-1 text-[10px] text-muted-foreground pt-1 border-t border-border/50">
+            <Clock className="h-2.5 w-2.5" />
+            <span>更新 {formatTime(lastUpdate)}</span>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

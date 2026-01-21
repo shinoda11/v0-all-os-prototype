@@ -87,8 +87,8 @@ const generateInitialForecasts = (storeId: string): DomainEvent[] => {
   const forecasts: DomainEvent[] = [];
   const today = new Date();
   
-  // Generate forecasts for today and next 6 days only (1 week)
-  for (let i = 0; i < 7; i++) {
+  // Generate forecasts for today and tomorrow only (2 days for demo)
+  for (let i = 0; i < 2; i++) {
     const date = new Date(today);
     date.setDate(today.getDate() + i);
     const dateStr = date.toISOString().split('T')[0];

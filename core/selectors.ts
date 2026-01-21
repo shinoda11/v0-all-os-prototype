@@ -289,6 +289,50 @@ export const selectRecentEvents = (
     .slice(0, limit);
 };
 
+// Lane-based event selection for timeline
+export type TimelineLane = 'sales' | 'forecast' | 'prep' | 'delivery' | 'labor' | 'decision';
+
+export interface LaneEvents {
+  lane: TimelineLane;
+  events: AppState['events'];
+}
+
+export const selectLaneEvents = (
+  state: AppState,
+  perLaneLimit: number = 5,
+  timeBand?: TimeBand
+): LaneEvents[] => {
+  const storeId = state.selectedStoreId;
+  if (!storeId) return [];
+  
+  const today = new Date().toISOString().split('T')[0];
+  const targetTimeBand = timeBand ?? state.selectedTimeBand;
+  
+  // Filter events for current store and today
+  const storeEvents = state.events.filter((e) => {
+    if (e.storeId !== storeId) return false;
+    // For timeBand filtering
+    if (targetTimeBand !== 'all') {
+      const eventHour = new Date(e.timestamp).getHours();
+      if (targetTimeBand === 'lunch' && (eventHour < 11 || eventHour >= 14)) return false;
+      if (targetTimeBand === 'idle' && (eventHour < 14 || eventHour >= 17)) return false;
+      if (targetTimeBand === 'dinner' && (eventHour < 17 || eventHour >= 22)) return false;
+    }
+    return true;
+  });
+  
+  const lanes: TimelineLane[] = ['sales', 'forecast', 'prep', 'delivery', 'labor', 'decision'];
+  
+  return lanes.map((lane) => {
+    const laneEvents = storeEvents
+      .filter((e) => e.type === lane)
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      .slice(0, perLaneLimit);
+    
+    return { lane, events: laneEvents };
+  });
+};
+
 // ------------------------------------------------------------
 // Highlight Selectors
 // ------------------------------------------------------------

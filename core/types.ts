@@ -147,6 +147,8 @@ export type ProposalType =
   | 'high-margin-priority'
   | 'extra-prep';
 
+export type ExpectedEffect = 'sales-impact' | 'stockout-avoidance' | 'waste-reduction' | 'labor-savings';
+
 export interface Proposal {
   id: string;
   type: ProposalType;
@@ -164,6 +166,10 @@ export interface Proposal {
   deadline: string;
   storeId: string;
   timeBand: TimeBand;
+  // Enhanced fields for decision making
+  expectedEffects: ExpectedEffect[];
+  todoCount: number; // Number of todos that will be generated on approval
+  status: 'pending' | 'approved' | 'rejected';
 }
 
 // ------------------------------------------------------------
@@ -360,6 +366,7 @@ export type AppAction =
   | { type: 'ADD_EVENT'; event: DomainEvent }
   | { type: 'ADD_EVENTS'; events: DomainEvent[] }
   | { type: 'SET_PROPOSALS'; proposals: Proposal[] }
+  | { type: 'ADD_PROPOSAL'; proposal: Proposal }
   | { type: 'UPDATE_PROPOSAL'; proposal: Proposal }
   | { type: 'REMOVE_PROPOSAL'; proposalId: string }
   | { type: 'REPLAY_START'; events: DomainEvent[] }

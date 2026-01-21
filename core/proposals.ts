@@ -12,6 +12,7 @@ import {
   Menu,
   PrepItem,
   Role,
+  ExpectedEffect,
 } from './types';
 import { deriveExceptions, deriveLaborMetrics, derivePrepMetrics, deriveDailySalesMetrics } from './derive';
 
@@ -29,6 +30,8 @@ interface ProposalTemplate {
   reason: string;
   priority: Proposal['priority'];
   defaultRoles: string[];
+  expectedEffects: ExpectedEffect[];
+  todoCount: number;
 }
 
 const PROPOSAL_TEMPLATES: Record<string, ProposalTemplate> = {
@@ -39,6 +42,8 @@ const PROPOSAL_TEMPLATES: Record<string, ProposalTemplate> = {
     reason: '配送遅延による材料不足',
     priority: 'high',
     defaultRoles: ['kitchen', 'floor'],
+    expectedEffects: ['stockout-avoidance'],
+    todoCount: 2,
   },
   'delivery-delay-prep-reorder': {
     type: 'prep-reorder',
@@ -47,6 +52,8 @@ const PROPOSAL_TEMPLATES: Record<string, ProposalTemplate> = {
     reason: '配送遅延への対応',
     priority: 'medium',
     defaultRoles: ['kitchen'],
+    expectedEffects: ['stockout-avoidance', 'labor-savings'],
+    todoCount: 1,
   },
   'staff-shortage-help-request': {
     type: 'help-request',
@@ -55,6 +62,8 @@ const PROPOSAL_TEMPLATES: Record<string, ProposalTemplate> = {
     reason: '人員不足',
     priority: 'high',
     defaultRoles: ['manager'],
+    expectedEffects: ['sales-impact', 'labor-savings'],
+    todoCount: 1,
   },
   'staff-shortage-scope-reduction': {
     type: 'scope-reduction',
@@ -63,6 +72,8 @@ const PROPOSAL_TEMPLATES: Record<string, ProposalTemplate> = {
     reason: '人員不足への対応',
     priority: 'medium',
     defaultRoles: ['kitchen', 'floor'],
+    expectedEffects: ['labor-savings', 'waste-reduction'],
+    todoCount: 2,
   },
   'demand-surge-high-margin': {
     type: 'high-margin-priority',
@@ -71,6 +82,8 @@ const PROPOSAL_TEMPLATES: Record<string, ProposalTemplate> = {
     reason: '需要急増への対応',
     priority: 'high',
     defaultRoles: ['kitchen', 'floor'],
+    expectedEffects: ['sales-impact'],
+    todoCount: 2,
   },
   'demand-surge-extra-prep': {
     type: 'extra-prep',
@@ -79,6 +92,8 @@ const PROPOSAL_TEMPLATES: Record<string, ProposalTemplate> = {
     reason: '需要急増への対応',
     priority: 'high',
     defaultRoles: ['kitchen'],
+    expectedEffects: ['sales-impact', 'stockout-avoidance'],
+    todoCount: 1,
   },
   'prep-behind-reorder': {
     type: 'prep-reorder',
@@ -87,6 +102,8 @@ const PROPOSAL_TEMPLATES: Record<string, ProposalTemplate> = {
     reason: '仕込み遅延',
     priority: 'medium',
     defaultRoles: ['kitchen'],
+    expectedEffects: ['stockout-avoidance', 'labor-savings'],
+    todoCount: 1,
   },
 };
 
@@ -120,7 +137,7 @@ export const generateProposalsFromExceptions = (
           triggeredBy: exception.relatedEventId,
           priority: exception.severity === 'critical' ? 'critical' : menuRestriction.priority,
           createdAt: now,
-          targetMenuIds: menus.slice(0, 3).map((m) => m.id), // Suggest first 3 menus as candidates
+          targetMenuIds: menus.slice(0, 3).map((m) => m.id),
           targetPrepItemIds: [],
           quantity: 0,
           distributedToRoles: roles
@@ -129,9 +146,11 @@ export const generateProposalsFromExceptions = (
           deadline,
           storeId,
           timeBand,
+          expectedEffects: menuRestriction.expectedEffects,
+          todoCount: menuRestriction.todoCount,
+          status: 'pending',
         });
 
-        // Also generate prep reorder proposal
         const prepReorder = PROPOSAL_TEMPLATES['delivery-delay-prep-reorder'];
         proposals.push({
           id: generateProposalId(),
@@ -151,12 +170,14 @@ export const generateProposalsFromExceptions = (
           deadline,
           storeId,
           timeBand,
+          expectedEffects: prepReorder.expectedEffects,
+          todoCount: prepReorder.todoCount,
+          status: 'pending',
         });
         break;
       }
 
       case 'staff-shortage': {
-        // Generate help request proposal
         const helpRequest = PROPOSAL_TEMPLATES['staff-shortage-help-request'];
         proposals.push({
           id: generateProposalId(),
@@ -169,16 +190,18 @@ export const generateProposalsFromExceptions = (
           createdAt: now,
           targetMenuIds: [],
           targetPrepItemIds: [],
-          quantity: exception.severity === 'critical' ? 2 : 1, // Number of staff needed
+          quantity: exception.severity === 'critical' ? 2 : 1,
           distributedToRoles: roles
             .filter((r) => helpRequest.defaultRoles.includes(r.code))
             .map((r) => r.id),
           deadline,
           storeId,
           timeBand,
+          expectedEffects: helpRequest.expectedEffects,
+          todoCount: helpRequest.todoCount,
+          status: 'pending',
         });
 
-        // Also generate scope reduction proposal
         const scopeReduction = PROPOSAL_TEMPLATES['staff-shortage-scope-reduction'];
         proposals.push({
           id: generateProposalId(),
@@ -198,12 +221,14 @@ export const generateProposalsFromExceptions = (
           deadline,
           storeId,
           timeBand,
+          expectedEffects: scopeReduction.expectedEffects,
+          todoCount: scopeReduction.todoCount,
+          status: 'pending',
         });
         break;
       }
 
       case 'demand-surge': {
-        // Generate high margin priority proposal
         const highMargin = PROPOSAL_TEMPLATES['demand-surge-high-margin'];
         const highMarginMenus = [...menus].sort((a, b) => b.price - a.price).slice(0, 3);
         proposals.push({
@@ -224,9 +249,11 @@ export const generateProposalsFromExceptions = (
           deadline,
           storeId,
           timeBand,
+          expectedEffects: highMargin.expectedEffects,
+          todoCount: highMargin.todoCount,
+          status: 'pending',
         });
 
-        // Generate extra prep proposal
         const extraPrep = PROPOSAL_TEMPLATES['demand-surge-extra-prep'];
         proposals.push({
           id: generateProposalId(),
@@ -239,13 +266,16 @@ export const generateProposalsFromExceptions = (
           createdAt: now,
           targetMenuIds: [],
           targetPrepItemIds: prepItems.slice(0, 3).map((p) => p.id),
-          quantity: 10, // Default extra prep quantity
+          quantity: 10,
           distributedToRoles: roles
             .filter((r) => extraPrep.defaultRoles.includes(r.code))
             .map((r) => r.id),
           deadline,
           storeId,
           timeBand,
+          expectedEffects: extraPrep.expectedEffects,
+          todoCount: extraPrep.todoCount,
+          status: 'pending',
         });
         break;
       }
@@ -270,6 +300,9 @@ export const generateProposalsFromExceptions = (
           deadline,
           storeId,
           timeBand,
+          expectedEffects: prepReorder.expectedEffects,
+          todoCount: prepReorder.todoCount,
+          status: 'pending',
         });
         break;
       }

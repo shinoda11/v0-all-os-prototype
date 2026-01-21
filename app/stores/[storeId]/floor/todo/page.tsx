@@ -2,7 +2,7 @@
 
 import React from "react"
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { PageHeader } from '@/components/PageHeader';
 import { StatsGrid } from '@/components/StatsGrid';
 import { EmptyState } from '@/components/EmptyState';
@@ -389,11 +389,25 @@ export default function TodoPage() {
   const [selectedRole, setSelectedRole] = useState<string | undefined>(undefined);
   const [timeBand, setTimeBand] = useState<TimeBand>(state.selectedTimeBand);
   const [completingTodo, setCompletingTodo] = useState<DecisionEvent | null>(null);
-  const [lastUpdate] = useState(new Date());
+  const [lastUpdate, setLastUpdate] = useState(new Date());
 
   const activeTodos = selectActiveTodos(state, selectedRole);
   const completedTodos = selectCompletedTodos(state);
   const todoStats = selectTodoStats(state, selectedRole);
+
+  // Update last update time periodically and on data changes
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setLastUpdate(new Date());
+    }, 30000); // Update every 30 seconds
+    return () => clearInterval(interval);
+  }, []);
+
+  // Update last update when time band changes
+  const handleTimeBandChange = useCallback((newTimeBand: TimeBand) => {
+    setTimeBand(newTimeBand);
+    setLastUpdate(new Date());
+  }, []);
 
   // Filter todos by time band
   const filteredActiveTodos = useMemo(() => {
@@ -406,7 +420,8 @@ export default function TodoPage() {
     return completedTodos.filter((todo) => todo.timeBand === timeBand || todo.timeBand === 'all');
   }, [completedTodos, timeBand]);
 
-  const pendingTodos = filteredActiveTodos.filter((t) => t.action === 'approved');
+  // pending = distributed todos waiting to start, approved = legacy approval events
+  const pendingTodos = filteredActiveTodos.filter((t) => t.action === 'pending' || t.action === 'approved');
   const inProgressTodos = filteredActiveTodos.filter((t) => t.action === 'started');
   const pausedTodos = filteredActiveTodos.filter((t) => t.action === 'paused');
 
@@ -464,7 +479,7 @@ export default function TodoPage() {
     };
     actions.addEvent(completedEvent);
 
-    // Also complete prep if linked
+    // Also complete prep if linked - this creates prep_event that updates cockpit metrics
     if (completingTodo.targetPrepItemIds && completingTodo.targetPrepItemIds.length > 0) {
       actions.completePrep(
         completingTodo.targetPrepItemIds[0],
@@ -475,6 +490,7 @@ export default function TodoPage() {
     }
 
     setCompletingTodo(null);
+    setLastUpdate(new Date()); // Update last refresh time
   };
 
   const getRoleNames = (roleIds: string[]) =>
@@ -525,7 +541,7 @@ export default function TodoPage() {
               <RefreshCw className="h-3 w-3" />
               最終更新: {lastUpdate.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}
             </div>
-            <TimeBandTabs value={timeBand} onChange={setTimeBand} />
+            <TimeBandTabs value={timeBand} onChange={handleTimeBandChange} />
           </div>
         }
       />
