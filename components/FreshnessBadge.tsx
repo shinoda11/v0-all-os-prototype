@@ -5,17 +5,26 @@ import { cn } from '@/lib/utils';
 import { Clock, CheckCircle, AlertCircle } from 'lucide-react';
 import { useI18n } from '@/i18n/I18nProvider';
 
+/* ===== Design Guidelines Compliance =====
+ * 2.3: 状態は色+アイコン+ラベル併用。色依存禁止
+ * 2.1: スペーシング 4/8/12/16/24/32
+ * 2.4: ターゲットサイズ44x44相当
+ */
+
 export type FreshnessStatus = 'fresh' | 'warning' | 'stale';
 
 interface FreshnessBadgeProps {
-  lastUpdate: string | Date;
+  lastUpdate: string | Date | null | undefined;
   className?: string;
   showTime?: boolean;
   compact?: boolean;
 }
 
-export function getFreshnessStatus(lastUpdate: string | Date): FreshnessStatus {
+export function getFreshnessStatus(lastUpdate: string | Date | null | undefined): FreshnessStatus {
+  if (!lastUpdate) return 'stale';
   const updateTime = typeof lastUpdate === 'string' ? new Date(lastUpdate) : lastUpdate;
+  if (Number.isNaN(updateTime.getTime())) return 'stale';
+  
   const now = new Date();
   const diffMinutes = (now.getTime() - updateTime.getTime()) / (1000 * 60);
   
@@ -24,8 +33,11 @@ export function getFreshnessStatus(lastUpdate: string | Date): FreshnessStatus {
   return 'stale';
 }
 
-export function formatUpdateTime(lastUpdate: string | Date, locale: 'ja' | 'en' = 'ja'): string {
+export function formatUpdateTime(lastUpdate: string | Date | null | undefined, locale: 'ja' | 'en' = 'ja'): string {
+  // 2.3: 欠損値は「--」で統一
+  if (!lastUpdate) return '--';
   const updateTime = typeof lastUpdate === 'string' ? new Date(lastUpdate) : lastUpdate;
+  if (Number.isNaN(updateTime.getTime())) return '--';
   return updateTime.toLocaleTimeString(locale === 'ja' ? 'ja-JP' : 'en-US', { hour: '2-digit', minute: '2-digit' });
 }
 
@@ -46,26 +58,21 @@ export function FreshnessBadge({
   const { locale, t } = useI18n();
   const status = getFreshnessStatus(lastUpdate);
   const time = formatUpdateTime(lastUpdate, locale);
+  const label = getFreshnessLabel(status, t);
   
-  // All monochrome - gray scale only
+  // 2.3: 状態はアイコン+ラベル併用。色のみに依存しない
   const statusConfig = {
     fresh: {
       icon: CheckCircle,
-      color: 'text-gray-500',
-      bgColor: 'bg-gray-100',
-      borderColor: 'border-gray-200',
+      label: '最新',
     },
     warning: {
       icon: Clock,
-      color: 'text-gray-500',
-      bgColor: 'bg-gray-100',
-      borderColor: 'border-gray-200',
+      label: '古いデータ',
     },
     stale: {
       icon: AlertCircle,
-      color: 'text-gray-600',
-      bgColor: 'bg-gray-100',
-      borderColor: 'border-gray-300',
+      label: '古いデータ',
     },
   };
   
@@ -76,29 +83,29 @@ export function FreshnessBadge({
     return (
       <div 
         className={cn(
-          'inline-flex items-center gap-1 text-[10px]',
-          config.color,
+          'inline-flex items-center gap-2 text-sm text-muted-foreground',
           className
         )}
-        title={`最終更新: ${time}`}
+        title={`${config.label}: ${time}`}
       >
-        <Icon className="h-2.5 w-2.5" />
+        <Icon className="h-4 w-4" />
         <span>{time}</span>
       </div>
     );
   }
   
+  // 2.1スペーシング準拠: px-2=8px, py-1=4px, gap-2=8px
   return (
     <div 
       className={cn(
-        'inline-flex items-center gap-1.5 px-1.5 py-0.5 rounded text-[10px] border',
-        config.bgColor,
-        config.borderColor,
-        config.color,
+        'inline-flex items-center gap-2 px-2 py-1 rounded text-sm text-muted-foreground bg-secondary',
+        status === 'stale' && 'bg-amber-50 text-amber-800',
         className
       )}
+      title={config.label}
     >
-      <Icon className="h-2.5 w-2.5" />
+      <Icon className="h-4 w-4" />
+      <span>{status === 'stale' ? config.label : ''}</span>
       {showTime && <span>{time}</span>}
     </div>
   );
@@ -109,28 +116,24 @@ export function FreshnessIndicator({
   lastUpdate,
   className,
 }: { 
-  lastUpdate: string | Date; 
+  lastUpdate: string | Date | null | undefined; 
   className?: string;
 }) {
   const { locale, t } = useI18n();
   const status = getFreshnessStatus(lastUpdate);
-  
-  // All monochrome dots
-  const dotColors = {
-    fresh: 'bg-gray-400',
-    warning: 'bg-gray-400',
-    stale: 'bg-gray-500',
-  };
+  const time = formatUpdateTime(lastUpdate, locale);
+  const label = getFreshnessLabel(status, t);
   
   return (
     <div 
-      className={cn('flex items-center gap-1', className)}
-      title={`${getFreshnessLabel(status, t)} (${formatUpdateTime(lastUpdate, locale)})`}
+      className={cn('flex items-center gap-2 text-sm text-muted-foreground', className)}
+      title={`${label} (${time})`}
     >
-      <div className={cn('h-1.5 w-1.5 rounded-full', dotColors[status])} />
-      <span className="text-[10px] text-muted-foreground">
-        {formatUpdateTime(lastUpdate, locale)}
-      </span>
+      <Clock className="h-4 w-4" />
+      <span>{time}</span>
+      {status === 'stale' && (
+        <span className="text-amber-700">古いデータ</span>
+      )}
     </div>
   );
 }

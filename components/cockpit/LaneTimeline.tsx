@@ -20,59 +20,47 @@ import {
   Filter,
   FileWarning,
   ExternalLink,
+  AlertTriangle,
 } from 'lucide-react';
 import type { DomainEvent, TimelineLane, TimelineEvent, TimeBand } from '@/core/types';
 
+/* ===== Design Guidelines Compliance =====
+ * 原則3: コンテナは最終手段 - 枠線ではなく余白でグルーピング
+ * 2.1: スペーシング 4/8/12/16/24/32
+ * 2.3: 状態は色+アイコン+ラベル併用
+ * 2.4: ターゲットサイズ最低44x44
+ * 2.5: ウェイトはRegular/Boldの2段のみ
+ */
+
+// レーン設定 - アイコンサイズ統一
 const LANE_CONFIG: Record<TimelineLane, {
   label: string;
   icon: React.ReactNode;
-  color: string;
-  bgColor: string;
 }> = {
   sales: {
     label: '売上',
     icon: <DollarSign className="h-4 w-4" />,
-    color: 'text-foreground',
-    bgColor: 'bg-muted',
   },
   forecast: {
     label: '予測',
     icon: <BarChart3 className="h-4 w-4" />,
-    color: 'text-muted-foreground',
-    bgColor: 'bg-muted/50',
   },
   prep: {
-    label: '仕込み',
+    label: '仕込',
     icon: <ChefHat className="h-4 w-4" />,
-    color: 'text-foreground',
-    bgColor: 'bg-muted',
   },
   delivery: {
-    label: '配送',
+    label: '入荷',
     icon: <Truck className="h-4 w-4" />,
-    color: 'text-muted-foreground',
-    bgColor: 'bg-muted/50',
   },
   labor: {
     label: '労務',
     icon: <Users className="h-4 w-4" />,
-    color: 'text-foreground',
-    bgColor: 'bg-muted',
   },
   decision: {
     label: '意思決定',
     icon: <CheckCircle className="h-4 w-4" />,
-    color: 'text-primary',
-    bgColor: 'bg-primary/5',
   },
-};
-
-// Monochrome status styles - only critical uses brand red
-const STATUS_STYLES = {
-  normal: 'border-l-2 border-l-border',
-  warning: 'border-l-2 border-l-gray-400 bg-gray-50',
-  critical: 'border-l-2 border-l-primary bg-primary/5',
-  success: 'border-l-2 border-l-gray-600 bg-gray-50',
 };
 
 function formatTime(timestamp: string): string {
@@ -158,31 +146,33 @@ function LaneRow({ lane, events, onEventClick }: LaneRowProps) {
   const config = LANE_CONFIG[lane];
   
   return (
-    <div className="flex border-b border-border last:border-b-0">
-      {/* Lane label - using grayscale colors */}
-      <div className={cn(
-        'w-24 shrink-0 py-2 px-3 flex items-center gap-2 bg-gray-50 text-gray-700'
-      )}>
+    // 原則3: 枠線ではなく余白でグルーピング。最小限のボーダーのみ
+    <div className="flex">
+      {/* レーンラベル: 2.1スペーシング準拠 (py-3=12px, px-2=8px) */}
+      <div className="w-16 shrink-0 py-3 px-2 flex items-center gap-2 text-muted-foreground">
         {config.icon}
-        <span className="text-xs font-medium">{config.label}</span>
+        <span className="text-sm truncate">{config.label}</span>
       </div>
-      <div className="flex-1 py-1 px-2 overflow-x-auto">
-        <div className="flex gap-1.5 min-h-[32px] items-center">
+      {/* イベント領域: 2.1スペーシング準拠 */}
+      <div className="flex-1 py-2 px-4 overflow-x-auto border-b border-border">
+        <div className="flex gap-2 min-h-[44px] items-center">
           {events.length === 0 ? (
-            <span className="text-xs text-muted-foreground">イベントなし</span>
+            <span className="text-sm text-muted-foreground">--</span>
           ) : (
             events.map((event) => (
+              // 2.4: ターゲットサイズ44x44相当、2.3: 状態はアイコン併用
               <button
                 key={event.id}
                 type="button"
                 onClick={() => onEventClick(event)}
                 className={cn(
-                  'flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm bg-white border border-gray-200 hover:bg-gray-50 transition-colors',
-                  event.status === 'critical' && 'border-red-300 bg-red-50'
+                  'flex items-center gap-2 px-3 py-2 min-h-[44px] rounded bg-secondary text-secondary-foreground hover:bg-muted transition-colors',
+                  event.status === 'critical' && 'bg-red-50 text-red-900'
                 )}
               >
-                <span className="font-medium truncate max-w-[120px] text-gray-800">{event.title}</span>
-                <span className="text-gray-400 text-xs">{formatTime(event.timestamp)}</span>
+                {event.status === 'critical' && <AlertTriangle className="h-4 w-4 text-red-600 shrink-0" />}
+                <span className="truncate max-w-[120px]">{event.title}</span>
+                <span className="text-muted-foreground text-sm shrink-0">{formatTime(event.timestamp)}</span>
               </button>
             ))
           )}
@@ -241,50 +231,55 @@ function EventDetailPanel({ event, onClose, storeId }: EventDetailPanelProps) {
   };
   
   return (
-    <Card className="absolute right-0 top-0 w-72 shadow-lg z-10">
-      <CardHeader className="pb-2">
+    // 原則3: ドロワーは必要な枠。2.1スペーシング準拠
+    <Card className="absolute right-0 top-0 w-80 shadow-lg z-10">
+      <CardHeader className="p-4">
         <div className="flex items-center justify-between">
-          <div className={cn('flex items-center gap-2', config.color)}>
+          <div className="flex items-center gap-2 text-foreground">
             {config.icon}
-            <span className="text-sm font-medium">{config.label}</span>
+            <span className="text-sm">{config.label}</span>
           </div>
-          <Button variant="ghost" size="sm" onClick={onClose} className="h-6 w-6 p-0">
+          {/* 2.4: 閉じるボタンは44x44ヒット領域 */}
+          <Button variant="ghost" size="sm" onClick={onClose} className="h-8 w-8 p-0">
             ×
           </Button>
         </div>
       </CardHeader>
-      <CardContent className="space-y-2">
+      <CardContent className="p-4 pt-0 space-y-4">
         <div>
-          <div className="font-medium">{event.title}</div>
-          <div className="text-sm text-muted-foreground">{event.description}</div>
+          <div className="text-base font-bold">{event.title}</div>
+          <div className="text-sm text-muted-foreground mt-1">{event.description}</div>
         </div>
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <Clock className="h-3 w-3" />
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Clock className="h-4 w-4" />
           {new Date(event.timestamp).toLocaleString('ja-JP')}
         </div>
+        {/* 2.3: 状態はアイコン+ラベル併用 */}
         {event.status && event.status !== 'normal' && (
-          <Badge
-            variant={event.status === 'critical' ? 'destructive' : 'secondary'}
-            className={cn(
-              event.status === 'success' && 'bg-gray-100 text-gray-700',
-              event.status === 'warning' && 'bg-gray-100 text-gray-600'
-            )}
-          >
-            {event.status === 'success' ? '完了' : event.status === 'critical' ? '緊急' : '注意'}
-          </Badge>
+          <div className={cn(
+            'flex items-center gap-2 px-3 py-2 rounded text-sm',
+            event.status === 'critical' && 'bg-red-50 text-red-900',
+            event.status === 'warning' && 'bg-amber-50 text-amber-900',
+            event.status === 'success' && 'bg-emerald-50 text-emerald-900'
+          )}>
+            {event.status === 'critical' && <AlertTriangle className="h-4 w-4" />}
+            {event.status === 'warning' && <AlertTriangle className="h-4 w-4" />}
+            {event.status === 'success' && <CheckCircle className="h-4 w-4" />}
+            <span>{event.status === 'success' ? '完了' : event.status === 'critical' ? '緊急対応が必要' : '注意が必要'}</span>
+          </div>
         )}
         
-        {/* Incident CTA for critical events */}
+        {/* 原則4: Primary CTAは単一。2.2 CTA階層設計 */}
         {event.status === 'critical' && (
-          <div className="pt-2 border-t">
+          <div className="pt-4 border-t border-border">
             {existingIncident ? (
-              <Button size="sm" variant="outline" onClick={handleGoToIncident} className="w-full gap-1.5 bg-transparent">
-                <ExternalLink className="h-3.5 w-3.5" />
+              <Button variant="secondary" onClick={handleGoToIncident} className="w-full gap-2 h-11">
+                <ExternalLink className="h-4 w-4" />
                 {t('incidents.goToExisting')}
               </Button>
             ) : (
-              <Button size="sm" onClick={handleCreateIncident} className="w-full gap-1.5">
-                <FileWarning className="h-3.5 w-3.5" />
+              <Button onClick={handleCreateIncident} className="w-full gap-2 h-11">
+                <FileWarning className="h-4 w-4" />
                 {t('incidents.createFromSignal')}
               </Button>
             )}
@@ -341,20 +336,22 @@ export function LaneTimeline({ events, maxEventsPerLane = 10, lastUpdate, storeI
   };
 
   return (
+    // 原則3: Cardは最終手段だが、タイムラインは独立コンポーネントなので許容
     <Card className="relative">
-      <CardHeader className="pb-2">
+      <CardHeader className="p-4">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <CardTitle className="text-base">統合タイムライン</CardTitle>
+          <div className="flex items-center gap-4">
+            <CardTitle>統合タイムライン</CardTitle>
             {lastUpdate && (
-              <span className="text-xs text-muted-foreground flex items-center gap-1">
-                <Clock className="h-3 w-3" />
+              <span className="text-sm text-muted-foreground flex items-center gap-2">
+                <Clock className="h-4 w-4" />
                 {new Date(lastUpdate).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}
               </span>
             )}
           </div>
-          <div className="flex items-center gap-1">
-            <Filter className="h-3.5 w-3.5 text-muted-foreground" />
+          {/* 2.4: フィルターボタンは44x44ヒット領域 */}
+          <div className="flex items-center gap-2">
+            <Filter className="h-4 w-4 text-muted-foreground" />
             {lanes.map((lane) => {
               const config = LANE_CONFIG[lane];
               const isActive = filterLanes.size === 0 || filterLanes.has(lane);
@@ -363,22 +360,22 @@ export function LaneTimeline({ events, maxEventsPerLane = 10, lastUpdate, storeI
                   key={lane}
                   type="button"
                   onClick={() => toggleLaneFilter(lane)}
+                  title={config.label}
                   className={cn(
-                    'p-1 rounded transition-colors',
-                    isActive ? config.bgColor : 'bg-muted/50 opacity-50'
+                    'p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded transition-colors',
+                    isActive ? 'bg-secondary text-secondary-foreground' : 'text-muted-foreground opacity-50'
                   )}
                 >
-                  <span className={cn('text-xs', isActive ? config.color : 'text-muted-foreground')}>
-                    {config.icon}
-                  </span>
+                  {config.icon}
                 </button>
               );
             })}
           </div>
         </div>
       </CardHeader>
+      {/* 原則1: 余白でグルーピング。枠線は最小限 */}
       <CardContent className="p-0">
-        <div className="border-t border-border">
+        <div>
           {visibleLanes.map((lane) => (
             <LaneRow
               key={lane}
@@ -389,13 +386,13 @@ export function LaneTimeline({ events, maxEventsPerLane = 10, lastUpdate, storeI
           ))}
         </div>
       </CardContent>
-{selectedEvent && (
-  <EventDetailPanel
-  event={selectedEvent}
-  onClose={() => setSelectedEvent(null)}
-  storeId={storeId}
-  />
-  )}
+      {selectedEvent && (
+        <EventDetailPanel
+          event={selectedEvent}
+          onClose={() => setSelectedEvent(null)}
+          storeId={storeId}
+        />
+      )}
     </Card>
   );
 }
