@@ -82,20 +82,20 @@ export function SalesKPICard({ data, highlighted }: SalesKPICardProps) {
       highlighted && 'ring-2 ring-primary ring-offset-2'
     )}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
-        <CardTitle className="text-xs font-medium text-muted-foreground">売上</CardTitle>
+        <CardTitle className="text-sm font-medium text-muted-foreground">売上</CardTitle>
         <DollarSign className="h-4 w-4 text-muted-foreground" />
       </CardHeader>
       <CardContent className="space-y-2">
         {!data ? <LoadingValue /> : (
           <>
             <div className="flex items-baseline gap-2">
-              <span className="text-xl font-bold">¥{data.actual.toLocaleString()}</span>
-              <div className={cn('flex items-center gap-0.5 text-xs', trendColor)}>
-                <TrendIcon className="h-3 w-3" />
+              <span className="text-2xl font-bold">¥{data.actual.toLocaleString()}</span>
+              <div className={cn('flex items-center gap-0.5 text-sm', trendColor)}>
+                <TrendIcon className="h-3.5 w-3.5" />
                 <span>{Math.round(data.achievementRate)}%</span>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-x-2 text-xs">
+            <div className="grid grid-cols-2 gap-x-2 text-sm">
               <div className="text-muted-foreground">予測</div>
               <div className="text-right">¥{data.forecast.toLocaleString()}</div>
               <div className="text-muted-foreground">差分</div>
@@ -142,19 +142,19 @@ export function LaborKPICard({ data, highlighted }: LaborKPICardProps) {
       highlighted && 'ring-2 ring-primary ring-offset-2'
     )}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
-        <CardTitle className="text-xs font-medium text-muted-foreground">レーバー</CardTitle>
+        <CardTitle className="text-sm font-medium text-muted-foreground">レーバー</CardTitle>
         <Users className="h-4 w-4 text-muted-foreground" />
       </CardHeader>
       <CardContent className="space-y-2">
         {!data ? <LoadingValue /> : (
           <>
             <div className="flex items-baseline gap-2">
-              <span className="text-xl font-bold">¥{data.actualCost.toLocaleString()}</span>
-              <Badge variant={data.estimatedLaborRate <= 30 ? 'default' : 'destructive'} className="text-[10px] h-5">
+              <span className="text-2xl font-bold">¥{data.actualCost.toLocaleString()}</span>
+              <Badge variant={data.estimatedLaborRate <= 30 ? 'default' : 'destructive'} className="text-xs h-5">
                 {data.estimatedLaborRate.toFixed(1)}%
               </Badge>
             </div>
-            <div className="grid grid-cols-2 gap-x-2 text-xs">
+            <div className="grid grid-cols-2 gap-x-2 text-sm">
               <div className="text-muted-foreground">売上/人件費</div>
               <div className="text-right">{data.salesPerLaborCost.toFixed(1)}倍</div>
               <div className="text-muted-foreground">予定vs実績人時</div>
@@ -196,18 +196,18 @@ export function SupplyDemandKPICard({ data, highlighted }: SupplyDemandKPICardPr
       highlighted && 'ring-2 ring-primary ring-offset-2'
     )}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
-        <CardTitle className="text-xs font-medium text-muted-foreground">需給</CardTitle>
+        <CardTitle className="text-sm font-medium text-muted-foreground">需給</CardTitle>
         <Package className="h-4 w-4 text-muted-foreground" />
       </CardHeader>
       <CardContent className="space-y-2">
         {!data ? <LoadingValue /> : (
           <>
             <div className="flex items-baseline gap-2">
-              <span className="text-xl font-bold">
+              <span className="text-2xl font-bold">
                 {!hasRisk ? 'バランス' : data.stockoutRisk > data.excessRisk ? '欠品リスク' : '過剰リスク'}
               </span>
             </div>
-            <div className="grid grid-cols-2 gap-x-2 text-xs">
+            <div className="grid grid-cols-2 gap-x-2 text-sm">
               <div className="text-muted-foreground">欠品リスク</div>
               <div className={cn('text-right', data.stockoutRisk > 0 && 'text-red-600 font-medium')}>
                 {data.stockoutRisk}品目
@@ -267,21 +267,21 @@ export function OperationsKPICard({ data, highlighted }: OperationsKPICardProps)
       highlighted && 'ring-2 ring-primary ring-offset-2'
     )}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
-        <CardTitle className="text-xs font-medium text-muted-foreground">オペ</CardTitle>
+        <CardTitle className="text-sm font-medium text-muted-foreground">オペ</CardTitle>
         <Gauge className="h-4 w-4 text-muted-foreground" />
       </CardHeader>
       <CardContent className="space-y-2">
         {!data ? <LoadingValue /> : (
           <>
             <div className="flex items-baseline gap-2">
-              <span className="text-xl font-bold">{Math.round(data.completionRate)}%</span>
+              <span className="text-2xl font-bold">{Math.round(data.completionRate)}%</span>
               {data.delayedCount > 0 && (
-                <Badge variant="destructive" className="text-[10px] h-5">
+                <Badge variant="destructive" className="text-xs h-5">
                   {data.delayedCount}件遅延
                 </Badge>
               )}
             </div>
-            <div className="grid grid-cols-2 gap-x-2 text-xs">
+            <div className="grid grid-cols-2 gap-x-2 text-sm">
               <div className="text-muted-foreground">完了率</div>
               <div className="text-right">{Math.round(data.completionRate)}%</div>
               <div className="text-muted-foreground">遅延タスク</div>
@@ -290,7 +290,7 @@ export function OperationsKPICard({ data, highlighted }: OperationsKPICardProps)
               </div>
             </div>
             {data.bottleneck && (
-              <div className="text-xs p-1.5 bg-yellow-50 border border-yellow-200 rounded">
+              <div className="text-sm p-2 bg-yellow-50 border border-yellow-200 rounded">
                 <div className="font-medium text-yellow-800">ボトルネック</div>
                 <div className="text-yellow-700 truncate">{data.bottleneck.task}</div>
               </div>
@@ -330,25 +330,25 @@ export function ExceptionsKPICard({ data, highlighted }: ExceptionsKPICardProps)
       highlighted && 'ring-2 ring-primary ring-offset-2'
     )}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
-        <CardTitle className="text-xs font-medium text-muted-foreground">例外</CardTitle>
+        <CardTitle className="text-sm font-medium text-muted-foreground">例外</CardTitle>
         <AlertTriangle className="h-4 w-4 text-muted-foreground" />
       </CardHeader>
       <CardContent className="space-y-2">
         {!data ? <LoadingValue /> : (
           <>
             <div className="flex items-baseline gap-2">
-              <span className="text-xl font-bold">{total}</span>
-              <span className="text-sm text-muted-foreground">件</span>
+              <span className="text-2xl font-bold">{total}</span>
+              <span className="text-base text-muted-foreground">件</span>
             </div>
-            <div className="flex gap-2 text-xs">
+            <div className="flex gap-2 text-sm">
               {data.criticalCount > 0 && (
-                <Badge variant="destructive" className="text-[10px] h-5 gap-1">
+                <Badge variant="destructive" className="text-xs h-5 gap-1">
                   <AlertCircle className="h-3 w-3" />
                   緊急 {data.criticalCount}
                 </Badge>
               )}
               {data.warningCount > 0 && (
-                <Badge variant="outline" className="text-[10px] h-5 gap-1 border-yellow-300 text-yellow-700">
+                <Badge variant="outline" className="text-xs h-5 gap-1 border-yellow-300 text-yellow-700">
                   <AlertTriangle className="h-3 w-3" />
                   警告 {data.warningCount}
                 </Badge>

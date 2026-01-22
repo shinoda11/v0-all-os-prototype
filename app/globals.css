@@ -24,7 +24,7 @@
   --secondary: 0 0% 96%;
   --secondary-foreground: 0 0% 13%;
   --muted: 0 0% 96%;
-  --muted-foreground: 0 0% 45%;
+  --muted-foreground: 0 0% 38%; /* Darker for better contrast */
   --accent: 0 0% 96%;
   --accent-foreground: 0 0% 13%;
   --destructive: 0 84% 60%;
@@ -127,8 +127,26 @@
   * {
     @apply border-border outline-ring-50;
   }
+  html {
+    font-size: 16px; /* Base size - can be increased to 17px or 18px for better readability */
+  }
   body {
     @apply bg-background text-foreground;
+    font-size: 1rem; /* 16px base */
+    line-height: 1.6;
+  }
+  /* Ensure minimum readable sizes */
+  p, span, div {
+    font-size: inherit;
+  }
+  /* Slightly larger small text for better readability */
+  .text-xs {
+    font-size: 0.8125rem; /* 13px instead of 12px */
+    line-height: 1.5;
+  }
+  .text-sm {
+    font-size: 0.9375rem; /* 15px instead of 14px */
+    line-height: 1.5;
   }
 }
 
