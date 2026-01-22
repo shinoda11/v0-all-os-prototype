@@ -76,6 +76,8 @@ export function AskDrawer({ open, onClose, onAddProposal, storeId }: AskDrawerPr
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   
+  // Removed debug log
+  
   // Get current data
   const exceptions = selectExceptions(state);
   const laborMetrics = selectLaborMetrics(state);
@@ -97,6 +99,8 @@ export function AskDrawer({ open, onClose, onAddProposal, storeId }: AskDrawerPr
   
   // Get demand drops
   const demandDrops = detectDemandDrops(storeId);
+  
+  // Removed debug logs
   
   // Generate unique message ID
   const generateId = () => `msg-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -379,33 +383,35 @@ export function AskDrawer({ open, onClose, onAddProposal, storeId }: AskDrawerPr
   
   return (
     <Sheet open={open} onOpenChange={onClose}>
-      <SheetContent className="w-[400px] sm:w-[500px] flex flex-col p-0">
-        <SheetHeader className="px-6 pt-6 pb-4 border-b">
-          <SheetTitle className="flex items-center gap-2">
+      <SheetContent className="w-[420px] sm:w-[480px] flex flex-col p-0 h-full">
+        {/* Header */}
+        <SheetHeader className="px-5 pt-5 pb-4 border-b shrink-0">
+          <SheetTitle className="flex items-center gap-2 text-lg">
             <Sparkles className="h-5 w-5 text-primary" />
             {t('ask.title')}
           </SheetTitle>
-          <SheetDescription>{t('ask.description')}</SheetDescription>
+          <SheetDescription className="text-sm">{t('ask.description')}</SheetDescription>
         </SheetHeader>
         
         {/* Messages Area */}
-        <ScrollArea className="flex-1 px-6 py-4">
+        <div className="flex-1 overflow-y-auto px-5 py-4">
           {messages.length === 0 ? (
-            <div className="space-y-4">
-              <p className="text-sm text-muted-foreground">{t('ask.suggestedQuestions')}</p>
-              <div className="flex flex-wrap gap-2">
-                {questionChips.map(chip => (
-                  <Button
-                    key={chip.id}
-                    variant="outline"
-                    size="sm"
-                    className="gap-2 bg-transparent"
-                    onClick={() => handleChipClick(chip)}
-                  >
-                    {chip.icon}
-                    {t(chip.labelKey)}
-                  </Button>
-                ))}
+            <div className="space-y-5">
+              <div>
+                <p className="text-sm font-medium text-foreground mb-3">{t('ask.suggestedQuestions')}</p>
+                <div className="flex flex-col gap-2">
+                  {questionChips.map(chip => (
+                    <Button
+                      key={chip.id}
+                      variant="outline"
+                      className="justify-start gap-3 h-auto py-3 px-4 text-left bg-transparent hover:bg-muted/50"
+                      onClick={() => handleChipClick(chip)}
+                    >
+                      <span className="shrink-0 text-muted-foreground">{chip.icon}</span>
+                      <span className="text-sm">{t(chip.labelKey)}</span>
+                    </Button>
+                  ))}
+                </div>
               </div>
             </div>
           ) : (
@@ -413,38 +419,38 @@ export function AskDrawer({ open, onClose, onAddProposal, storeId }: AskDrawerPr
               {messages.map(message => (
                 <div key={message.id} className={cn('flex', message.type === 'user' ? 'justify-end' : 'justify-start')}>
                   {message.type === 'user' ? (
-                    <div className="bg-primary text-primary-foreground rounded-lg px-4 py-2 max-w-[85%]">
+                    <div className="bg-primary text-primary-foreground rounded-2xl rounded-br-sm px-4 py-2.5 max-w-[85%]">
                       <p className="text-sm">{message.content}</p>
                     </div>
                   ) : (
-                    <Card className="max-w-[95%] w-full">
+                    <Card className="w-full border-muted">
                       <CardContent className="p-4 space-y-3">
                         {/* Conclusion */}
                         {message.conclusion && (
-                          <div className="flex items-start gap-2">
-                            <Lightbulb className="h-4 w-4 text-primary mt-0.5 shrink-0" />
-                            <p className="text-sm font-medium">{message.conclusion}</p>
+                          <div className="flex items-start gap-2.5">
+                            <Lightbulb className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+                            <p className="text-sm leading-relaxed">{message.conclusion}</p>
                           </div>
                         )}
                         
                         {/* Evidence */}
                         {message.evidence && message.evidence.length > 0 && (
-                          <div className="bg-muted/50 rounded-lg p-3 space-y-2">
-                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                              <BarChart3 className="h-3 w-3" />
+                          <div className="bg-muted/40 rounded-lg p-3 space-y-2">
+                            <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                              <BarChart3 className="h-3.5 w-3.5" />
                               {t('ask.evidence')}
                             </div>
-                            <div className="space-y-1.5">
+                            <div className="space-y-2">
                               {message.evidence.map((ev, idx) => (
-                                <div key={idx} className="flex items-center justify-between text-sm">
-                                  <span className="text-muted-foreground">{ev.label}</span>
+                                <div key={idx} className="flex items-center justify-between text-sm gap-2">
+                                  <span className="text-muted-foreground truncate">{ev.label}</span>
                                   {ev.link ? (
-                                    <a href={ev.link} className="font-medium text-primary hover:underline flex items-center gap-1">
+                                    <a href={ev.link} className="font-medium text-primary hover:underline flex items-center gap-1 shrink-0">
                                       {ev.value}
                                       <ChevronRight className="h-3 w-3" />
                                     </a>
                                   ) : (
-                                    <span className="font-medium">{ev.value}</span>
+                                    <span className="font-semibold shrink-0">{ev.value}</span>
                                   )}
                                 </div>
                               ))}
@@ -453,9 +459,9 @@ export function AskDrawer({ open, onClose, onAddProposal, storeId }: AskDrawerPr
                         )}
                         
                         {/* Confidence & Actions */}
-                        <div className="flex items-center justify-between pt-2 border-t">
+                        <div className="flex items-center justify-between pt-3 border-t">
                           {message.confidence && (
-                            <Badge className={cn('text-xs', CONFIDENCE_COLORS[message.confidence])}>
+                            <Badge variant="secondary" className={cn('text-xs', CONFIDENCE_COLORS[message.confidence])}>
                               {t(`ask.confidence.${message.confidence}`)}
                             </Badge>
                           )}
@@ -464,9 +470,9 @@ export function AskDrawer({ open, onClose, onAddProposal, storeId }: AskDrawerPr
                             <Button
                               size="sm"
                               onClick={() => handleCreateProposal(message)}
-                              className="gap-1"
+                              className="gap-1.5"
                             >
-                              <FileText className="h-3 w-3" />
+                              <FileText className="h-3.5 w-3.5" />
                               {t('ask.createProposal')}
                             </Button>
                           )}
@@ -478,15 +484,15 @@ export function AskDrawer({ open, onClose, onAddProposal, storeId }: AskDrawerPr
               ))}
               
               {/* Show chips again after messages */}
-              <div className="pt-4 border-t">
-                <p className="text-xs text-muted-foreground mb-2">{t('ask.otherQuestions')}</p>
-                <div className="flex flex-wrap gap-2">
+              <div className="pt-4 mt-2 border-t">
+                <p className="text-xs font-medium text-muted-foreground mb-2">{t('ask.otherQuestions')}</p>
+                <div className="flex flex-col gap-1.5">
                   {questionChips.map(chip => (
                     <Button
                       key={chip.id}
-                      variant="outline"
+                      variant="ghost"
                       size="sm"
-                      className="gap-1.5 text-xs bg-transparent"
+                      className="justify-start gap-2 h-auto py-2 px-3 text-xs text-muted-foreground hover:text-foreground"
                       onClick={() => handleChipClick(chip)}
                     >
                       {chip.icon}
@@ -497,10 +503,10 @@ export function AskDrawer({ open, onClose, onAddProposal, storeId }: AskDrawerPr
               </div>
             </div>
           )}
-        </ScrollArea>
+        </div>
         
         {/* Input Area */}
-        <div className="px-6 py-4 border-t bg-muted/30">
+        <div className="px-5 py-4 border-t bg-muted/20 shrink-0">
           <div className="flex gap-2">
             <Input
               value={inputValue}
