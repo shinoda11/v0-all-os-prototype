@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { PageHeader } from '@/components/PageHeader';
+import { OSHeader } from '@/components/OSHeader';
 import { TimeBandTabs } from '@/components/TimeBandTabs';
 import { MetricCard } from '@/components/MetricCard';
 import { LaneTimeline } from '@/components/Timeline';
@@ -612,6 +613,14 @@ export default function CockpitPage() {
 
   return (
     <div className="space-y-6">
+      {/* OS Header with Ask OS button */}
+      <OSHeader
+        title={t('cockpit.title')}
+        timeBand={timeBand}
+        onTimeBandChange={setTimeBand}
+        showTimeBandTabs={false}
+      />
+      
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <PageHeader title={t('cockpit.title')} subtitle={shortName} />
