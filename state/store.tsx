@@ -42,6 +42,7 @@ interface StoreContextValue {
     startDecision: (proposal: Proposal) => void;
     completeDecision: (proposal: Proposal) => void;
     updateProposal: (proposal: Proposal) => void;
+    addProposal: (proposal: Proposal) => void;
     // Replay
     startReplay: () => void;
     stepReplay: () => void;

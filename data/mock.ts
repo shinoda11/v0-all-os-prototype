@@ -208,3 +208,101 @@ export const getEventCountsByType = (
 
   return counts;
 };
+
+// ------------------------------------------------------------
+// Menu Sales Time Series (for demand drop detection)
+// ------------------------------------------------------------
+
+export type SalesChannel = 'dine-in' | 'takeout' | 'delivery';
+
+export interface MenuSalesRecord {
+  menuId: string;
+  date: string; // YYYY-MM-DD
+  timeBand: 'lunch' | 'idle' | 'dinner';
+  channel: SalesChannel;
+  qty: number;
+}
+
+// Generate mock menu sales history for the past 10 days
+export const generateMenuSalesHistory = (storeId: string): MenuSalesRecord[] => {
+  const records: MenuSalesRecord[] = [];
+  const today = new Date();
+  const menuIds = ['menu-1', 'menu-2', 'menu-3', 'menu-4', 'menu-5'];
+  const channels: SalesChannel[] = ['dine-in', 'takeout', 'delivery'];
+  const timeBands: Array<'lunch' | 'idle' | 'dinner'> = ['lunch', 'idle', 'dinner'];
+
+  // Base quantities for each menu (typical daily sales)
+  const baseQty: Record<string, number> = {
+    'menu-1': 25, // 熟成まぐろ握り
+    'menu-2': 30, // 炙りサーモン握り - will have demand drop
+    'menu-3': 12, // 特選うに軍艦
+    'menu-4': 18, // 玉子焼き
+    'menu-5': 8,  // 特上盛り合わせ
+  };
+
+  // Channel distribution (typical)
+  const channelDist: Record<SalesChannel, number> = {
+    'dine-in': 0.6,
+    'takeout': 0.25,
+    'delivery': 0.15,
+  };
+
+  // Time band distribution
+  const timeBandDist: Record<string, number> = {
+    'lunch': 0.35,
+    'idle': 0.15,
+    'dinner': 0.50,
+  };
+
+  for (let dayOffset = 10; dayOffset >= 0; dayOffset--) {
+    const date = new Date(today);
+    date.setDate(today.getDate() - dayOffset);
+    const dateStr = date.toISOString().split('T')[0];
+    const isWeekend = [0, 6].includes(date.getDay());
+    const weekendMultiplier = isWeekend ? 1.3 : 1.0;
+
+    for (const menuId of menuIds) {
+      // Apply demand drop for menu-2 (炙りサーモン握り) in last 3 days
+      let dropMultiplier = 1.0;
+      if (menuId === 'menu-2' && dayOffset <= 2) {
+        dropMultiplier = 0.55; // 45% drop
+      }
+
+      for (const timeBand of timeBands) {
+        for (const channel of channels) {
+          const base = baseQty[menuId] || 10;
+          const qty = Math.round(
+            base *
+            weekendMultiplier *
+            dropMultiplier *
+            timeBandDist[timeBand] *
+            channelDist[channel] *
+            (0.8 + Math.random() * 0.4) // Add some variance
+          );
+
+          if (qty > 0) {
+            records.push({
+              menuId,
+              date: dateStr,
+              timeBand,
+              channel,
+              qty,
+            });
+          }
+        }
+      }
+    }
+  }
+
+  return records;
+};
+
+// Get menu sales history (cached per store)
+const menuSalesCache: Record<string, MenuSalesRecord[]> = {};
+
+export const getMenuSalesHistory = (storeId: string): MenuSalesRecord[] => {
+  if (!menuSalesCache[storeId]) {
+    menuSalesCache[storeId] = generateMenuSalesHistory(storeId);
+  }
+  return menuSalesCache[storeId];
+};

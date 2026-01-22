@@ -147,7 +147,11 @@ export type ProposalType =
   | 'help-request'
   | 'scope-reduction'
   | 'high-margin-priority'
-  | 'extra-prep';
+  | 'extra-prep'
+  // Demand drop specific actions
+  | 'prep-amount-adjust'
+  | 'quality-check'
+  | 'channel-switch';
 
 export type ExpectedEffect = 'sales-impact' | 'stockout-avoidance' | 'waste-reduction' | 'labor-savings';
 
@@ -215,7 +219,7 @@ export interface ExceptionImpact {
 
 export interface ExceptionItem {
   id: string;
-  type: 'delivery-delay' | 'staff-shortage' | 'demand-surge' | 'prep-behind';
+  type: 'delivery-delay' | 'staff-shortage' | 'demand-surge' | 'prep-behind' | 'demand-drop';
   severity: 'warning' | 'critical';
   title: string;
   description: string;
@@ -225,6 +229,28 @@ export interface ExceptionItem {
   status: ExceptionStatus;
   impact: ExceptionImpact;
   linkedProposalId?: string;
+  // Demand drop specific fields
+  demandDropMeta?: DemandDropMeta;
+}
+
+// Demand drop detection metadata
+export interface DemandDropMeta {
+  menuId: string;
+  menuName: string;
+  dropRate: number; // e.g., 0.35 = 35% drop
+  absoluteDrop: number; // absolute quantity drop
+  avg3Day: number;
+  avg7Day: number;
+  affectedTimeBands: Array<{ timeBand: TimeBand; dropRate: number }>;
+  affectedChannels: Array<{ channel: string; dropRate: number }>;
+  hypotheses: Array<{ id: string; text: string; confidence: 'high' | 'medium' | 'low' }>;
+  recommendedActions: Array<{ 
+    id: string; 
+    text: string; 
+    proposalType: ProposalType;
+    expectedEffect: ExpectedEffect;
+    targetRoles: string[];
+  }>;
 }
 
 export interface CockpitMetrics {

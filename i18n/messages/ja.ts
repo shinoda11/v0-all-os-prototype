@@ -31,6 +31,7 @@ export const ja = {
   'os.header.badge': 'All OS',
   'os.header.businessDate': '営業日',
   'os.header.lastUpdated': '更新',
+  'os.header.askOS': 'Ask OS',
 
   // Cockpit
   'cockpit.title': '運用コックピット',
@@ -119,12 +120,14 @@ export const ja = {
   'exceptions.distributeSummary': '配布サマリー',
   'exceptions.todoCount': '{count}件のToDoを配布',
   'exceptions.sendToQueue': 'キューへ送信',
+  'exceptions.viewDetail': '詳細',
 
   // Exception types
   'exception.type.delivery-delay': '配送遅延',
   'exception.type.staff-shortage': '人員不足',
   'exception.type.demand-surge': '需要急増',
   'exception.type.prep-behind': '仕込み遅延',
+  'exception.type.demand-drop': '出数下降',
 
   // Impact types
   'impact.stockout': '欠品',
@@ -324,6 +327,82 @@ export const ja = {
   // Language
   'language.japanese': '日本語',
   'language.english': 'English',
+
+  // Demand Drop
+  'demandDrop.detailTitle': '出数下降の詳細',
+  'demandDrop.dropRate': '下降率',
+  'demandDrop.absoluteDrop': '差分',
+  'demandDrop.units': '食',
+  'demandDrop.avg3Day': '直近3日平均',
+  'demandDrop.avg7Day': '前週平均',
+  'demandDrop.affectedTimeBands': '影響タイムバンド',
+  'demandDrop.affectedChannels': '影響チャネル',
+  'demandDrop.hypotheses': '原因仮説トップ3',
+  'demandDrop.recommendedActions': '推奨アクション',
+  'demandDrop.createProposal': '提案作成',
+  'demandDrop.addToQueue': 'キューに追加',
+  'demandDrop.proposalCreated': '追加済',
+  'demandDrop.confidence.high': '高確度',
+  'demandDrop.confidence.medium': '中確度',
+  'demandDrop.confidence.low': '低確度',
+
+  // Ask OS
+  'ask.title': 'Ask OS',
+  'ask.description': '質問してください。データに基づいて回答します。',
+  'ask.suggestedQuestions': 'よくある質問',
+  'ask.otherQuestions': '他の質問',
+  'ask.inputPlaceholder': '質問を入力...',
+  'ask.evidence': '根拠データ',
+  'ask.createProposal': '提案を作成',
+  'ask.proposalCreated': '提案をキューに追加しました',
+  'ask.proposalType': '種類',
+  'ask.proposalTitle': 'タイトル',
+  'ask.defaultResponse': '申し訳ありませんが、その質問には対応していません。上のチップから質問を選んでください。',
+  'ask.confidence.high': '高確度',
+  'ask.confidence.medium': '中確度',
+  'ask.confidence.low': '低確度',
+  // Question chips
+  'ask.chip.todayProjection': '今日の着地見込み',
+  'ask.chip.laborRateReason': '人件費率が悪い理由',
+  'ask.chip.demandDropProducts': '出数が下降している商品',
+  // Today's projection responses
+  'ask.projection.conclusionGood': '本日の売上は予測に対して{rate}%達成しており、順調です。',
+  'ask.projection.conclusionBehind': '本日の売上は予測に対して{rate}%で、¥{gap}のギャップがあります。',
+  'ask.projection.forecast': '予測売上',
+  'ask.projection.actual': '実績売上',
+  'ask.projection.projectedEOD': '着地見込',
+  'ask.projection.achievementRate': '達成率',
+  'ask.projection.proposalTitle': '売上挽回アクション',
+  'ask.projection.proposalDesc': '売上ギャップ¥{gap}を挽回するための高粗利商品の推し施策',
+  'ask.projection.proposalReason': '売上達成率{rate}%のため、挽回施策が必要',
+  // Labor rate responses
+  'ask.labor.conclusionOver': '人件費率は現在{current}%で、目標{target}%を{delta}pt上回っています。',
+  'ask.labor.conclusionGood': '人件費率は{current}%で、目標{target}%内に収まっています。',
+  'ask.labor.currentRate': '現在の人件費率',
+  'ask.labor.targetRate': '目標人件費率',
+  'ask.labor.activeStaff': '稼働中スタッフ',
+  'ask.labor.people': '人',
+  'ask.labor.laborCost': '累計人件費',
+  'ask.labor.possibleCauses': '考えられる原因',
+  'ask.labor.reasonOverstaffed': '現在{count}名が稼働中で、売上に対して人員が多い可能性',
+  'ask.labor.reasonLowSales': '売上達成率が{rate}%と低調で、相対的に人件費率が上昇',
+  'ask.labor.reasonGeneral': '売上に対する労働時間のバランスが悪化',
+  'ask.labor.proposalTitle': '人件費率改善アクション',
+  'ask.labor.proposalDesc': '人件費率を{delta}pt改善するための施策',
+  'ask.labor.proposalReason': '人件費率{current}%が目標{target}%を超過',
+  // Demand drop responses
+  'ask.demandDrop.noDrops': '現在、出数が大きく下降している商品はありません。',
+  'ask.demandDrop.conclusion': '{count}件の商品で出数下降を検出しました。最も影響が大きいのは{topMenu}で、{dropRate}%下降しています。',
+  'ask.demandDrop.topItem': '最影響商品',
+  'ask.demandDrop.dropRate': '下降率',
+  'ask.demandDrop.avg3Day': '直近3日平均',
+  'ask.demandDrop.avg7Day': '前週平均',
+  'ask.demandDrop.units': '食',
+  'ask.demandDrop.affectedChannels': '影響チャネル',
+  'ask.demandDrop.allChannels': '全チャネル',
+  'ask.demandDrop.proposalTitle': '{menu}の仕込み量調整',
+  'ask.demandDrop.proposalDesc': '出数{dropRate}%下降に伴う仕込み量の見直し',
+  'ask.demandDrop.proposalReason': '{menu}の出数が{dropRate}%下降しているため',
 } as const;
 
 export type MessageKey = keyof typeof ja;

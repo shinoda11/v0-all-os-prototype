@@ -222,6 +222,8 @@ export const selectEnhancedCockpitMetrics = (
 // Exception Selectors
 // ------------------------------------------------------------
 
+import { deriveDemandDropExceptions } from './derive';
+
 export const selectExceptions = (
   state: AppState,
   date?: string
@@ -231,7 +233,24 @@ export const selectExceptions = (
   
   if (!storeId) return [];
   
-  return deriveExceptions(state.events, storeId, targetDate);
+  // Get base exceptions from events
+  const baseExceptions = deriveExceptions(state.events, storeId, targetDate);
+  
+  // Get demand drop exceptions
+  const demandDropExceptions = deriveDemandDropExceptions(storeId);
+  
+  // Combine and sort by severity and detection time
+  const allExceptions = [...baseExceptions, ...demandDropExceptions];
+  allExceptions.sort((a, b) => {
+    // Critical first
+    if (a.severity !== b.severity) {
+      return a.severity === 'critical' ? -1 : 1;
+    }
+    // Then by detection time (newest first)
+    return new Date(b.detectedAt).getTime() - new Date(a.detectedAt).getTime();
+  });
+  
+  return allExceptions;
 };
 
 // ------------------------------------------------------------

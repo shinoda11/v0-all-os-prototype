@@ -23,6 +23,7 @@ import {
   OperationsKPI,
   ExceptionsKPI,
   EnhancedCockpitMetrics,
+  ExpectedEffect,
 } from './types';
 
 // ------------------------------------------------------------
@@ -1462,4 +1463,289 @@ export const deriveLaborGuardrailSummary = (
     status,
     lastUpdate: new Date().toISOString(),
   };
+};
+
+// ------------------------------------------------------------
+// Demand Drop Detection
+// ------------------------------------------------------------
+
+import { getMenuSalesHistory, MENUS, type MenuSalesRecord, type SalesChannel } from '@/data/mock';
+import type { DemandDropMeta, ProposalType } from './types';
+
+export interface DemandDropDetectionResult {
+  menuId: string;
+  menuName: string;
+  avg3Day: number;
+  avg7Day: number;
+  dropRate: number; // 0.35 = 35% drop
+  absoluteDrop: number;
+  severity: 'warning' | 'critical';
+  affectedTimeBands: Array<{ timeBand: TimeBand; dropRate: number }>;
+  affectedChannels: Array<{ channel: string; dropRate: number }>;
+}
+
+// Detection thresholds
+const DEMAND_DROP_THRESHOLDS = {
+  relativeDropWarning: 0.20, // 20% drop = warning
+  relativeDropCritical: 0.35, // 35% drop = critical
+  absoluteDropMin: 5, // At least 5 units drop to trigger
+  minDailyVolume: 3, // Exclude menus with < 3 daily avg (low volume)
+};
+
+// Hypothesis templates based on conditions
+const HYPOTHESIS_TEMPLATES = [
+  { 
+    id: 'h-competitor', 
+    condition: (r: DemandDropDetectionResult) => r.dropRate > 0.3,
+    text: '近隣の競合店が新メニューやプロモーションを開始した可能性',
+    confidence: 'medium' as const,
+  },
+  { 
+    id: 'h-seasonal', 
+    condition: (r: DemandDropDetectionResult) => true, // Always consider
+    text: '季節的な需要変動（気温変化、イベント終了など）',
+    confidence: 'medium' as const,
+  },
+  { 
+    id: 'h-quality', 
+    condition: (r: DemandDropDetectionResult) => r.affectedChannels.some(c => c.channel === 'dine-in' && c.dropRate > 0.25),
+    text: '品質や提供スピードに関する顧客不満の可能性',
+    confidence: 'low' as const,
+  },
+  { 
+    id: 'h-price', 
+    condition: (r: DemandDropDetectionResult) => r.dropRate > 0.25,
+    text: '価格感度の変化（値上げ後の反応、競合との価格差）',
+    confidence: 'medium' as const,
+  },
+  { 
+    id: 'h-delivery-issue', 
+    condition: (r: DemandDropDetectionResult) => r.affectedChannels.some(c => c.channel === 'delivery' && c.dropRate > 0.3),
+    text: 'デリバリープラットフォームでの表示順位低下または配達遅延',
+    confidence: 'high' as const,
+  },
+  { 
+    id: 'h-social', 
+    condition: (r: DemandDropDetectionResult) => r.dropRate > 0.4,
+    text: 'SNSやレビューサイトでのネガティブな投稿',
+    confidence: 'low' as const,
+  },
+];
+
+// Recommended actions based on conditions
+const ACTION_TEMPLATES = [
+  {
+    id: 'a-menu-restrict',
+    condition: (r: DemandDropDetectionResult) => r.dropRate > 0.35,
+    text: '一時的なメニュー制限で他商品へ誘導',
+    proposalType: 'menu-restriction' as ProposalType,
+    expectedEffect: 'waste-reduction' as ExpectedEffect,
+    targetRoles: ['manager', 'kitchen'],
+  },
+  {
+    id: 'a-prep-adjust',
+    condition: (r: DemandDropDetectionResult) => r.absoluteDrop > 5,
+    text: '仕込み量を削減してロスを抑制',
+    proposalType: 'prep-amount-adjust' as ProposalType,
+    expectedEffect: 'waste-reduction' as ExpectedEffect,
+    targetRoles: ['kitchen'],
+  },
+  {
+    id: 'a-quality-check',
+    condition: (r: DemandDropDetectionResult) => r.affectedChannels.some(c => c.channel === 'dine-in'),
+    text: '調理品質と提供オペレーションの確認',
+    proposalType: 'quality-check' as ProposalType,
+    expectedEffect: 'sales-impact' as ExpectedEffect,
+    targetRoles: ['manager', 'kitchen'],
+  },
+  {
+    id: 'a-channel-switch',
+    condition: (r: DemandDropDetectionResult) => r.affectedChannels.some(c => c.channel === 'delivery' && c.dropRate > 0.25),
+    text: 'デリバリー以外のチャネルへプロモーション集中',
+    proposalType: 'channel-switch' as ProposalType,
+    expectedEffect: 'sales-impact' as ExpectedEffect,
+    targetRoles: ['manager', 'floor'],
+  },
+];
+
+/**
+ * Detect menus with significant demand drop
+ * Compares 3-day average vs 7-day average
+ */
+export const detectDemandDrops = (
+  storeId: string
+): DemandDropDetectionResult[] => {
+  const records = getMenuSalesHistory(storeId);
+  const today = new Date();
+  const results: DemandDropDetectionResult[] = [];
+
+  // Get unique menu IDs
+  const menuIds = [...new Set(records.map(r => r.menuId))];
+
+  for (const menuId of menuIds) {
+    const menuRecords = records.filter(r => r.menuId === menuId);
+    
+    // Group by date
+    const byDate = new Map<string, number>();
+    for (const rec of menuRecords) {
+      byDate.set(rec.date, (byDate.get(rec.date) ?? 0) + rec.qty);
+    }
+
+    // Get sorted dates
+    const dates = [...byDate.keys()].sort();
+    if (dates.length < 7) continue; // Need at least 7 days of data
+
+    // Calculate 3-day average (most recent 3 days)
+    const recent3Days = dates.slice(-3);
+    const avg3Day = recent3Days.reduce((sum, d) => sum + (byDate.get(d) ?? 0), 0) / 3;
+
+    // Calculate 7-day average (days 4-10, excluding recent 3)
+    const previous7Days = dates.slice(-10, -3);
+    if (previous7Days.length === 0) continue;
+    const avg7Day = previous7Days.reduce((sum, d) => sum + (byDate.get(d) ?? 0), 0) / previous7Days.length;
+
+    // Skip low volume menus
+    if (avg7Day < DEMAND_DROP_THRESHOLDS.minDailyVolume) continue;
+
+    // Calculate drop
+    const absoluteDrop = avg7Day - avg3Day;
+    const dropRate = avg7Day > 0 ? absoluteDrop / avg7Day : 0;
+
+    // Check thresholds
+    if (dropRate < DEMAND_DROP_THRESHOLDS.relativeDropWarning) continue;
+    if (absoluteDrop < DEMAND_DROP_THRESHOLDS.absoluteDropMin) continue;
+
+    // Determine severity
+    const severity: 'warning' | 'critical' = 
+      dropRate >= DEMAND_DROP_THRESHOLDS.relativeDropCritical ? 'critical' : 'warning';
+
+    // Analyze by time band
+    const byTimeBand = new Map<string, { recent: number; previous: number }>();
+    for (const rec of menuRecords) {
+      const isRecent = recent3Days.includes(rec.date);
+      const isPrevious = previous7Days.includes(rec.date);
+      if (!isRecent && !isPrevious) continue;
+
+      const entry = byTimeBand.get(rec.timeBand) ?? { recent: 0, previous: 0 };
+      if (isRecent) entry.recent += rec.qty;
+      if (isPrevious) entry.previous += rec.qty;
+      byTimeBand.set(rec.timeBand, entry);
+    }
+
+    const affectedTimeBands: Array<{ timeBand: TimeBand; dropRate: number }> = [];
+    for (const [tb, data] of byTimeBand) {
+      const tbDropRate = data.previous > 0 ? (data.previous - data.recent) / data.previous : 0;
+      if (tbDropRate > 0.1) {
+        affectedTimeBands.push({ timeBand: tb as TimeBand, dropRate: tbDropRate });
+      }
+    }
+    affectedTimeBands.sort((a, b) => b.dropRate - a.dropRate);
+
+    // Analyze by channel
+    const byChannel = new Map<string, { recent: number; previous: number }>();
+    for (const rec of menuRecords) {
+      const isRecent = recent3Days.includes(rec.date);
+      const isPrevious = previous7Days.includes(rec.date);
+      if (!isRecent && !isPrevious) continue;
+
+      const entry = byChannel.get(rec.channel) ?? { recent: 0, previous: 0 };
+      if (isRecent) entry.recent += rec.qty;
+      if (isPrevious) entry.previous += rec.qty;
+      byChannel.set(rec.channel, entry);
+    }
+
+    const affectedChannels: Array<{ channel: string; dropRate: number }> = [];
+    for (const [ch, data] of byChannel) {
+      const chDropRate = data.previous > 0 ? (data.previous - data.recent) / data.previous : 0;
+      if (chDropRate > 0.1) {
+        affectedChannels.push({ channel: ch, dropRate: chDropRate });
+      }
+    }
+    affectedChannels.sort((a, b) => b.dropRate - a.dropRate);
+
+    // Get menu name
+    const menu = MENUS.find(m => m.id === menuId);
+    const menuName = menu?.name ?? menuId;
+
+    results.push({
+      menuId,
+      menuName,
+      avg3Day: Math.round(avg3Day * 10) / 10,
+      avg7Day: Math.round(avg7Day * 10) / 10,
+      dropRate: Math.round(dropRate * 100) / 100,
+      absoluteDrop: Math.round(absoluteDrop * 10) / 10,
+      severity,
+      affectedTimeBands,
+      affectedChannels,
+    });
+  }
+
+  // Sort by drop rate descending
+  results.sort((a, b) => b.dropRate - a.dropRate);
+
+  return results;
+};
+
+/**
+ * Convert demand drop detection results to exception items
+ */
+export const deriveDemandDropExceptions = (
+  storeId: string
+): ExceptionItem[] => {
+  const drops = detectDemandDrops(storeId);
+  const now = new Date();
+
+  return drops.slice(0, 5).map((drop, index) => {
+    // Generate hypotheses
+    const hypotheses = HYPOTHESIS_TEMPLATES
+      .filter(h => h.condition(drop))
+      .slice(0, 3)
+      .map(h => ({ id: h.id, text: h.text, confidence: h.confidence }));
+
+    // Generate recommended actions
+    const recommendedActions = ACTION_TEMPLATES
+      .filter(a => a.condition(drop))
+      .slice(0, 3)
+      .map(a => ({ 
+        id: a.id, 
+        text: a.text, 
+        proposalType: a.proposalType,
+        expectedEffect: a.expectedEffect,
+        targetRoles: a.targetRoles,
+      }));
+
+    const demandDropMeta: DemandDropMeta = {
+      menuId: drop.menuId,
+      menuName: drop.menuName,
+      dropRate: drop.dropRate,
+      absoluteDrop: drop.absoluteDrop,
+      avg3Day: drop.avg3Day,
+      avg7Day: drop.avg7Day,
+      affectedTimeBands: drop.affectedTimeBands,
+      affectedChannels: drop.affectedChannels,
+      hypotheses,
+      recommendedActions,
+    };
+
+    const exception: ExceptionItem = {
+      id: `demand-drop-${storeId}-${drop.menuId}-${now.getTime()}`,
+      type: 'demand-drop',
+      severity: drop.severity,
+      title: `${drop.menuName}の出数下降`,
+      description: `直近3日平均${drop.avg3Day}食 vs 前週${drop.avg7Day}食（${Math.round(drop.dropRate * 100)}%減）`,
+      relatedEventId: `menu-${drop.menuId}`,
+      detectedAt: now.toISOString(),
+      resolved: false,
+      status: 'unhandled',
+      impact: {
+        timeBand: drop.affectedTimeBands[0]?.timeBand ?? 'all',
+        affectedItems: [{ id: drop.menuId, name: drop.menuName, type: 'menu' }],
+        impactType: 'stockout', // Using stockout as proxy for demand issues
+        impactSeverity: drop.severity === 'critical' ? 'high' : 'medium',
+      },
+      demandDropMeta,
+    };
+
+    return exception;
+  });
 };

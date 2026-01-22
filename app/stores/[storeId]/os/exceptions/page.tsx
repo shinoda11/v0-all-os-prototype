@@ -10,38 +10,33 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { FileText } from 'lucide-react'; // Import FileText
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useStore } from '@/state/store';
 import { useI18n } from '@/i18n/I18nProvider';
 import { selectExceptions, selectCurrentStore } from '@/core/selectors';
-import type { ExceptionItem, Proposal, ProposalType, ExpectedEffect, TimeBand, ImpactType } from '@/core/types';
+import type { ExceptionItem, Proposal, ProposalType, ExpectedEffect, TimeBand, ImpactType, DemandDropMeta, Role } from '@/core/types';
 import {
   AlertTriangle,
   AlertCircle,
   Truck,
   Users,
   TrendingUp,
+  TrendingDown,
   ChefHat,
   CheckCircle2,
   Clock,
   Package,
   Send,
   X,
+  FileText,
+  Lightbulb,
+  Zap,
+  BarChart3,
+  ShoppingCart,
+  ArrowRight,
+  Info,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -69,6 +64,11 @@ const EXCEPTION_CONFIG: Record<
     icon: <ChefHat className="h-5 w-5" />,
     color: 'text-orange-600',
     labelKey: 'exception.type.prep-behind',
+  },
+  'demand-drop': {
+    icon: <TrendingDown className="h-5 w-5" />,
+    color: 'text-red-600',
+    labelKey: 'exception.type.demand-drop',
   },
 };
 
@@ -125,9 +125,10 @@ interface ExceptionCardProps {
   exception: ExceptionItem;
   onCreateProposal: () => void;
   onResolve: () => void;
+  onViewDetail?: () => void;
 }
 
-function ExceptionCard({ exception, onCreateProposal, onResolve }: ExceptionCardProps) {
+function ExceptionCard({ exception, onCreateProposal, onResolve, onViewDetail }: ExceptionCardProps) {
   const { t, locale } = useI18n();
   const config = EXCEPTION_CONFIG[exception.type];
   const isCritical = exception.severity === 'critical';
@@ -135,6 +136,7 @@ function ExceptionCard({ exception, onCreateProposal, onResolve }: ExceptionCard
   const impactTypeConfig = IMPACT_TYPE_LABELS[exception.impact.impactType];
   const impactSeverityConfig = IMPACT_SEVERITY_LABELS[exception.impact.impactSeverity];
   const hasProposal = exception.status === 'proposal-created' || exception.linkedProposalId;
+  const isDemandDrop = exception.type === 'demand-drop';
 
   return (
     <Card className={cn('transition-all', isCritical && 'border-red-200 bg-red-50/30')}>
@@ -193,6 +195,12 @@ function ExceptionCard({ exception, onCreateProposal, onResolve }: ExceptionCard
               {t('exceptions.detectedAt')}: {new Date(exception.detectedAt).toLocaleTimeString(locale === 'ja' ? 'ja-JP' : 'en-US')}
             </p>
             <div className="flex gap-2">
+              {isDemandDrop && onViewDetail && (
+                <Button size="sm" variant="outline" onClick={onViewDetail} className="gap-1 bg-transparent">
+                  <Info className="h-4 w-4" />
+                  {t('exceptions.viewDetail')}
+                </Button>
+              )}
               {!hasProposal && exception.status === 'unhandled' && (
                 <Button size="sm" variant="outline" onClick={onCreateProposal} className="gap-1 bg-transparent">
                   <FileText className="h-4 w-4" />
@@ -433,6 +441,258 @@ function ProposalDraftDrawer({ exception, roles, open, onClose, onSubmit }: Prop
   );
 }
 
+// Demand Drop Detail Drawer Component
+interface DemandDropDetailDrawerProps {
+  exception: ExceptionItem | null;
+  open: boolean;
+  onClose: () => void;
+  onAddProposal: (proposal: Proposal) => void;
+  roles: Role[];
+  storeId: string;
+}
+
+// Channel display names
+const CHANNEL_NAMES: Record<string, string> = {
+  'dine-in': '店内',
+  'takeout': 'テイクアウト',
+  'delivery': 'デリバリー',
+};
+
+// Confidence badge colors
+const CONFIDENCE_COLORS: Record<string, string> = {
+  high: 'bg-green-100 text-green-800',
+  medium: 'bg-yellow-100 text-yellow-800',
+  low: 'bg-gray-100 text-gray-600',
+};
+
+// Proposal type labels
+const PROPOSAL_TYPE_LABELS: Record<string, string> = {
+  'menu-restriction': 'メニュー制限',
+  'prep-amount-adjust': '仕込み量調整',
+  'quality-check': '品質確認',
+  'channel-switch': 'チャネル切替',
+};
+
+function DemandDropDetailDrawer({ exception, open, onClose, onAddProposal, roles, storeId }: DemandDropDetailDrawerProps) {
+  const { t } = useI18n();
+  const [createdActions, setCreatedActions] = useState<Set<string>>(new Set());
+  
+  // Reset created actions when exception changes
+  React.useEffect(() => {
+    if (exception) {
+      setCreatedActions(new Set());
+    }
+  }, [exception]);
+
+  if (!exception || exception.type !== 'demand-drop' || !exception.demandDropMeta) {
+    return null;
+  }
+
+  const meta = exception.demandDropMeta;
+  const dropPercent = Math.round(meta.dropRate * 100);
+
+  return (
+    <Sheet open={open} onOpenChange={onClose}>
+      <SheetContent className="w-[450px] sm:w-[600px] overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle className="flex items-center gap-2">
+            <TrendingDown className="h-5 w-5 text-red-600" />
+            {t('demandDrop.detailTitle')}
+          </SheetTitle>
+          <SheetDescription>{meta.menuName}</SheetDescription>
+        </SheetHeader>
+
+        <div className="space-y-6 mt-6">
+          {/* Drop Summary */}
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm text-muted-foreground">{t('demandDrop.dropRate')}</div>
+                <div className="text-3xl font-bold text-red-600">-{dropPercent}%</div>
+              </div>
+              <div className="text-right">
+                <div className="text-sm text-muted-foreground">{t('demandDrop.absoluteDrop')}</div>
+                <div className="text-2xl font-semibold">-{meta.absoluteDrop}{t('demandDrop.units')}</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-4 mt-3 pt-3 border-t border-red-200">
+              <div className="flex-1">
+                <div className="text-xs text-muted-foreground">{t('demandDrop.avg3Day')}</div>
+                <div className="font-medium">{meta.avg3Day}{t('demandDrop.units')}/日</div>
+              </div>
+              <ArrowRight className="h-4 w-4 text-muted-foreground" />
+              <div className="flex-1 text-right">
+                <div className="text-xs text-muted-foreground">{t('demandDrop.avg7Day')}</div>
+                <div className="font-medium">{meta.avg7Day}{t('demandDrop.units')}/日</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Affected Time Bands */}
+          {meta.affectedTimeBands.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <Clock className="h-4 w-4" />
+                {t('demandDrop.affectedTimeBands')}
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {meta.affectedTimeBands.map((tb) => (
+                  <div key={tb.timeBand} className="bg-muted/50 rounded-lg p-3 text-center">
+                    <div className="text-xs text-muted-foreground">{t(TIME_BAND_LABELS[tb.timeBand])}</div>
+                    <div className="font-semibold text-red-600">-{Math.round(tb.dropRate * 100)}%</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Affected Channels */}
+          {meta.affectedChannels.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <ShoppingCart className="h-4 w-4" />
+                {t('demandDrop.affectedChannels')}
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {meta.affectedChannels.map((ch) => (
+                  <div key={ch.channel} className="bg-muted/50 rounded-lg p-3 text-center">
+                    <div className="text-xs text-muted-foreground">{CHANNEL_NAMES[ch.channel] ?? ch.channel}</div>
+                    <div className="font-semibold text-red-600">-{Math.round(ch.dropRate * 100)}%</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Hypotheses */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <Lightbulb className="h-4 w-4" />
+              {t('demandDrop.hypotheses')}
+            </div>
+            <div className="space-y-2">
+              {meta.hypotheses.map((hypothesis, idx) => (
+                <div key={hypothesis.id} className="flex items-start gap-3 bg-muted/30 rounded-lg p-3">
+                  <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium shrink-0">
+                    {idx + 1}
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm">{hypothesis.text}</p>
+                    <div className="flex items-center gap-2 mt-2">
+                      <Badge variant="outline" className="text-[10px]">
+                        {PROPOSAL_TYPE_LABELS[hypothesis.proposalType] ?? hypothesis.proposalType}
+                      </Badge>
+                      <Badge variant="outline" className="text-[10px]">
+                        <Users className="h-2.5 w-2.5 mr-1" />
+                        {hypothesis.targetRoles.join(', ')}
+                      </Badge>
+                    </div>
+                  </div>
+                  <Badge className={cn('shrink-0', CONFIDENCE_COLORS[hypothesis.confidence])}>
+                    {t(`demandDrop.confidence.${hypothesis.confidence}`)}
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Recommended Actions */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <Zap className="h-4 w-4" />
+              {t('demandDrop.recommendedActions')}
+            </div>
+            <div className="space-y-3">
+              {meta.recommendedActions.map((action) => {
+                const isCreated = createdActions.has(action.id);
+                const targetRoleIds = roles
+                  .filter(r => action.targetRoles.includes(r.code))
+                  .map(r => r.id);
+                
+                const handleCreateProposal = () => {
+                  const now = new Date();
+                  const deadline = new Date(now.getTime() + 2 * 60 * 60 * 1000); // 2 hours from now
+                  
+                  const proposal: Proposal = {
+                    id: `prop-dd-${action.id}-${now.getTime()}`,
+                    type: action.proposalType,
+                    title: `${meta.menuName}: ${PROPOSAL_TYPE_LABELS[action.proposalType] ?? action.proposalType}`,
+                    description: action.text,
+                    reason: `${meta.menuName}の出数が${Math.round(meta.dropRate * 100)}%下降（直近3日平均${meta.avg3Day}食 vs 前週${meta.avg7Day}食）`,
+                    triggeredBy: exception.id,
+                    priority: exception.severity === 'critical' ? 'high' : 'medium',
+                    createdAt: now.toISOString(),
+                    targetMenuIds: [meta.menuId],
+                    targetPrepItemIds: [],
+                    quantity: Math.round(meta.absoluteDrop),
+                    distributedToRoles: targetRoleIds,
+                    deadline: deadline.toISOString(),
+                    storeId,
+                    timeBand: meta.affectedTimeBands[0]?.timeBand ?? 'all',
+                    expectedEffects: [action.expectedEffect],
+                    todoCount: 1,
+                    status: 'pending',
+                  };
+                  
+                  onAddProposal(proposal);
+                  setCreatedActions(prev => new Set(prev).add(action.id));
+                };
+                
+                return (
+                  <div key={action.id} className={cn(
+                    'rounded-lg p-3 border',
+                    isCreated 
+                      ? 'bg-green-50 border-green-200' 
+                      : 'bg-blue-50 border-blue-200'
+                  )}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1">
+                        <p className="text-sm font-medium">{action.text}</p>
+                        <div className="flex items-center gap-2 mt-2">
+                          <Badge variant="outline" className="text-[10px]">
+                            {PROPOSAL_TYPE_LABELS[action.proposalType] ?? action.proposalType}
+                          </Badge>
+                          <Badge variant="outline" className="text-[10px]">
+                            <Users className="h-2.5 w-2.5 mr-1" />
+                            {action.targetRoles.join(', ')}
+                          </Badge>
+                        </div>
+                      </div>
+                      {isCreated ? (
+                        <Badge className="shrink-0 bg-green-100 text-green-800 gap-1">
+                          <CheckCircle2 className="h-3 w-3" />
+                          {t('demandDrop.proposalCreated')}
+                        </Badge>
+                      ) : (
+                        <Button
+                          size="sm"
+                          onClick={handleCreateProposal}
+                          className="shrink-0 gap-1"
+                        >
+                          <Send className="h-3 w-3" />
+                          {t('demandDrop.addToQueue')}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Close Button */}
+          <div className="pt-4 border-t">
+            <Button variant="outline" onClick={onClose} className="w-full bg-transparent">
+              <X className="h-4 w-4 mr-2" />
+              {t('common.close')}
+            </Button>
+          </div>
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
 // Main Page Component
 export default function ExceptionsPage() {
   const { t } = useI18n();
@@ -444,6 +704,8 @@ export default function ExceptionsPage() {
 
   const [selectedExceptionForProposal, setSelectedExceptionForProposal] = useState<ExceptionItem | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [selectedExceptionForDetail, setSelectedExceptionForDetail] = useState<ExceptionItem | null>(null);
+  const [detailDrawerOpen, setDetailDrawerOpen] = useState(false);
 
   if (!currentStore) {
     return null;
@@ -465,6 +727,11 @@ export default function ExceptionsPage() {
   const handleCreateProposal = (exception: ExceptionItem) => {
     setSelectedExceptionForProposal(exception);
     setDrawerOpen(true);
+  };
+
+  const handleViewDetail = (exception: ExceptionItem) => {
+    setSelectedExceptionForDetail(exception);
+    setDetailDrawerOpen(true);
   };
 
   const handleSubmitProposal = (proposal: Proposal) => {
@@ -519,11 +786,11 @@ export default function ExceptionsPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-{activeExceptions.length === 0 ? (
-  <EmptyState
-    icon={<CheckCircle2 className="h-8 w-8 text-green-500" />}
-    title={t('exceptions.noExceptions')}
-  />
+          {activeExceptions.length === 0 ? (
+            <EmptyState
+              icon={<CheckCircle2 className="h-8 w-8 text-green-500" />}
+              title={t('exceptions.noExceptions')}
+            />
           ) : (
             <div className="space-y-4">
               {activeExceptions.map((exception) => (
@@ -532,6 +799,7 @@ export default function ExceptionsPage() {
                   exception={exception}
                   onCreateProposal={() => handleCreateProposal(exception)}
                   onResolve={() => handleResolve(exception.id)}
+                  onViewDetail={exception.type === 'demand-drop' ? () => handleViewDetail(exception) : undefined}
                 />
               ))}
             </div>
@@ -549,6 +817,19 @@ export default function ExceptionsPage() {
           setSelectedExceptionForProposal(null);
         }}
         onSubmit={handleSubmitProposal}
+      />
+
+      {/* Demand Drop Detail Drawer */}
+      <DemandDropDetailDrawer
+        exception={selectedExceptionForDetail}
+        open={detailDrawerOpen}
+        onClose={() => {
+          setDetailDrawerOpen(false);
+          setSelectedExceptionForDetail(null);
+        }}
+        onAddProposal={handleSubmitProposal}
+        roles={state.roles}
+        storeId={storeId}
       />
     </div>
   );
