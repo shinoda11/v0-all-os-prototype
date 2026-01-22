@@ -1,12 +1,10 @@
 'use client';
 
 import React, { useState, useCallback } from 'react';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { useStore } from '@/state/store';
 import { useI18n } from '@/i18n/I18nProvider';
 import { 
@@ -17,19 +15,16 @@ import {
 import { detectDemandDrops, deriveLaborGuardrailSummary, type DemandDropDetectionResult, type LaborGuardrailInput } from '@/core/derive';
 import type { Proposal, ExceptionItem, DemandDropMeta } from '@/core/types';
 import { 
-  MessageCircle, 
   Send, 
   TrendingDown, 
   DollarSign, 
   Target,
   Lightbulb,
-  AlertTriangle,
-  CheckCircle2,
   FileText,
   ChevronRight,
   Sparkles,
   BarChart3,
-  Users,
+  X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -381,17 +376,23 @@ export function AskDrawer({ open, onClose, onAddProposal, storeId }: AskDrawerPr
     setMessages(prev => [...prev, confirmMessage]);
   };
   
+  if (!open) return null;
+  
   return (
-    <Sheet open={open} onOpenChange={onClose}>
-      <SheetContent className="w-[420px] sm:w-[480px] flex flex-col p-0 h-full">
-        {/* Header */}
-        <SheetHeader className="px-5 pt-5 pb-4 border-b shrink-0">
-          <SheetTitle className="flex items-center gap-2 text-lg">
-            <Sparkles className="h-5 w-5 text-primary" />
-            {t('ask.title')}
-          </SheetTitle>
-          <SheetDescription className="text-sm">{t('ask.description')}</SheetDescription>
-        </SheetHeader>
+    <div className="flex flex-col h-full bg-background border-l border-border">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b shrink-0">
+        <div className="flex items-center gap-2">
+          <Sparkles className="h-5 w-5 text-primary" />
+          <div>
+            <h2 className="font-semibold text-base">{t('ask.title')}</h2>
+            <p className="text-xs text-muted-foreground">{t('ask.description')}</p>
+          </div>
+        </div>
+        <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8">
+          <X className="h-4 w-4" />
+        </Button>
+      </div>
         
         {/* Messages Area */}
         <div className="flex-1 overflow-y-auto px-5 py-4">
@@ -505,22 +506,21 @@ export function AskDrawer({ open, onClose, onAddProposal, storeId }: AskDrawerPr
           )}
         </div>
         
-        {/* Input Area */}
-        <div className="px-5 py-4 border-t bg-muted/20 shrink-0">
-          <div className="flex gap-2">
-            <Input
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              placeholder={t('ask.inputPlaceholder')}
-              onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-              className="flex-1"
-            />
-            <Button onClick={handleSendMessage} size="icon" disabled={!inputValue.trim()}>
-              <Send className="h-4 w-4" />
-            </Button>
-          </div>
+      {/* Input Area */}
+      <div className="px-4 py-3 border-t bg-muted/20 shrink-0">
+        <div className="flex gap-2">
+          <Input
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            placeholder={t('ask.inputPlaceholder')}
+            onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+            className="flex-1"
+          />
+          <Button onClick={handleSendMessage} size="icon" disabled={!inputValue.trim()}>
+            <Send className="h-4 w-4" />
+          </Button>
         </div>
-      </SheetContent>
-    </Sheet>
+      </div>
+    </div>
   );
 }

@@ -1,14 +1,13 @@
 'use client';
 
-import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { TimeBandTabs } from '@/components/TimeBandTabs';
-import { AskDrawer } from '@/components/AskDrawer';
+import { useAskPanel } from '@/components/AppShell';
 import { useStore } from '@/state/store';
 import { selectCurrentStore } from '@/core/selectors';
 import { useI18n, useLocaleDateFormat } from '@/i18n/I18nProvider';
-import type { TimeBand, Proposal } from '@/core/types';
+import type { TimeBand } from '@/core/types';
 import { RefreshCw, Globe, MessageCircle } from 'lucide-react';
 
 interface OSHeaderProps {
@@ -24,15 +23,11 @@ export function OSHeader({
   onTimeBandChange,
   showTimeBandTabs = true,
 }: OSHeaderProps) {
-  const { state, actions } = useStore();
+  const { state } = useStore();
   const currentStore = selectCurrentStore(state);
   const { locale, setLocale, t } = useI18n();
   const { formatDate, formatTime } = useLocaleDateFormat();
-  const [askDrawerOpen, setAskDrawerOpen] = useState(false);
-  
-  const handleAddProposal = (proposal: Proposal) => {
-    actions.addProposal(proposal);
-  };
+  const askPanel = useAskPanel();
 
   // Get current business date (today for now)
   const today = new Date();
@@ -95,7 +90,7 @@ export function OSHeader({
           <Button
             variant="default"
             size="sm"
-            onClick={() => setAskDrawerOpen(true)}
+            onClick={askPanel.toggle}
             className="h-7 px-3 text-xs gap-1.5"
           >
             <MessageCircle className="h-3.5 w-3.5" />
@@ -103,16 +98,6 @@ export function OSHeader({
           </Button>
         </div>
       </div>
-      
-      {/* Ask OS Drawer */}
-      {currentStore && (
-        <AskDrawer
-          open={askDrawerOpen}
-          onClose={() => setAskDrawerOpen(false)}
-          onAddProposal={handleAddProposal}
-          storeId={currentStore.id}
-        />
-      )}
 
       {/* Time Band Tabs */}
       {showTimeBandTabs && onTimeBandChange && (
