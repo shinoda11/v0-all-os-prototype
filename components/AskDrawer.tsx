@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -11,9 +12,12 @@ import {
   selectExceptions,
   selectLaborMetrics,
   selectDailySalesMetrics,
+  selectTodayKeyIncidents,
+  selectCriticalIncidents,
+  selectIncidentByMenuName,
 } from '@/core/selectors';
 import { detectDemandDrops, deriveLaborGuardrailSummary, type DemandDropDetectionResult, type LaborGuardrailInput } from '@/core/derive';
-import type { Proposal, ExceptionItem, DemandDropMeta } from '@/core/types';
+import type { Proposal, ExceptionItem, DemandDropMeta, Incident } from '@/core/types';
 import { 
   Send, 
   TrendingDown, 
@@ -25,6 +29,9 @@ import {
   Sparkles,
   BarChart3,
   X,
+  FileWarning,
+  ExternalLink,
+  AlertTriangle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -39,6 +46,17 @@ interface Message {
   evidence?: Array<{ label: string; value: string; link?: string }>;
   confidence?: 'high' | 'medium' | 'low';
   relatedExceptionId?: string;
+  // Incident link - always guide to incident detail for evidence
+  relatedIncidentId?: string;
+  incidentLink?: string;
+  canCreateIncident?: boolean;
+  incidentCreateParams?: {
+    menuName?: string;
+    dropRate?: number;
+    title: string;
+    summary: string;
+  };
+  // Legacy proposal (now redirects to incident)
   canCreateProposal?: boolean;
   proposalData?: Partial<Proposal>;
 }
@@ -67,17 +85,20 @@ interface AskDrawerProps {
 
 export function AskDrawer({ open, onClose, onAddProposal, storeId }: AskDrawerProps) {
   const { t, locale } = useI18n();
-  const { state } = useStore();
+  const { state, actions } = useStore();
+  const router = useRouter();
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
-  
-  // Removed debug log
   
   // Get current data
   const exceptions = selectExceptions(state);
   const laborMetrics = selectLaborMetrics(state);
   const today = new Date().toISOString().split('T')[0];
   const salesMetrics = selectDailySalesMetrics(state, today);
+  
+  // Get incidents
+  const todayIncidents = selectTodayKeyIncidents(state);
+  const criticalIncidents = selectCriticalIncidents(state);
   
   // Calculate labor guardrail summary
   const dayOfWeek = new Date().getDay();
@@ -216,10 +237,8 @@ export function AskDrawer({ open, onClose, onAddProposal, storeId }: AskDrawerPr
     const topDrop = demandDrops[0];
     const dropPercent = Math.round(topDrop.dropRate * 100);
     
-    // Find related exception
-    const relatedException = exceptions.find(
-      e => e.type === 'demand-drop' && e.demandDropMeta?.menuId === topDrop.menuId
-    );
+    // Find related incident
+    const relatedIncident = selectIncidentByMenuName(state, topDrop.menuName);
     
     return {
       id: generateId(),
@@ -232,24 +251,63 @@ export function AskDrawer({ open, onClose, onAddProposal, storeId }: AskDrawerPr
         dropRate: dropPercent 
       }),
       evidence: [
-        { label: t('ask.demandDrop.topItem'), value: topDrop.menuName, link: `/stores/${storeId}/os/exceptions` },
+        { label: t('ask.demandDrop.topItem'), value: topDrop.menuName },
         { label: t('ask.demandDrop.dropRate'), value: `-${dropPercent}%` },
         { label: t('ask.demandDrop.avg3Day'), value: `${topDrop.avg3Day}${t('ask.demandDrop.units')}` },
         { label: t('ask.demandDrop.avg7Day'), value: `${topDrop.avg7Day}${t('ask.demandDrop.units')}` },
         { label: t('ask.demandDrop.affectedChannels'), value: topDrop.affectedChannels.map(c => c.channel).join(', ') || t('ask.demandDrop.allChannels') },
       ],
       confidence: topDrop.severity === 'critical' ? 'high' : 'medium',
-      relatedExceptionId: relatedException?.id,
-      canCreateProposal: true,
-      proposalData: {
-        type: 'prep-amount-adjust',
-        title: t('ask.demandDrop.proposalTitle', { menu: topDrop.menuName }),
-        description: t('ask.demandDrop.proposalDesc', { dropRate: dropPercent }),
-        reason: t('ask.demandDrop.proposalReason', { menu: topDrop.menuName, dropRate: dropPercent }),
-        targetMenuIds: [topDrop.menuId],
-      },
+      // Always link to incident for evidence
+      relatedIncidentId: relatedIncident?.id,
+      incidentLink: relatedIncident 
+        ? `/stores/${storeId}/os/incidents/${relatedIncident.id}`
+        : undefined,
+      canCreateIncident: !relatedIncident,
+      incidentCreateParams: !relatedIncident ? {
+        menuName: topDrop.menuName,
+        dropRate: dropPercent,
+        title: `${topDrop.menuName}の出数${dropPercent}%下降`,
+        summary: t('ask.demandDrop.conclusion', { count: 1, topMenu: topDrop.menuName, dropRate: dropPercent }),
+      } : undefined,
     };
-  }, [demandDrops, exceptions, storeId, t]);
+  }, [demandDrops, state, storeId, t]);
+  
+  // Handler for "Today's key incidents"
+  const handleTodayKeyIncidents = useCallback((): Message => {
+    if (todayIncidents.length === 0) {
+      return {
+        id: generateId(),
+        type: 'assistant',
+        content: '',
+        timestamp: new Date(),
+        conclusion: t('ask.incidents.noIncidents'),
+        evidence: [],
+        confidence: 'high',
+      };
+    }
+    
+    const criticalCount = criticalIncidents.length;
+    let conclusionText = t('ask.incidents.summary', { count: todayIncidents.length });
+    if (criticalCount > 0) {
+      conclusionText += ' ' + t('ask.incidents.criticalCount', { count: criticalCount });
+    }
+    
+    return {
+      id: generateId(),
+      type: 'assistant',
+      content: '',
+      timestamp: new Date(),
+      conclusion: conclusionText,
+      evidence: todayIncidents.slice(0, 3).map((incident) => ({
+        label: incident.title,
+        value: t(`incidents.severity.${incident.severity}`),
+        link: `/stores/${storeId}/os/incidents/${incident.id}`,
+      })),
+      confidence: 'high',
+      incidentLink: `/stores/${storeId}/os/incidents`,
+    };
+  }, [todayIncidents, criticalIncidents, storeId, t]);
   
   // Question chips
   const questionChips: QuestionChip[] = [
@@ -270,6 +328,12 @@ export function AskDrawer({ open, onClose, onAddProposal, storeId }: AskDrawerPr
       labelKey: 'ask.chip.demandDropProducts',
       icon: <TrendingDown className="h-4 w-4" />,
       handler: handleDemandDropProducts,
+    },
+    {
+      id: 'today-key-incidents',
+      labelKey: 'ask.chip.todayKeyIncidents',
+      icon: <FileWarning className="h-4 w-4" />,
+      handler: handleTodayKeyIncidents,
     },
   ];
   
@@ -308,6 +372,8 @@ export function AskDrawer({ open, onClose, onAddProposal, storeId }: AskDrawerPr
       assistantMessage = handleTodayProjection();
     } else if (lowerInput.includes('人件費') || lowerInput.includes('労務') || lowerInput.includes('labor')) {
       assistantMessage = handleLaborRateReason();
+    } else if (lowerInput.includes('案件') || lowerInput.includes('incident') || lowerInput.includes('主要')) {
+      assistantMessage = handleTodayKeyIncidents();
     } else if (lowerInput.includes('出数') || lowerInput.includes('下降') || lowerInput.includes('demand') || lowerInput.includes('drop')) {
       assistantMessage = handleDemandDropProducts();
     } else {
@@ -328,8 +394,46 @@ export function AskDrawer({ open, onClose, onAddProposal, storeId }: AskDrawerPr
     setInputValue('');
   };
   
-  // Handle proposal creation
+  // Handle incident creation from Ask
+  const handleCreateIncidentFromAsk = (message: Message) => {
+    if (!message.incidentCreateParams) return;
+    
+    const result = actions.createIncidentFromSignal({
+      storeId,
+      businessDate: today,
+      timeBand: 'all',
+      type: 'demand_drop',
+      menuName: message.incidentCreateParams.menuName,
+      dropRate: message.incidentCreateParams.dropRate,
+      title: message.incidentCreateParams.title,
+      summary: message.incidentCreateParams.summary,
+    });
+    
+    // Navigate to incident detail
+    router.push(`/stores/${storeId}/os/incidents/${result.incidentId}`);
+    
+    // Add confirmation message
+    const confirmMessage: Message = {
+      id: generateId(),
+      type: 'assistant',
+      content: '',
+      timestamp: new Date(),
+      conclusion: t('ask.incidentCreated'),
+      incidentLink: `/stores/${storeId}/os/incidents/${result.incidentId}`,
+      confidence: 'high',
+    };
+    
+    setMessages(prev => [...prev, confirmMessage]);
+  };
+
+  // Handle proposal creation (now redirects to incident detail)
   const handleCreateProposal = (message: Message) => {
+    // If there's an incident link, navigate there instead
+    if (message.incidentLink) {
+      router.push(message.incidentLink);
+      return;
+    }
+    
     if (!message.proposalData) return;
     
     const now = new Date();

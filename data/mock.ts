@@ -11,6 +11,7 @@ import type {
   PrepItem,
   DomainEvent,
   AppState,
+  Incident,
 } from '@/core/types';
 
 import mockSushiData from './mock_sushi_events.json';
@@ -103,6 +104,225 @@ export const PREP_ITEMS: PrepItem[] = [
 ];
 
 // ------------------------------------------------------------
+// Sample Incidents
+// ------------------------------------------------------------
+
+const generateSampleIncidents = (storeId: string): Incident[] => {
+  const today = new Date().toISOString().split('T')[0];
+  const now = new Date().toISOString();
+  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+  const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+
+  return [
+    {
+      id: `incident-${storeId}-1`,
+      storeId,
+      businessDate: today,
+      timeBand: 'lunch',
+      type: 'demand_drop',
+      severity: 'critical',
+      status: 'investigating',
+      leadAgent: 'management',
+      supportingAgents: ['plan', 'ops', 'pos', 'supply'],
+      title: '炙りサーモン握りの出数45%下降',
+      summary: '直近3日間で炙りサーモン握りの出数が前週比45%下降。全チャネル（店内・テイクアウト・デリバリー）で同様の傾向。',
+      evidence: [
+        {
+          id: 'ev-1-1',
+          label: '直近3日平均出数',
+          value: '16.5食/日',
+          period: '直近3日',
+          sourceEventIds: [],
+        },
+        {
+          id: 'ev-1-2',
+          label: '前週平均出数',
+          value: '30食/日',
+          period: '前週',
+          sourceEventIds: [],
+        },
+        {
+          id: 'ev-1-3',
+          label: '下降率',
+          value: '-45%',
+          sourceEventIds: [],
+        },
+      ],
+      hypotheses: [
+        {
+          id: 'hyp-1-1',
+          title: '季節要因による需要減',
+          confidence: 'mid',
+          rationale: '冬季は炙り系より熟成系が好まれる傾向',
+          evidenceRefs: ['ev-1-1', 'ev-1-2'],
+        },
+        {
+          id: 'hyp-1-2',
+          title: '競合店の価格攻勢',
+          confidence: 'low',
+          rationale: '近隣店舗でサーモン関連のキャンペーン実施の可能性',
+          evidenceRefs: ['ev-1-3'],
+        },
+      ],
+      recommendationDrafts: [
+        {
+          id: 'rec-1-1',
+          type: 'prep-adjustment',
+          title: '炙りサーモンの仕込み量を30%削減',
+          reason: '出数下降に伴う廃棄ロス防止',
+          expectedEffect: {
+            type: 'cost',
+            value: 15000,
+            unit: '¥',
+            description: '1日あたりの廃棄ロス削減',
+          },
+          scope: 'ランチ・ディナー',
+          deadline: '本日中',
+          distributedToRoles: ['kitchen', 'manager'],
+        },
+      ],
+      recipients: [
+        { role: 'manager', label: '店長' },
+        { role: 'area_manager', label: 'エリアマネージャー' },
+      ],
+      createdAt: twoHoursAgo,
+      updatedAt: now,
+    },
+    {
+      id: `incident-${storeId}-2`,
+      storeId,
+      businessDate: today,
+      timeBand: 'lunch',
+      type: 'labor_overrun',
+      severity: 'warning',
+      status: 'proposed',
+      leadAgent: 'hr',
+      supportingAgents: ['plan', 'ops'],
+      title: '人件費率が目標を5pt超過',
+      summary: '現在の人件費率が19%で、目標14%を5pt超過。売上達成率85%に対してスタッフ配置が過剰。',
+      evidence: [
+        {
+          id: 'ev-2-1',
+          label: '現在の人件費率',
+          value: '19%',
+          sourceEventIds: [],
+        },
+        {
+          id: 'ev-2-2',
+          label: '目標人件費率',
+          value: '14%',
+          sourceEventIds: [],
+        },
+        {
+          id: 'ev-2-3',
+          label: '稼働中スタッフ',
+          value: '5名',
+          sourceEventIds: [],
+        },
+      ],
+      hypotheses: [
+        {
+          id: 'hyp-2-1',
+          title: '売上未達による相対的上昇',
+          confidence: 'high',
+          rationale: '売上達成率85%のため、人件費率が相対的に上昇',
+          evidenceRefs: ['ev-2-1', 'ev-2-2'],
+        },
+      ],
+      recommendationDrafts: [
+        {
+          id: 'rec-2-1',
+          type: 'labor-adjustment',
+          title: 'アイドル時間帯のシフト調整',
+          reason: '人件費率改善のため、閑散時間帯の人員を1名削減',
+          expectedEffect: {
+            type: 'cost',
+            value: 2500,
+            unit: '¥',
+            description: '本日の人件費削減',
+          },
+          scope: 'アイドル時間帯（14:00-17:00）',
+          deadline: '本日14:00まで',
+          distributedToRoles: ['manager'],
+        },
+      ],
+      recipients: [
+        { role: 'manager', label: '店長' },
+      ],
+      createdAt: oneHourAgo,
+      updatedAt: oneHourAgo,
+    },
+    {
+      id: `incident-${storeId}-3`,
+      storeId,
+      businessDate: today,
+      timeBand: 'dinner',
+      type: 'stockout_risk',
+      severity: 'warning',
+      status: 'open',
+      leadAgent: 'ops',
+      supportingAgents: ['supply', 'plan'],
+      title: '特選うにの在庫残り30%',
+      summary: 'ディナータイム開始時点で特選うにの在庫が残り30%。予測需要を考慮すると20:00頃に欠品の可能性。',
+      evidence: [
+        {
+          id: 'ev-3-1',
+          label: '現在の在庫',
+          value: '5貫分',
+          sourceEventIds: [],
+        },
+        {
+          id: 'ev-3-2',
+          label: '予測需要',
+          value: '12貫',
+          timeBand: 'dinner',
+          sourceEventIds: [],
+        },
+      ],
+      hypotheses: [],
+      recommendationDrafts: [],
+      recipients: [
+        { role: 'manager', label: '店長' },
+      ],
+      createdAt: now,
+      updatedAt: now,
+    },
+    {
+      id: `incident-${storeId}-4`,
+      storeId,
+      businessDate: today,
+      timeBand: 'all',
+      type: 'delivery_delay',
+      severity: 'info',
+      status: 'resolved',
+      leadAgent: 'ops',
+      supportingAgents: ['supply'],
+      title: '仕入れ配送90分遅延（解決済）',
+      summary: '本日の魚介仕入れが90分遅延したが、代替対応により影響なし。',
+      evidence: [
+        {
+          id: 'ev-4-1',
+          label: '遅延時間',
+          value: '90分',
+          sourceEventIds: [],
+        },
+        {
+          id: 'ev-4-2',
+          label: '対応策',
+          value: '代替仕入先から緊急調達',
+          sourceEventIds: [],
+        },
+      ],
+      hypotheses: [],
+      recommendationDrafts: [],
+      recipients: [],
+      createdAt: twoHoursAgo,
+      updatedAt: oneHourAgo,
+    },
+  ];
+};
+
+// ------------------------------------------------------------
 // Normalized Events from JSON
 // ------------------------------------------------------------
 
@@ -167,6 +387,9 @@ export const loadMockData = (): Partial<AppState> => {
   // Combine forecasts with normalized JSON events
   const allEvents = [...allForecasts, ...normalizedJsonEvents];
 
+  // Generate sample incidents for the first store (demo)
+  const sampleIncidents = generateSampleIncidents('1');
+
   return {
     stores: STORES,
     staff: STAFF,
@@ -174,6 +397,7 @@ export const loadMockData = (): Partial<AppState> => {
     menus: MENUS,
     prepItems: PREP_ITEMS,
     events: allEvents,
+    incidents: sampleIncidents,
     selectedMonth: new Date().toISOString().substring(0, 7),
   };
 };

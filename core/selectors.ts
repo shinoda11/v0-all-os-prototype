@@ -4,7 +4,7 @@
 // UI components should ONLY use selectors, never derive directly
 // ============================================================
 
-import { AppState, TimeBand, DailySalesMetrics, CockpitMetrics, ExceptionItem, DecisionEvent, ShiftSummary, SupplyDemandMetrics, WeeklyLaborMetrics } from './types';
+import { AppState, TimeBand, DailySalesMetrics, CockpitMetrics, ExceptionItem, DecisionEvent, ShiftSummary, SupplyDemandMetrics, WeeklyLaborMetrics, Incident, IncidentSeverity, IncidentStatus } from './types';
 import {
   deriveForecastTable,
   deriveForecastForDate,
@@ -353,6 +353,63 @@ export const selectLaneEvents = (
     
     return { lane, events: laneEvents };
   });
+};
+
+// ------------------------------------------------------------
+// Incident Selectors
+// ------------------------------------------------------------
+
+// Get all incidents for current store
+export const selectIncidents = (state: AppState): Incident[] => {
+  const storeId = state.selectedStoreId;
+  if (!storeId) return [];
+  
+  return (state.incidents || [])
+    .filter((i) => i.storeId === storeId)
+    .sort((a, b) => {
+      // Sort by severity (critical > warning > info), then by updatedAt desc
+      const severityOrder: Record<IncidentSeverity, number> = { critical: 3, warning: 2, info: 1 };
+      const sevDiff = severityOrder[b.severity] - severityOrder[a.severity];
+      if (sevDiff !== 0) return sevDiff;
+      return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+    });
+};
+
+// Get open (unresolved) incidents
+export const selectOpenIncidents = (state: AppState): Incident[] => {
+  return selectIncidents(state).filter((i) => i.status !== 'resolved');
+};
+
+// Get critical incidents
+export const selectCriticalIncidents = (state: AppState): Incident[] => {
+  return selectIncidents(state).filter((i) => i.severity === 'critical' && i.status !== 'resolved');
+};
+
+// Get management-led incidents
+export const selectManagementLedIncidents = (state: AppState): Incident[] => {
+  return selectIncidents(state).filter((i) => i.leadAgent === 'management');
+};
+
+// Get incidents by type
+export const selectIncidentsByType = (state: AppState, type: string): Incident[] => {
+  return selectIncidents(state).filter((i) => i.type === type);
+};
+
+// Get today's key incidents (for Ask OS)
+export const selectTodayKeyIncidents = (state: AppState): Incident[] => {
+  const today = new Date().toISOString().split('T')[0];
+  return selectOpenIncidents(state)
+    .filter((i) => i.businessDate === today)
+    .slice(0, 5);
+};
+
+// Find incident by menu/item name (for Ask OS demand drop queries)
+export const selectIncidentByMenuName = (state: AppState, menuName: string): Incident | null => {
+  const incidents = selectIncidents(state);
+  return incidents.find((i) => 
+    i.type === 'demand_drop' && 
+    (i.title.includes(menuName) || i.evidence.some((e) => e.label.includes(menuName)))
+  ) ?? null;
 };
 
 // ------------------------------------------------------------

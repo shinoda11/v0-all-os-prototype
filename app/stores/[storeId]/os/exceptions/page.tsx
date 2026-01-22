@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { PageHeader } from '@/components/PageHeader';
 import { MetricCard } from '@/components/MetricCard';
 import { EmptyState } from '@/components/EmptyState';
@@ -37,6 +37,8 @@ import {
   ShoppingCart,
   ArrowRight,
   Info,
+  FileWarning,
+  ExternalLink,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -447,6 +449,8 @@ interface DemandDropDetailDrawerProps {
   open: boolean;
   onClose: () => void;
   onAddProposal: (proposal: Proposal) => void;
+  onCreateIncident: (params: { menuName: string; dropRate: number; timeBand: TimeBand }) => { incidentId: string; isNew: boolean };
+  onFindExistingIncident: (menuName: string, timeBand: TimeBand) => string | null;
   roles: Role[];
   storeId: string;
 }
@@ -473,8 +477,9 @@ const PROPOSAL_TYPE_LABELS: Record<string, string> = {
   'channel-switch': 'チャネル切替',
 };
 
-function DemandDropDetailDrawer({ exception, open, onClose, onAddProposal, roles, storeId }: DemandDropDetailDrawerProps) {
+function DemandDropDetailDrawer({ exception, open, onClose, onAddProposal, onCreateIncident, onFindExistingIncident, roles, storeId }: DemandDropDetailDrawerProps) {
   const { t } = useI18n();
+  const router = useRouter();
   const [createdActions, setCreatedActions] = useState<Set<string>>(new Set());
   
   // Reset created actions when exception changes
@@ -490,6 +495,25 @@ function DemandDropDetailDrawer({ exception, open, onClose, onAddProposal, roles
 
   const meta = exception.demandDropMeta;
   const dropPercent = Math.round(meta.dropRate * 100);
+  const timeBand = meta.affectedTimeBands[0]?.timeBand ?? 'all';
+  
+  // Check if incident already exists
+  const existingIncidentId = onFindExistingIncident(meta.menuName, timeBand);
+  
+  const handleCreateIncident = () => {
+    const result = onCreateIncident({
+      menuName: meta.menuName,
+      dropRate: meta.dropRate * 100,
+      timeBand,
+    });
+    router.push(`/stores/${storeId}/os/incidents/${result.incidentId}`);
+  };
+  
+  const handleGoToIncident = () => {
+    if (existingIncidentId) {
+      router.push(`/stores/${storeId}/os/incidents/${existingIncidentId}`);
+    }
+  };
 
   return (
     <Sheet open={open} onOpenChange={onClose}>
@@ -680,8 +704,19 @@ function DemandDropDetailDrawer({ exception, open, onClose, onAddProposal, roles
             </div>
           </div>
 
-          {/* Close Button */}
-          <div className="pt-4 border-t">
+          {/* Create Incident / Go to Incident CTA */}
+          <div className="pt-4 border-t space-y-2">
+            {existingIncidentId ? (
+              <Button onClick={handleGoToIncident} className="w-full gap-2">
+                <ExternalLink className="h-4 w-4" />
+                {t('incidents.goToExisting')}
+              </Button>
+            ) : (
+              <Button onClick={handleCreateIncident} className="w-full gap-2">
+                <FileWarning className="h-4 w-4" />
+                {t('incidents.createFromSignal')}
+              </Button>
+            )}
             <Button variant="outline" onClick={onClose} className="w-full bg-transparent">
               <X className="h-4 w-4 mr-2" />
               {t('common.close')}
@@ -742,6 +777,27 @@ export default function ExceptionsPage() {
   const handleResolve = (id: string) => {
     // In real app, would update exception status
     console.log('Resolve exception:', id);
+  };
+
+  // Incident creation handlers
+  const today = new Date().toISOString().split('T')[0];
+  
+  const handleCreateIncident = (params: { menuName: string; dropRate: number; timeBand: TimeBand }) => {
+    return actions.createIncidentFromSignal({
+      storeId,
+      businessDate: today,
+      timeBand: params.timeBand,
+      type: 'demand_drop',
+      menuName: params.menuName,
+      dropRate: params.dropRate,
+      title: `${params.menuName}の出数${Math.round(params.dropRate)}%下降`,
+      summary: `${params.menuName}の出数が${Math.round(params.dropRate)}%下降しています。`,
+    });
+  };
+
+  const handleFindExistingIncident = (menuName: string, timeBand: TimeBand): string | null => {
+    const existing = actions.findExistingIncident(storeId, today, timeBand, 'demand_drop', menuName);
+    return existing?.id ?? null;
   };
 
   // Active exceptions (not resolved)
@@ -828,6 +884,8 @@ export default function ExceptionsPage() {
           setSelectedExceptionForDetail(null);
         }}
         onAddProposal={handleSubmitProposal}
+        onCreateIncident={handleCreateIncident}
+        onFindExistingIncident={handleFindExistingIncident}
         roles={state.roles}
         storeId={storeId}
       />

@@ -3,7 +3,7 @@
 // Single reducer for all state mutations
 // ============================================================
 
-import { AppState, AppAction, DomainEvent } from '@/core/types';
+import { AppState, AppAction, DomainEvent, Incident, IncidentStatus, AgentId, EvidenceItem, Hypothesis, RecommendationDraft } from '@/core/types';
 
 // Highlight duration in milliseconds
 const HIGHLIGHT_DURATION = 2000;
@@ -46,6 +46,9 @@ export const initialState: AppState = {
 
   // Proposals
   proposals: [],
+
+  // Incidents
+  incidents: [],
 
   // Replay
   replay: {
@@ -125,6 +128,47 @@ export const appReducer = (state: AppState, action: AppAction): AppState => {
       return {
         ...state,
         proposals: state.proposals.filter((p) => p.id !== action.proposalId),
+      };
+
+    // Incident actions
+    case 'ADD_INCIDENT':
+      return {
+        ...state,
+        incidents: [...(state.incidents || []), action.incident],
+      };
+
+    case 'UPDATE_INCIDENT':
+      return {
+        ...state,
+        incidents: (state.incidents || []).map((i) =>
+          i.id === action.incident.id ? action.incident : i
+        ),
+      };
+
+    case 'UPDATE_INCIDENT_STATUS':
+      return {
+        ...state,
+        incidents: (state.incidents || []).map((i) =>
+          i.id === action.incidentId 
+            ? { ...i, status: action.status, updatedAt: new Date().toISOString() } 
+            : i
+        ),
+      };
+
+    case 'ATTACH_AGENT_OUTPUT':
+      return {
+        ...state,
+        incidents: (state.incidents || []).map((i) =>
+          i.id === action.incidentId
+            ? {
+                ...i,
+                evidence: [...i.evidence, ...action.evidence],
+                hypotheses: [...i.hypotheses, ...action.hypotheses],
+                recommendationDrafts: [...i.recommendationDrafts, ...action.drafts],
+                updatedAt: new Date().toISOString(),
+              }
+            : i
+        ),
       };
 
     case 'REPLAY_START':

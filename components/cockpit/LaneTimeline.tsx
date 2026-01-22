@@ -1,10 +1,13 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { useStore } from '@/state/store';
+import { useI18n } from '@/i18n/I18nProvider';
 import {
   DollarSign,
   BarChart3,
@@ -15,8 +18,10 @@ import {
   Clock,
   ChevronRight,
   Filter,
+  FileWarning,
+  ExternalLink,
 } from 'lucide-react';
-import type { DomainEvent, TimelineLane, TimelineEvent } from '@/core/types';
+import type { DomainEvent, TimelineLane, TimelineEvent, TimeBand } from '@/core/types';
 
 const LANE_CONFIG: Record<TimelineLane, {
   label: string;
@@ -189,12 +194,50 @@ function LaneRow({ lane, events, onEventClick }: LaneRowProps) {
 interface EventDetailPanelProps {
   event: TimelineEvent | null;
   onClose: () => void;
+  storeId: string;
 }
 
-function EventDetailPanel({ event, onClose }: EventDetailPanelProps) {
+function EventDetailPanel({ event, onClose, storeId }: EventDetailPanelProps) {
+  const router = useRouter();
+  const { t } = useI18n();
+  const { actions } = useStore();
+  
   if (!event) return null;
   
   const config = LANE_CONFIG[event.lane];
+  
+  // Check if this is a demand_drop related event
+  const isDemandDropEvent = event.originalEvent && 
+    (event.originalEvent.type === 'sales' && event.status === 'critical');
+  
+  const today = new Date().toISOString().split('T')[0];
+  const timeBand: TimeBand = 'all'; // Could be derived from event timestamp
+  
+  // Check for existing incident
+  const existingIncident = isDemandDropEvent 
+    ? actions.findExistingIncident(storeId, today, timeBand, 'demand_drop')
+    : undefined;
+  
+  const handleCreateIncident = () => {
+    if (!event.originalEvent) return;
+    
+    const result = actions.createIncidentFromSignal({
+      storeId,
+      businessDate: today,
+      timeBand,
+      type: 'demand_drop',
+      title: `${event.title}の異常検出`,
+      summary: event.description,
+    });
+    
+    router.push(`/stores/${storeId}/os/incidents/${result.incidentId}`);
+  };
+  
+  const handleGoToIncident = () => {
+    if (existingIncident) {
+      router.push(`/stores/${storeId}/os/incidents/${existingIncident.id}`);
+    }
+  };
   
   return (
     <Card className="absolute right-0 top-0 w-72 shadow-lg z-10">
@@ -228,6 +271,23 @@ function EventDetailPanel({ event, onClose }: EventDetailPanelProps) {
             {event.status === 'success' ? '完了' : event.status === 'critical' ? '緊急' : '警告'}
           </Badge>
         )}
+        
+        {/* Incident CTA for critical events */}
+        {event.status === 'critical' && (
+          <div className="pt-2 border-t">
+            {existingIncident ? (
+              <Button size="sm" variant="outline" onClick={handleGoToIncident} className="w-full gap-1.5 bg-transparent">
+                <ExternalLink className="h-3.5 w-3.5" />
+                {t('incidents.goToExisting')}
+              </Button>
+            ) : (
+              <Button size="sm" onClick={handleCreateIncident} className="w-full gap-1.5">
+                <FileWarning className="h-3.5 w-3.5" />
+                {t('incidents.createFromSignal')}
+              </Button>
+            )}
+          </div>
+        )}
       </CardContent>
     </Card>
   );
@@ -237,9 +297,10 @@ interface LaneTimelineProps {
   events: DomainEvent[];
   maxEventsPerLane?: number;
   lastUpdate?: string;
+  storeId: string;
 }
 
-export function LaneTimeline({ events, maxEventsPerLane = 10, lastUpdate }: LaneTimelineProps) {
+export function LaneTimeline({ events, maxEventsPerLane = 10, lastUpdate, storeId }: LaneTimelineProps) {
   const [selectedEvent, setSelectedEvent] = useState<TimelineEvent | null>(null);
   const [filterLanes, setFilterLanes] = useState<Set<TimelineLane>>(new Set());
 
@@ -326,12 +387,13 @@ export function LaneTimeline({ events, maxEventsPerLane = 10, lastUpdate }: Lane
           ))}
         </div>
       </CardContent>
-      {selectedEvent && (
-        <EventDetailPanel
-          event={selectedEvent}
-          onClose={() => setSelectedEvent(null)}
-        />
-      )}
+{selectedEvent && (
+  <EventDetailPanel
+  event={selectedEvent}
+  onClose={() => setSelectedEvent(null)}
+  storeId={storeId}
+  />
+  )}
     </Card>
   );
 }

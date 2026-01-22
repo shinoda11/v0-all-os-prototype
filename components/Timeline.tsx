@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useRouter, useParams } from 'next/navigation';
 import { DomainEvent, TimeBand } from '@/core/types';
 import { cn } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -25,9 +26,12 @@ import {
   AlertTriangle,
   ChevronDown,
   ChevronUp,
+  FileWarning,
+  ExternalLink,
 } from 'lucide-react';
 import { FreshnessBadge, getFreshnessStatus, type FreshnessStatus } from '@/components/FreshnessBadge';
 import { useI18n } from '@/i18n/I18nProvider';
+import { useStore } from '@/state/store';
 
 // Lane definitions
 export type TimelineLane = 'sales' | 'forecast' | 'prep' | 'delivery' | 'labor' | 'decision';
@@ -181,6 +185,11 @@ interface EventDetailPanelProps {
 
 function EventDetailPanel({ event, open, onClose }: EventDetailPanelProps) {
   const { t } = useI18n();
+  const router = useRouter();
+  const params = useParams();
+  const { actions } = useStore();
+  const storeId = params.storeId as string;
+  
   if (!event) return null;
 
   const lane = event.type as TimelineLane;
@@ -267,12 +276,41 @@ function EventDetailPanel({ event, open, onClose }: EventDetailPanelProps) {
             </div>
           )}
 
-          {/* Action Button */}
-          {(event.type === 'delivery' && event.status === 'delayed') && (
-            <Button className="w-full" size="sm">
-              関連提案を作成
-            </Button>
-          )}
+          {/* Action Button - Create Incident for critical events */}
+          {storeId && (event.type === 'delivery' && event.status === 'delayed') && (() => {
+            const today = new Date().toISOString().split('T')[0];
+            const existingIncident = actions.findExistingIncident(storeId, today, timeBand, 'delivery_delay');
+            
+            const handleCreateIncident = () => {
+              const result = actions.createIncidentFromSignal({
+                storeId,
+                businessDate: today,
+                timeBand,
+                type: 'demand_drop', // Use demand_drop type for now
+                title: `${event.itemName}配送${event.delayMinutes}分遅延`,
+                summary: `${event.itemName}の配送が${event.delayMinutes}分遅延しています。`,
+              });
+              router.push(`/stores/${storeId}/os/incidents/${result.incidentId}`);
+            };
+            
+            const handleGoToIncident = () => {
+              if (existingIncident) {
+                router.push(`/stores/${storeId}/os/incidents/${existingIncident.id}`);
+              }
+            };
+            
+            return existingIncident ? (
+              <Button variant="outline" className="w-full gap-2 bg-transparent" size="sm" onClick={handleGoToIncident}>
+                <ExternalLink className="h-4 w-4" />
+                {t('incidents.goToExisting')}
+              </Button>
+            ) : (
+              <Button className="w-full gap-2" size="sm" onClick={handleCreateIncident}>
+                <FileWarning className="h-4 w-4" />
+                {t('incidents.createFromSignal')}
+              </Button>
+            );
+          })()}
         </div>
       </SheetContent>
     </Sheet>

@@ -17,6 +17,7 @@ import {
   ChevronRight,
   Settings,
   ExternalLink,
+  FileWarning,
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -95,6 +96,11 @@ const osSection: NavSection = {
       label: '運用コックピット',
       path: '/os/cockpit',
       icon: <Gauge className="h-4 w-4" />,
+    },
+    {
+      label: '案件センター',
+      path: '/os/incidents',
+      icon: <FileWarning className="h-4 w-4" />,
     },
     {
       label: '例外センター',

@@ -6,7 +6,7 @@
 // ============================================================
 
 import React, { createContext, useContext, useReducer, useEffect, useCallback, useRef, useMemo } from 'react';
-import { AppState, AppAction, DomainEvent, Proposal, TimeBand } from '@/core/types';
+import { AppState, AppAction, DomainEvent, Proposal, TimeBand, Incident, IncidentStatus, AgentId, EvidenceItem, Hypothesis, RecommendationDraft } from '@/core/types';
 import { appReducer, initialState } from './reducer';
 import { loadMockData, loadSampleEvents } from '@/data/mock';
 import { generateProposals } from '@/core/proposals';
@@ -51,6 +51,24 @@ interface StoreContextValue {
     resetReplay: () => void;
     // Proposals
     refreshProposals: () => void;
+    // Incidents
+    addIncident: (incident: Incident) => void;
+    updateIncident: (incident: Incident) => void;
+    updateIncidentStatus: (incidentId: string, status: IncidentStatus) => void;
+    attachAgentOutput: (incidentId: string, agentId: AgentId, evidence: EvidenceItem[], hypotheses: Hypothesis[], drafts: RecommendationDraft[]) => void;
+    // Create incident from signal (returns incident id or existing incident id)
+    createIncidentFromSignal: (params: {
+      storeId: string;
+      businessDate: string;
+      timeBand: TimeBand;
+      type: 'demand_drop';
+      menuItemId?: string;
+      menuName?: string;
+      dropRate?: number;
+      title: string;
+      summary: string;
+    }) => { incidentId: string; isNew: boolean };
+    findExistingIncident: (storeId: string, businessDate: string, timeBand: TimeBand, type: string, menuItemId?: string) => Incident | undefined;
   };
 }
 
@@ -326,6 +344,117 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       );
       dispatch({ type: 'SET_PROPOSALS', proposals });
       publishStateUpdate('proposal:changed', 'proposals-refreshed', ['proposals']);
+    },
+
+    // Incidents
+    addIncident: (incident: Incident) => {
+      dispatch({ type: 'ADD_INCIDENT', incident });
+      publishStateUpdate('state:updated', 'incident-added', ['incidents']);
+    },
+
+    updateIncident: (incident: Incident) => {
+      dispatch({ type: 'UPDATE_INCIDENT', incident });
+      publishStateUpdate('state:updated', 'incident-updated', ['incidents']);
+    },
+
+    updateIncidentStatus: (incidentId: string, status: IncidentStatus) => {
+      dispatch({ type: 'UPDATE_INCIDENT_STATUS', incidentId, status });
+      publishStateUpdate('state:updated', 'incident-status-changed', ['incidents']);
+    },
+
+    attachAgentOutput: (incidentId: string, agentId: AgentId, evidence: EvidenceItem[], hypotheses: Hypothesis[], drafts: RecommendationDraft[]) => {
+      dispatch({ type: 'ATTACH_AGENT_OUTPUT', incidentId, agentId, evidence, hypotheses, drafts });
+      publishStateUpdate('state:updated', 'agent-output-attached', ['incidents']);
+    },
+
+    // Find existing incident by signal parameters
+    findExistingIncident: (storeId: string, businessDate: string, timeBand: TimeBand, type: string, menuItemId?: string) => {
+      const currentState = stateRef.current;
+      return (currentState.incidents || []).find((incident) => {
+        const baseMatch = 
+          incident.storeId === storeId &&
+          incident.businessDate === businessDate &&
+          incident.timeBand === timeBand &&
+          incident.type === type;
+        
+        if (!baseMatch) return false;
+        
+        // For demand_drop, also match on menu item if provided
+        if (type === 'demand_drop' && menuItemId) {
+          // Check if any evidence references this menu
+          return incident.evidence.some((ev) => 
+            ev.label.includes(menuItemId) || ev.id.includes(menuItemId)
+          ) || incident.title.includes(menuItemId);
+        }
+        
+        return baseMatch;
+      });
+    },
+
+    // Create incident from signal (demand_drop, etc.)
+    createIncidentFromSignal: (params) => {
+      const currentState = stateRef.current;
+      const { storeId, businessDate, timeBand, type, menuItemId, menuName, dropRate, title, summary } = params;
+      
+      // Check for existing incident
+      const existing = (currentState.incidents || []).find((incident) => {
+        const baseMatch = 
+          incident.storeId === storeId &&
+          incident.businessDate === businessDate &&
+          incident.timeBand === timeBand &&
+          incident.type === type;
+        
+        if (!baseMatch) return false;
+        
+        // For demand_drop, match on menu name
+        if (type === 'demand_drop' && menuName) {
+          return incident.title.includes(menuName);
+        }
+        
+        return baseMatch;
+      });
+      
+      if (existing) {
+        return { incidentId: existing.id, isNew: false };
+      }
+      
+      // Create new incident
+      const now = new Date().toISOString();
+      const incidentId = `incident-${storeId}-${Date.now()}`;
+      
+      const newIncident: Incident = {
+        id: incidentId,
+        storeId,
+        businessDate,
+        timeBand,
+        type,
+        severity: (dropRate && dropRate >= 40) ? 'critical' : 'warning',
+        status: 'open',
+        leadAgent: 'management', // demand_drop is always management-led
+        supportingAgents: ['plan', 'ops', 'pos', 'supply'],
+        title,
+        summary,
+        evidence: menuName ? [
+          {
+            id: `ev-${incidentId}-1`,
+            label: menuName,
+            value: dropRate ? `-${Math.round(dropRate)}%` : '下降検出',
+            sourceEventIds: [],
+          },
+        ] : [],
+        hypotheses: [],
+        recommendationDrafts: [],
+        recipients: [
+          { role: 'manager', label: '店長' },
+        ],
+        createdAt: now,
+        updatedAt: now,
+      };
+      
+      dispatch({ type: 'ADD_INCIDENT', incident: newIncident });
+      publishStateUpdate('state:updated', 'incident-created-from-signal', ['incidents']);
+      
+      return { incidentId, isNew: true };
     },
   }), []);
 
