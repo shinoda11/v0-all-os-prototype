@@ -60,7 +60,7 @@ interface SalesKPICardProps {
 
 export function SalesKPICard({ data, highlighted }: SalesKPICardProps) {
   const TrendIcon = data?.trend === 'up' ? TrendingUp : data?.trend === 'down' ? TrendingDown : Minus;
-  const trendColor = data?.trend === 'up' ? 'text-green-600' : data?.trend === 'down' ? 'text-red-600' : 'text-muted-foreground';
+  const trendColor = data?.trend === 'up' ? 'text-emerald-600' : data?.trend === 'down' ? 'text-red-600' : 'text-muted-foreground';
   
   const status = data
     ? data.achievementRate >= 100 ? 'success'
@@ -69,9 +69,9 @@ export function SalesKPICard({ data, highlighted }: SalesKPICardProps) {
     : 'default';
     
   const statusColors = {
-    success: 'border-green-500/50 bg-green-50/50',
-    warning: 'border-yellow-500/50 bg-yellow-50/50',
-    error: 'border-red-500/50 bg-red-50/50',
+    success: 'border-emerald-200 bg-emerald-50/50',
+    warning: 'border-amber-200 bg-amber-50/50',
+    error: 'border-red-200 bg-red-50/50',
     default: '',
   };
 
@@ -99,7 +99,7 @@ export function SalesKPICard({ data, highlighted }: SalesKPICardProps) {
               <div className="text-muted-foreground">予測</div>
               <div className="text-right">¥{data.forecast.toLocaleString()}</div>
               <div className="text-muted-foreground">差分</div>
-              <div className={cn('text-right', data.diff >= 0 ? 'text-green-600' : 'text-red-600')}>
+              <div className={cn('text-right', data.diff >= 0 ? 'text-emerald-600' : 'text-red-600')}>
                 {data.diff >= 0 ? '+' : ''}¥{data.diff.toLocaleString()}
               </div>
               <div className="text-muted-foreground">着地見込</div>
@@ -129,9 +129,9 @@ export function LaborKPICard({ data, highlighted }: LaborKPICardProps) {
     : 'default';
     
   const statusColors = {
-    success: 'border-green-500/50 bg-green-50/50',
-    warning: 'border-yellow-500/50 bg-yellow-50/50',
-    error: 'border-red-500/50 bg-red-50/50',
+success: 'border-emerald-200 bg-emerald-50/50',
+    warning: 'border-amber-200 bg-amber-50/50',
+    error: 'border-red-200 bg-red-50/50',
     default: '',
   };
 
@@ -183,9 +183,9 @@ export function SupplyDemandKPICard({ data, highlighted }: SupplyDemandKPICardPr
   const status = !data ? 'default' : !hasRisk ? 'success' : data.stockoutRisk > 2 || data.excessRisk > 2 ? 'error' : 'warning';
   
   const statusColors = {
-    success: 'border-green-500/50 bg-green-50/50',
-    warning: 'border-yellow-500/50 bg-yellow-50/50',
-    error: 'border-red-500/50 bg-red-50/50',
+success: 'border-emerald-200 bg-emerald-50/50',
+    warning: 'border-amber-200 bg-amber-50/50',
+    error: 'border-red-200 bg-red-50/50',
     default: '',
   };
 
@@ -213,7 +213,7 @@ export function SupplyDemandKPICard({ data, highlighted }: SupplyDemandKPICardPr
                 {data.stockoutRisk}品目
               </div>
               <div className="text-muted-foreground">過剰リスク</div>
-              <div className={cn('text-right', data.excessRisk > 0 && 'text-yellow-600 font-medium')}>
+              <div className={cn('text-right', data.excessRisk > 0 && 'text-amber-600 font-medium')}>
                 {data.excessRisk}品目
               </div>
             </div>
@@ -225,7 +225,7 @@ export function SupplyDemandKPICard({ data, highlighted }: SupplyDemandKPICardPr
                     variant="outline"
                     className={cn(
                       'text-sm',
-                      item.risk === 'stockout' ? 'border-red-300 text-red-700' : 'border-yellow-300 text-yellow-700'
+                      item.risk === 'stockout' ? 'border-red-200 text-red-700' : 'border-amber-200 text-amber-700'
                     )}
                   >
                     {item.name}
@@ -254,9 +254,9 @@ export function OperationsKPICard({ data, highlighted }: OperationsKPICardProps)
     : 'error';
     
   const statusColors = {
-    success: 'border-green-500/50 bg-green-50/50',
-    warning: 'border-yellow-500/50 bg-yellow-50/50',
-    error: 'border-red-500/50 bg-red-50/50',
+success: 'border-emerald-200 bg-emerald-50/50',
+    warning: 'border-amber-200 bg-amber-50/50',
+    error: 'border-red-200 bg-red-50/50',
     default: '',
   };
 
@@ -290,9 +290,9 @@ export function OperationsKPICard({ data, highlighted }: OperationsKPICardProps)
               </div>
             </div>
             {data.bottleneck && (
-              <div className="text-base p-3 bg-yellow-50 border border-yellow-200 rounded">
-                <div className="font-semibold text-yellow-800">ボトルネック</div>
-                <div className="text-yellow-700 truncate">{data.bottleneck.task}</div>
+              <div className="text-base p-3 bg-amber-50 border border-amber-200 rounded">
+                <div className="font-semibold text-amber-700">ボトルネック</div>
+                <div className="text-amber-600 truncate">{data.bottleneck.task}</div>
               </div>
             )}
             <LastUpdate timestamp={data.lastUpdate} />
@@ -317,9 +317,9 @@ export function ExceptionsKPICard({ data, highlighted }: ExceptionsKPICardProps)
     : 'warning';
     
   const statusColors = {
-    success: 'border-green-500/50 bg-green-50/50',
-    warning: 'border-yellow-500/50 bg-yellow-50/50',
-    error: 'border-red-500/50 bg-red-50/50',
+    success: 'border-emerald-500/40 bg-emerald-500/10',
+    warning: 'border-amber-500/40 bg-amber-500/10',
+    error: 'border-red-500/40 bg-red-500/10',
     default: '',
   };
 
@@ -348,19 +348,19 @@ export function ExceptionsKPICard({ data, highlighted }: ExceptionsKPICardProps)
                 </Badge>
               )}
               {data.warningCount > 0 && (
-                <Badge variant="outline" className="text-base px-2 py-1 gap-1.5 border-yellow-300 text-yellow-700">
+                <Badge variant="outline" className="text-base px-2 py-1 gap-1.5 border-amber-200 text-amber-700">
                   <AlertTriangle className="h-4 w-4" />
                   警告 {data.warningCount}
                 </Badge>
               )}
               {total === 0 && (
-                <span className="text-green-600">問題なし</span>
+                <span className="text-emerald-600">問題なし</span>
               )}
             </div>
             {data.topException && (
               <div className={cn(
                 'text-base p-3 rounded border',
-                data.topException.impactType === 'sales' ? 'bg-red-50 border-red-200' : 'bg-yellow-50 border-yellow-200'
+                data.topException.impactType === 'sales' ? 'bg-red-50 border-red-200' : 'bg-amber-50 border-amber-200'
               )}>
                 <div className="font-semibold truncate">{data.topException.title}</div>
                 <div className="text-muted-foreground">{data.topException.impact}</div>

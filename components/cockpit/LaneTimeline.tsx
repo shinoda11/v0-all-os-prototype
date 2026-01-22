@@ -31,47 +31,48 @@ const LANE_CONFIG: Record<TimelineLane, {
 }> = {
   sales: {
     label: '売上',
-    icon: <DollarSign className="h-3.5 w-3.5" />,
-    color: 'text-green-700',
-    bgColor: 'bg-green-100',
+    icon: <DollarSign className="h-4 w-4" />,
+    color: 'text-foreground',
+    bgColor: 'bg-muted',
   },
   forecast: {
     label: '予測',
-    icon: <BarChart3 className="h-3.5 w-3.5" />,
-    color: 'text-indigo-700',
-    bgColor: 'bg-indigo-100',
+    icon: <BarChart3 className="h-4 w-4" />,
+    color: 'text-muted-foreground',
+    bgColor: 'bg-muted/50',
   },
   prep: {
     label: '仕込み',
-    icon: <ChefHat className="h-3.5 w-3.5" />,
-    color: 'text-orange-700',
-    bgColor: 'bg-orange-100',
+    icon: <ChefHat className="h-4 w-4" />,
+    color: 'text-foreground',
+    bgColor: 'bg-muted',
   },
   delivery: {
     label: '配送',
-    icon: <Truck className="h-3.5 w-3.5" />,
-    color: 'text-purple-700',
-    bgColor: 'bg-purple-100',
+    icon: <Truck className="h-4 w-4" />,
+    color: 'text-muted-foreground',
+    bgColor: 'bg-muted/50',
   },
   labor: {
     label: '労務',
-    icon: <Users className="h-3.5 w-3.5" />,
-    color: 'text-blue-700',
-    bgColor: 'bg-blue-100',
+    icon: <Users className="h-4 w-4" />,
+    color: 'text-foreground',
+    bgColor: 'bg-muted',
   },
   decision: {
     label: '意思決定',
-    icon: <CheckCircle className="h-3.5 w-3.5" />,
-    color: 'text-teal-700',
-    bgColor: 'bg-teal-100',
+    icon: <CheckCircle className="h-4 w-4" />,
+    color: 'text-primary',
+    bgColor: 'bg-primary/5',
   },
 };
 
+// Monochrome status styles - only critical uses brand red
 const STATUS_STYLES = {
-  normal: 'border-l-2 border-l-gray-300',
-  warning: 'border-l-2 border-l-yellow-500 bg-yellow-50/50',
-  critical: 'border-l-2 border-l-red-500 bg-red-50/50',
-  success: 'border-l-2 border-l-green-500 bg-green-50/50',
+  normal: 'border-l-2 border-l-border',
+  warning: 'border-l-2 border-l-gray-400 bg-gray-50',
+  critical: 'border-l-2 border-l-primary bg-primary/5',
+  success: 'border-l-2 border-l-gray-600 bg-gray-50',
 };
 
 function formatTime(timestamp: string): string {
@@ -263,12 +264,13 @@ function EventDetailPanel({ event, onClose, storeId }: EventDetailPanelProps) {
         </div>
         {event.status && event.status !== 'normal' && (
           <Badge
-            variant={event.status === 'success' ? 'default' : event.status === 'critical' ? 'destructive' : 'outline'}
+            variant={event.status === 'critical' ? 'destructive' : 'secondary'}
             className={cn(
-              event.status === 'warning' && 'border-yellow-300 text-yellow-700'
+              event.status === 'success' && 'bg-gray-100 text-gray-700',
+              event.status === 'warning' && 'bg-gray-100 text-gray-600'
             )}
           >
-            {event.status === 'success' ? '完了' : event.status === 'critical' ? '緊急' : '警告'}
+            {event.status === 'success' ? '完了' : event.status === 'critical' ? '緊急' : '注意'}
           </Badge>
         )}
         
