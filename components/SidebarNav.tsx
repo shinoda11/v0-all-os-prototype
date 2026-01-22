@@ -95,22 +95,22 @@ const osSection: NavSection = {
     {
       label: '運用コックピット',
       path: '/os/cockpit',
-      icon: <Gauge className="h-4 w-4" />,
+      icon: <Gauge className="h-5 w-5" />,
     },
     {
       label: '案件センター',
       path: '/os/incidents',
-      icon: <FileWarning className="h-4 w-4" />,
+      icon: <FileWarning className="h-5 w-5" />,
     },
     {
       label: '例外センター',
       path: '/os/exceptions',
-      icon: <AlertTriangle className="h-4 w-4" />,
+      icon: <AlertTriangle className="h-5 w-5" />,
     },
     {
       label: '週次労務レビュー',
       path: '/os/labor-weekly',
-      icon: <Clock className="h-4 w-4" />,
+      icon: <Clock className="h-5 w-5" />,
     },
   ],
 };
@@ -123,12 +123,12 @@ const floorSection: NavSection = {
     {
       label: '現場ToDo',
       path: '/floor/todo',
-      icon: <CheckSquare className="h-4 w-4" />,
+      icon: <CheckSquare className="h-5 w-5" />,
     },
     {
       label: '勤怠',
       path: '/floor/timeclock',
-      icon: <Clock className="h-4 w-4" />,
+      icon: <Clock className="h-5 w-5" />,
     },
   ],
 };
@@ -164,7 +164,7 @@ function NavGroup({ item, pathname, storeId }: NavGroupProps) {
       <Link
         href={href}
         className={cn(
-          'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+          'flex items-center gap-3 rounded-lg px-4 py-3 text-base font-medium transition-colors',
           isActive(item.path)
             ? 'bg-primary text-primary-foreground'
             : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
@@ -181,7 +181,7 @@ function NavGroup({ item, pathname, storeId }: NavGroupProps) {
       <button
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
-          'flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+          'flex w-full items-center justify-between rounded-lg px-4 py-3 text-base font-medium transition-colors',
           hasActiveChild
             ? 'text-foreground'
             : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
@@ -192,13 +192,13 @@ function NavGroup({ item, pathname, storeId }: NavGroupProps) {
           {item.label}
         </span>
         {isOpen ? (
-          <ChevronDown className="h-4 w-4" />
+          <ChevronDown className="h-5 w-5" />
         ) : (
-          <ChevronRight className="h-4 w-4" />
+          <ChevronRight className="h-5 w-5" />
         )}
       </button>
       {isOpen && (
-        <div className="ml-4 space-y-1 border-l border-border pl-3">
+        <div className="ml-4 space-y-1 border-l border-border pl-4">
           {item.children.map((child) => {
             const childHref = buildHref(child.path);
             return (
@@ -206,7 +206,7 @@ function NavGroup({ item, pathname, storeId }: NavGroupProps) {
                 key={child.label}
                 href={childHref}
                 className={cn(
-                  'flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors',
+                  'flex items-center gap-3 rounded-lg px-4 py-3 text-base transition-colors',
                   isActive(child.path)
                     ? 'bg-primary text-primary-foreground'
                     : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
@@ -230,12 +230,12 @@ interface SectionHeaderProps {
 
 function SectionHeader({ title, description }: SectionHeaderProps) {
   return (
-    <div className="px-3 py-2">
-      <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+    <div className="px-4 py-3">
+      <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
         {title}
       </h3>
       {description && (
-        <p className="text-[10px] text-muted-foreground/70">{description}</p>
+        <p className="text-sm text-muted-foreground/70">{description}</p>
       )}
     </div>
   );

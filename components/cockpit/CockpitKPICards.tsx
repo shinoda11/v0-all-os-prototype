@@ -41,8 +41,8 @@ function LastUpdate({ timestamp }: LastUpdateProps) {
   else display = date.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
   
   return (
-    <span className="text-[10px] text-muted-foreground/70 flex items-center gap-1">
-      <Clock className="h-2.5 w-2.5" />
+    <span className="text-sm text-muted-foreground flex items-center gap-1">
+      <Clock className="h-3.5 w-3.5" />
       {display}
     </span>
   );
@@ -81,21 +81,21 @@ export function SalesKPICard({ data, highlighted }: SalesKPICardProps) {
       statusColors[status],
       highlighted && 'ring-2 ring-primary ring-offset-2'
     )}>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
-        <CardTitle className="text-sm font-medium text-muted-foreground">売上</CardTitle>
-        <DollarSign className="h-4 w-4 text-muted-foreground" />
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-base font-medium text-muted-foreground">売上</CardTitle>
+        <DollarSign className="h-5 w-5 text-muted-foreground" />
       </CardHeader>
-      <CardContent className="space-y-2">
+      <CardContent className="space-y-3">
         {!data ? <LoadingValue /> : (
           <>
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold">¥{data.actual.toLocaleString()}</span>
-              <div className={cn('flex items-center gap-0.5 text-sm', trendColor)}>
-                <TrendIcon className="h-3.5 w-3.5" />
+            <div className="flex items-baseline gap-3">
+              <span className="text-3xl font-bold">¥{data.actual.toLocaleString()}</span>
+              <div className={cn('flex items-center gap-1 text-lg', trendColor)}>
+                <TrendIcon className="h-5 w-5" />
                 <span>{Math.round(data.achievementRate)}%</span>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-x-2 text-sm">
+            <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-base">
               <div className="text-muted-foreground">予測</div>
               <div className="text-right">¥{data.forecast.toLocaleString()}</div>
               <div className="text-muted-foreground">差分</div>
@@ -141,20 +141,20 @@ export function LaborKPICard({ data, highlighted }: LaborKPICardProps) {
       statusColors[status],
       highlighted && 'ring-2 ring-primary ring-offset-2'
     )}>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
-        <CardTitle className="text-sm font-medium text-muted-foreground">レーバー</CardTitle>
-        <Users className="h-4 w-4 text-muted-foreground" />
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-base font-medium text-muted-foreground">レーバー</CardTitle>
+        <Users className="h-5 w-5 text-muted-foreground" />
       </CardHeader>
-      <CardContent className="space-y-2">
+      <CardContent className="space-y-3">
         {!data ? <LoadingValue /> : (
           <>
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold">¥{data.actualCost.toLocaleString()}</span>
-              <Badge variant={data.estimatedLaborRate <= 30 ? 'default' : 'destructive'} className="text-xs h-5">
+            <div className="flex items-baseline gap-3">
+              <span className="text-3xl font-bold">¥{data.actualCost.toLocaleString()}</span>
+              <Badge variant={data.estimatedLaborRate <= 30 ? 'default' : 'destructive'} className="text-base px-2 py-1">
                 {data.estimatedLaborRate.toFixed(1)}%
               </Badge>
             </div>
-            <div className="grid grid-cols-2 gap-x-2 text-sm">
+            <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-base">
               <div className="text-muted-foreground">売上/人件費</div>
               <div className="text-right">{data.salesPerLaborCost.toFixed(1)}倍</div>
               <div className="text-muted-foreground">予定vs実績人時</div>
@@ -195,19 +195,19 @@ export function SupplyDemandKPICard({ data, highlighted }: SupplyDemandKPICardPr
       statusColors[status],
       highlighted && 'ring-2 ring-primary ring-offset-2'
     )}>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
-        <CardTitle className="text-sm font-medium text-muted-foreground">需給</CardTitle>
-        <Package className="h-4 w-4 text-muted-foreground" />
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-base font-medium text-muted-foreground">需給</CardTitle>
+        <Package className="h-5 w-5 text-muted-foreground" />
       </CardHeader>
-      <CardContent className="space-y-2">
+      <CardContent className="space-y-3">
         {!data ? <LoadingValue /> : (
           <>
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold">
+            <div className="flex items-baseline gap-3">
+              <span className="text-3xl font-bold">
                 {!hasRisk ? 'バランス' : data.stockoutRisk > data.excessRisk ? '欠品リスク' : '過剰リスク'}
               </span>
             </div>
-            <div className="grid grid-cols-2 gap-x-2 text-sm">
+            <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-base">
               <div className="text-muted-foreground">欠品リスク</div>
               <div className={cn('text-right', data.stockoutRisk > 0 && 'text-red-600 font-medium')}>
                 {data.stockoutRisk}品目
@@ -218,13 +218,13 @@ export function SupplyDemandKPICard({ data, highlighted }: SupplyDemandKPICardPr
               </div>
             </div>
             {data.topItems.length > 0 && (
-              <div className="flex flex-wrap gap-1">
+              <div className="flex flex-wrap gap-2">
                 {data.topItems.slice(0, 3).map((item, i) => (
                   <Badge
                     key={i}
                     variant="outline"
                     className={cn(
-                      'text-[10px]',
+                      'text-sm',
                       item.risk === 'stockout' ? 'border-red-300 text-red-700' : 'border-yellow-300 text-yellow-700'
                     )}
                   >
@@ -266,22 +266,22 @@ export function OperationsKPICard({ data, highlighted }: OperationsKPICardProps)
       statusColors[status],
       highlighted && 'ring-2 ring-primary ring-offset-2'
     )}>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
-        <CardTitle className="text-sm font-medium text-muted-foreground">オペ</CardTitle>
-        <Gauge className="h-4 w-4 text-muted-foreground" />
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-base font-medium text-muted-foreground">オペ</CardTitle>
+        <Gauge className="h-5 w-5 text-muted-foreground" />
       </CardHeader>
-      <CardContent className="space-y-2">
+      <CardContent className="space-y-3">
         {!data ? <LoadingValue /> : (
           <>
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold">{Math.round(data.completionRate)}%</span>
+            <div className="flex items-baseline gap-3">
+              <span className="text-3xl font-bold">{Math.round(data.completionRate)}%</span>
               {data.delayedCount > 0 && (
-                <Badge variant="destructive" className="text-xs h-5">
+                <Badge variant="destructive" className="text-base px-2 py-1">
                   {data.delayedCount}件遅延
                 </Badge>
               )}
             </div>
-            <div className="grid grid-cols-2 gap-x-2 text-sm">
+            <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-base">
               <div className="text-muted-foreground">完了率</div>
               <div className="text-right">{Math.round(data.completionRate)}%</div>
               <div className="text-muted-foreground">遅延タスク</div>
@@ -290,8 +290,8 @@ export function OperationsKPICard({ data, highlighted }: OperationsKPICardProps)
               </div>
             </div>
             {data.bottleneck && (
-              <div className="text-sm p-2 bg-yellow-50 border border-yellow-200 rounded">
-                <div className="font-medium text-yellow-800">ボトルネック</div>
+              <div className="text-base p-3 bg-yellow-50 border border-yellow-200 rounded">
+                <div className="font-semibold text-yellow-800">ボトルネック</div>
                 <div className="text-yellow-700 truncate">{data.bottleneck.task}</div>
               </div>
             )}
@@ -329,27 +329,27 @@ export function ExceptionsKPICard({ data, highlighted }: ExceptionsKPICardProps)
       statusColors[status],
       highlighted && 'ring-2 ring-primary ring-offset-2'
     )}>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
-        <CardTitle className="text-sm font-medium text-muted-foreground">例外</CardTitle>
-        <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-base font-medium text-muted-foreground">例外</CardTitle>
+        <AlertTriangle className="h-5 w-5 text-muted-foreground" />
       </CardHeader>
-      <CardContent className="space-y-2">
+      <CardContent className="space-y-3">
         {!data ? <LoadingValue /> : (
           <>
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold">{total}</span>
-              <span className="text-base text-muted-foreground">件</span>
+            <div className="flex items-baseline gap-3">
+              <span className="text-3xl font-bold">{total}</span>
+              <span className="text-xl text-muted-foreground">件</span>
             </div>
-            <div className="flex gap-2 text-sm">
+            <div className="flex gap-3 text-base">
               {data.criticalCount > 0 && (
-                <Badge variant="destructive" className="text-xs h-5 gap-1">
-                  <AlertCircle className="h-3 w-3" />
+                <Badge variant="destructive" className="text-base px-2 py-1 gap-1.5">
+                  <AlertCircle className="h-4 w-4" />
                   緊急 {data.criticalCount}
                 </Badge>
               )}
               {data.warningCount > 0 && (
-                <Badge variant="outline" className="text-xs h-5 gap-1 border-yellow-300 text-yellow-700">
-                  <AlertTriangle className="h-3 w-3" />
+                <Badge variant="outline" className="text-base px-2 py-1 gap-1.5 border-yellow-300 text-yellow-700">
+                  <AlertTriangle className="h-4 w-4" />
                   警告 {data.warningCount}
                 </Badge>
               )}
@@ -359,10 +359,10 @@ export function ExceptionsKPICard({ data, highlighted }: ExceptionsKPICardProps)
             </div>
             {data.topException && (
               <div className={cn(
-                'text-xs p-1.5 rounded border',
+                'text-base p-3 rounded border',
                 data.topException.impactType === 'sales' ? 'bg-red-50 border-red-200' : 'bg-yellow-50 border-yellow-200'
               )}>
-                <div className="font-medium truncate">{data.topException.title}</div>
+                <div className="font-semibold truncate">{data.topException.title}</div>
                 <div className="text-muted-foreground">{data.topException.impact}</div>
               </div>
             )}

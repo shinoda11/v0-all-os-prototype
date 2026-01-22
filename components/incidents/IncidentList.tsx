@@ -102,76 +102,76 @@ function IncidentCard({ incident, storeId }: IncidentCardProps) {
         'transition-all hover:shadow-md hover:border-primary/30 cursor-pointer',
         incident.severity === 'critical' && 'border-l-4 border-l-red-500'
       )}>
-        <CardContent className="p-4">
-          <div className="flex items-start justify-between gap-4">
+        <CardContent className="p-5">
+          <div className="flex items-start justify-between gap-6">
             {/* Left: Main content */}
-            <div className="flex-1 min-w-0 space-y-2">
+            <div className="flex-1 min-w-0 space-y-3">
               {/* Title row */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
                 <span className={cn(
-                  'shrink-0 p-1.5 rounded',
+                  'shrink-0 p-2 rounded',
                   SEVERITY_STYLES[incident.severity]
                 )}>
                   {TYPE_ICONS[incident.type]}
                 </span>
-                <h3 className="font-semibold text-sm truncate">{incident.title}</h3>
+                <h3 className="font-semibold text-lg truncate">{incident.title}</h3>
               </div>
               
               {/* Summary */}
-              <p className="text-sm text-muted-foreground line-clamp-1">
+              <p className="text-base text-muted-foreground line-clamp-1">
                 {incident.summary}
               </p>
               
               {/* Meta row */}
-              <div className="flex flex-wrap items-center gap-2 text-xs">
+              <div className="flex flex-wrap items-center gap-3">
                 {/* Type */}
-                <Badge variant="outline" className="text-xs font-normal">
+                <Badge variant="outline" className="text-base font-normal px-3 py-1">
                   {typeLabel}
                 </Badge>
                 
                 {/* Severity */}
-                <Badge className={cn('text-xs font-normal border', SEVERITY_STYLES[incident.severity])}>
+                <Badge className={cn('text-base font-normal border px-3 py-1', SEVERITY_STYLES[incident.severity])}>
                   {severityLabel}
                 </Badge>
                 
                 {/* Status */}
-                <Badge variant="secondary" className={cn('text-xs font-normal', STATUS_STYLES[incident.status])}>
+                <Badge variant="secondary" className={cn('text-base font-normal px-3 py-1', STATUS_STYLES[incident.status])}>
                   {statusLabel}
                 </Badge>
                 
                 {/* Time band */}
-                <span className="text-muted-foreground">
+                <span className="text-base text-muted-foreground">
                   {timeBandLabel}
                 </span>
               </div>
             </div>
             
             {/* Right: Agents & time */}
-            <div className="flex flex-col items-end gap-2 shrink-0">
+            <div className="flex flex-col items-end gap-3 shrink-0">
               {/* Lead agent */}
-              <div className="flex items-center gap-1.5">
-                <Bot className="h-3 w-3 text-muted-foreground" />
-                <Badge className={cn('text-xs font-medium', AGENT_STYLES[incident.leadAgent])}>
+              <div className="flex items-center gap-2">
+                <Bot className="h-4 w-4 text-muted-foreground" />
+                <Badge className={cn('text-base font-medium px-3 py-1', AGENT_STYLES[incident.leadAgent])}>
                   {leadAgentLabel}
                 </Badge>
               </div>
               
               {/* Supporting agents */}
               {incident.supportingAgents.length > 0 && (
-                <div className="flex items-center gap-1">
-                  <Users className="h-3 w-3 text-muted-foreground" />
-                  <div className="flex gap-0.5">
+                <div className="flex items-center gap-2">
+                  <Users className="h-4 w-4 text-muted-foreground" />
+                  <div className="flex gap-1">
                     {incident.supportingAgents.slice(0, 3).map((agentId) => (
                       <Badge 
                         key={agentId} 
                         variant="outline"
-                        className={cn('text-[10px] px-1 py-0', AGENT_STYLES[agentId])}
+                        className={cn('text-sm px-2 py-0.5', AGENT_STYLES[agentId])}
                       >
                         {t(`incidents.agent.${agentId}`).slice(0, 2)}
                       </Badge>
                     ))}
                     {incident.supportingAgents.length > 3 && (
-                      <span className="text-[10px] text-muted-foreground">
+                      <span className="text-sm text-muted-foreground">
                         +{incident.supportingAgents.length - 3}
                       </span>
                     )}
@@ -183,7 +183,7 @@ function IncidentCard({ incident, storeId }: IncidentCardProps) {
               <FreshnessBadge lastUpdate={incident.updatedAt} compact />
               
               {/* Arrow */}
-              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              <ChevronRight className="h-6 w-6 text-muted-foreground" />
             </div>
           </div>
         </CardContent>

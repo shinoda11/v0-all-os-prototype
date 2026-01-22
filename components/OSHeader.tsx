@@ -51,49 +51,49 @@ export function OSHeader({
   return (
     <div className="space-y-4">
       {/* OS Label and Store Info */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          <Badge variant="default" className="bg-primary text-primary-foreground font-semibold">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-4">
+          <Badge variant="default" className="bg-primary text-primary-foreground font-semibold text-base px-3 py-1">
             {t('os.header.badge')}
           </Badge>
           <div>
-            <h1 className="text-xl font-bold sm:text-2xl">{title}</h1>
+            <h1 className="text-2xl font-bold sm:text-3xl">{title}</h1>
             {currentStore && (
-              <p className="text-sm text-muted-foreground">{shortName}</p>
+              <p className="text-base text-muted-foreground">{shortName}</p>
             )}
           </div>
         </div>
 
         {/* Business Date, Last Updated, and Language Toggle */}
-        <div className="flex items-center gap-4 text-sm">
+        <div className="flex items-center gap-6 text-base">
           <div className="flex items-center gap-2">
             <span className="text-muted-foreground">{t('os.header.businessDate')}:</span>
             <span className="font-medium">{businessDate}</span>
           </div>
-          <div className="flex items-center gap-1.5 text-muted-foreground">
-            <RefreshCw className="h-3.5 w-3.5" />
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <RefreshCw className="h-4 w-4" />
             <span>{t('os.header.lastUpdated')}: {lastUpdatedStr}</span>
           </div>
           
           {/* Language Toggle */}
           <Button
             variant="ghost"
-            size="sm"
+            size="default"
             onClick={toggleLocale}
-            className="h-7 px-2 text-xs gap-1.5"
+            className="px-3 gap-2"
           >
-            <Globe className="h-3.5 w-3.5" />
+            <Globe className="h-4 w-4" />
             <span>{locale === 'ja' ? 'English' : '日本語'}</span>
           </Button>
           
           {/* Ask OS Button */}
           <Button
             variant="default"
-            size="sm"
+            size="default"
             onClick={askPanel.toggle}
-            className="h-7 px-3 text-xs gap-1.5"
+            className="px-4 gap-2"
           >
-            <MessageCircle className="h-3.5 w-3.5" />
+            <MessageCircle className="h-4 w-4" />
             <span>{t('os.header.askOS')}</span>
           </Button>
         </div>
