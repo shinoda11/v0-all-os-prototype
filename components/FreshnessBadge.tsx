@@ -47,25 +47,25 @@ export function FreshnessBadge({
   const status = getFreshnessStatus(lastUpdate);
   const time = formatUpdateTime(lastUpdate, locale);
   
-  // Monochrome status - only stale uses brand red
+  // All monochrome - gray scale only
   const statusConfig = {
     fresh: {
       icon: CheckCircle,
       color: 'text-gray-500',
-      bgColor: 'bg-gray-50',
+      bgColor: 'bg-gray-100',
       borderColor: 'border-gray-200',
     },
     warning: {
       icon: Clock,
       color: 'text-gray-500',
-      bgColor: 'bg-gray-50',
+      bgColor: 'bg-gray-100',
       borderColor: 'border-gray-200',
     },
     stale: {
       icon: AlertCircle,
-      color: 'text-primary',
-      bgColor: 'bg-primary/5',
-      borderColor: 'border-primary/20',
+      color: 'text-gray-600',
+      bgColor: 'bg-gray-100',
+      borderColor: 'border-gray-300',
     },
   };
   
@@ -115,11 +115,11 @@ export function FreshnessIndicator({
   const { locale, t } = useI18n();
   const status = getFreshnessStatus(lastUpdate);
   
-  // Monochrome dots - only stale uses brand red
+  // All monochrome dots
   const dotColors = {
     fresh: 'bg-gray-400',
     warning: 'bg-gray-400',
-    stale: 'bg-primary',
+    stale: 'bg-gray-500',
   };
   
   return (

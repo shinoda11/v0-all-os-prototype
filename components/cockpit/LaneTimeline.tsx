@@ -156,13 +156,12 @@ interface LaneRowProps {
 
 function LaneRow({ lane, events, onEventClick }: LaneRowProps) {
   const config = LANE_CONFIG[lane];
-  console.log('[v0] LaneRow config for', lane, ':', config.bgColor, config.color);
   
   return (
     <div className="flex border-b border-border last:border-b-0">
+      {/* Lane label - using grayscale colors */}
       <div className={cn(
-        'w-20 shrink-0 py-2 px-2 flex items-center gap-1.5',
-        config.bgColor, config.color
+        'w-24 shrink-0 py-2 px-3 flex items-center gap-2 bg-gray-50 text-gray-700'
       )}>
         {config.icon}
         <span className="text-xs font-medium">{config.label}</span>
@@ -178,12 +177,12 @@ function LaneRow({ lane, events, onEventClick }: LaneRowProps) {
                 type="button"
                 onClick={() => onEventClick(event)}
                 className={cn(
-                  'flex items-center gap-1.5 px-2 py-1 rounded text-xs bg-background border hover:bg-muted/50 transition-colors',
-                  STATUS_STYLES[event.status ?? 'normal']
+                  'flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm bg-white border border-gray-200 hover:bg-gray-50 transition-colors',
+                  event.status === 'critical' && 'border-red-300 bg-red-50'
                 )}
               >
-                <span className="font-medium truncate max-w-[100px]">{event.title}</span>
-                <span className="text-muted-foreground text-[10px]">{formatTime(event.timestamp)}</span>
+                <span className="font-medium truncate max-w-[120px] text-gray-800">{event.title}</span>
+                <span className="text-gray-400 text-xs">{formatTime(event.timestamp)}</span>
               </button>
             ))
           )}
