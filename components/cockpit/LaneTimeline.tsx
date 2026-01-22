@@ -156,6 +156,7 @@ interface LaneRowProps {
 
 function LaneRow({ lane, events, onEventClick }: LaneRowProps) {
   const config = LANE_CONFIG[lane];
+  console.log('[v0] LaneRow config for', lane, ':', config.bgColor, config.color);
   
   return (
     <div className="flex border-b border-border last:border-b-0">
