@@ -625,6 +625,11 @@ export const ja = {
   'nav.timeClock': 'Time Clock',
   'nav.myScore': 'My Score',
   'nav.incidentCenter': 'Incident Center',
+  
+  // Cockpit Staff/Quest Status
+  'cockpit.staff.notTracked': '未計測',
+  'cockpit.quest.noAssigned': 'クエストなし',
+  'cockpit.quest.noQuestsBottleneck': 'クエストがまだ配布されていません',
 } as const;
 
 export type MessageKey = keyof typeof ja;

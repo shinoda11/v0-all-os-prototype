@@ -481,7 +481,15 @@ export const selectTodoStats = (
 ): TodoStats => {
   const storeId = state.selectedStoreId;
   if (!storeId) {
-    return { pendingCount: 0, inProgressCount: 0, completedCount: 0 };
+    return { 
+      pendingCount: 0, 
+      inProgressCount: 0, 
+      completedCount: 0,
+      pending: 0,
+      inProgress: 0,
+      completed: 0,
+      total: 0,
+    };
   }
   
   return deriveTodoStats(state.events, storeId, roleId);
@@ -500,8 +508,9 @@ export const selectShiftSummary = (
   
   if (!storeId) {
     return {
-      plannedHours: 0,
+      plannedHours: null,
       actualHours: 0,
+      activeStaffCount: 0,
       skillMix: { star3: 0, star2: 0, star1: 0 },
       roleMix: { kitchen: 0, floor: 0, delivery: 0 },
       onBreakCount: 0,

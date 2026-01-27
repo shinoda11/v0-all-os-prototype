@@ -305,13 +305,26 @@ export interface SupplyDemandKPI {
 
 // Dynamic Shift Summary (replaces MOCK_SHIFT_SUMMARY)
 export interface ShiftSummary {
-  plannedHours: number;
+  plannedHours: number | null; // null when shift plan is not available
   actualHours: number;
+  activeStaffCount: number; // Count of currently active staff
   skillMix: { star3: number; star2: number; star1: number };
   roleMix: { kitchen: number; floor: number; delivery: number };
   onBreakCount: number;
   lastUpdate: string;
   isCalculating: boolean; // True when data is incomplete
+}
+
+// Todo Stats for Quest Progress
+export interface TodoStats {
+  pendingCount: number;
+  inProgressCount: number;
+  completedCount: number;
+  // Aliases for easier access
+  pending: number;
+  inProgress: number;
+  completed: number;
+  total: number;
 }
 
 // Enhanced Supply/Demand Metrics

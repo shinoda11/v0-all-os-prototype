@@ -625,4 +625,9 @@ export const en = {
   'nav.timeClock': 'Time Clock',
   'nav.myScore': 'My Score',
   'nav.incidentCenter': 'Incident Center',
+  
+  // Cockpit Staff/Quest Status
+  'cockpit.staff.notTracked': 'Not tracked',
+  'cockpit.quest.noAssigned': 'No quests assigned',
+  'cockpit.quest.noQuestsBottleneck': 'No quests have been distributed yet',
 } as const;

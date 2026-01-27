@@ -143,6 +143,7 @@ function ReplayControls() {
 // Shift Summary + Quest Progress Component
 function DynamicShiftSummary() {
   const { state } = useStore();
+  const { t } = useI18n();
   const summary = selectShiftSummary(state);
   const todoStats = selectTodoStats(state);
   
@@ -151,6 +152,16 @@ function DynamicShiftSummary() {
   const questDone = todoStats.completed;
   const questInProgress = todoStats.inProgress;
   const questCompletionRate = questTotal > 0 ? Math.round((questDone / questTotal) * 100) : 0;
+  
+  // Format hours display - show "—" when plannedHours is null (not tracked)
+  const formatHoursDisplay = () => {
+    const actualDisplay = `${summary.actualHours.toFixed(1)}h`;
+    const plannedDisplay = summary.plannedHours !== null ? `${summary.plannedHours}h` : '—';
+    return `${actualDisplay} / ${plannedDisplay}`;
+  };
+  
+  // Check if hours are over planned (only when planned is available)
+  const isOverPlanned = summary.plannedHours !== null && summary.actualHours > summary.plannedHours;
   
   return (
     <Card>
@@ -183,8 +194,8 @@ function DynamicShiftSummary() {
           </div>
           <div className="flex justify-between items-center text-sm">
             <span className="text-muted-foreground">Hours</span>
-            <span className={cn('font-bold', summary.actualHours > summary.plannedHours && 'text-red-700')}>
-              {summary.actualHours.toFixed(1)}h / {summary.plannedHours}h
+            <span className={cn('font-bold', isOverPlanned && 'text-red-700')}>
+              {formatHoursDisplay()}
             </span>
           </div>
         </div>
@@ -199,10 +210,11 @@ function DynamicShiftSummary() {
             </span>
             <span className={cn(
               'font-bold',
+              questTotal === 0 ? 'text-muted-foreground' :
               questCompletionRate >= 80 ? 'text-emerald-700' : 
               questCompletionRate >= 50 ? 'text-amber-700' : 'text-red-700'
             )}>
-              {questCompletionRate}%
+              {questTotal === 0 ? '—' : `${questCompletionRate}%`}
             </span>
           </div>
           <div className="flex justify-between items-center text-sm">
@@ -218,12 +230,19 @@ function DynamicShiftSummary() {
             <div 
               className={cn(
                 'h-full transition-all',
+                questTotal === 0 ? 'bg-muted' :
                 questCompletionRate >= 80 ? 'bg-emerald-500' : 
                 questCompletionRate >= 50 ? 'bg-amber-500' : 'bg-red-500'
               )}
-              style={{ width: `${questCompletionRate}%` }}
+              style={{ width: questTotal === 0 ? '0%' : `${questCompletionRate}%` }}
             />
           </div>
+          {/* Bottleneck message when no quests */}
+          {questTotal === 0 && (
+            <div className="text-xs text-muted-foreground italic">
+              {t('cockpit.quest.noQuestsBottleneck')}
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>

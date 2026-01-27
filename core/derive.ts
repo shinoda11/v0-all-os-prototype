@@ -24,6 +24,7 @@ import {
   ExceptionsKPI,
   EnhancedCockpitMetrics,
   ExpectedEffect,
+  TodoStats,
 } from './types';
 
 // ------------------------------------------------------------
@@ -733,11 +734,8 @@ export const deriveCalendarData = (
 // Todo Statistics Derivation
 // ------------------------------------------------------------
 
-export interface TodoStats {
-  pendingCount: number;
-  inProgressCount: number;
-  completedCount: number;
-}
+// TodoStats is imported from ./types and re-exported for backward compatibility
+export type { TodoStats } from './types';
 
 export const deriveTodoStats = (
   events: DomainEvent[],
@@ -747,10 +745,20 @@ export const deriveTodoStats = (
   const activeTodos = deriveActiveTodos(events, storeId, roleId);
   const completedTodos = deriveCompletedTodos(events, storeId);
   
+  const pendingCount = activeTodos.filter((t) => t.action === 'approved').length;
+  const inProgressCount = activeTodos.filter((t) => t.action === 'started').length;
+  const completedCount = completedTodos.length;
+  const total = pendingCount + inProgressCount + completedCount;
+  
   return {
-    pendingCount: activeTodos.filter((t) => t.action === 'approved').length,
-    inProgressCount: activeTodos.filter((t) => t.action === 'started').length,
-    completedCount: completedTodos.length,
+    pendingCount,
+    inProgressCount,
+    completedCount,
+    // Aliases for easier access
+    pending: pendingCount,
+    inProgress: inProgressCount,
+    completed: completedCount,
+    total,
   };
 };
 
@@ -1242,8 +1250,18 @@ export const deriveShiftSummary = (
     }
   }
 
-  // Planned hours: 8h/person as default (would come from shift plan)
-  const plannedHours = storeStaff.length * 8;
+  // Count active staff (not on break)
+  let activeStaffCount = 0;
+  for (const [, session] of sessions) {
+    if (session.isActive && !session.isOnBreak) {
+      activeStaffCount++;
+    }
+  }
+  
+  // Planned hours: null when no shift data available, otherwise estimate from staff count
+  // In a real system, this would come from the shift plan
+  const hasShiftData = storeStaff.length > 0;
+  const plannedHours = hasShiftData ? storeStaff.length * 8 : null;
   
   // Check if we have enough data
   const isCalculating = sessions.size === 0;
@@ -1251,6 +1269,7 @@ export const deriveShiftSummary = (
   return {
     plannedHours,
     actualHours: Math.max(0, Math.round(actualHours * 10) / 10),
+    activeStaffCount,
     skillMix,
     roleMix,
     onBreakCount,
