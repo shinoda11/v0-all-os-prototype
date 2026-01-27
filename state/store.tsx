@@ -40,6 +40,8 @@ interface StoreContextValue {
     approveProposal: (proposal: Proposal) => void;
     rejectProposal: (proposal: Proposal) => void;
     startDecision: (proposal: Proposal) => void;
+    pauseDecision: (proposal: Proposal, reason?: string) => void;
+    resumeDecision: (proposal: Proposal) => void;
     completeDecision: (proposal: Proposal) => void;
     updateProposal: (proposal: Proposal) => void;
     addProposal: (proposal: Proposal) => void;
@@ -264,6 +266,37 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     startDecision: (proposal: Proposal) => {
       const storeId = storeIdRef.current;
       if (!storeId) return;
+      const event = commands.startDecision(storeId, proposal);
+      dispatch({ type: 'ADD_EVENT', event });
+      publishStateUpdate('decision:changed', 'started', ['decision', 'todo']);
+    },
+
+    pauseDecision: (proposal: Proposal, reason?: string) => {
+      const storeId = storeIdRef.current;
+      if (!storeId) return;
+      const pauseEvent: DomainEvent = {
+        id: `${proposal.id}-paused-${Date.now()}`,
+        type: 'decision',
+        storeId,
+        timestamp: new Date().toISOString(),
+        timeBand: proposal.timeBand ?? 'all',
+        proposalId: proposal.id,
+        action: 'paused',
+        title: proposal.title,
+        description: proposal.description || '',
+        distributedToRoles: proposal.distributedToRoles,
+        priority: proposal.priority,
+        pausedAt: new Date().toISOString(),
+        pauseReason: reason,
+      };
+      dispatch({ type: 'ADD_EVENT', event: pauseEvent });
+      publishStateUpdate('decision:changed', 'paused', ['decision', 'todo']);
+    },
+
+    resumeDecision: (proposal: Proposal) => {
+      const storeId = storeIdRef.current;
+      if (!storeId) return;
+      // Resume is essentially a new start event
       const event = commands.startDecision(storeId, proposal);
       dispatch({ type: 'ADD_EVENT', event });
       publishStateUpdate('decision:changed', 'started', ['decision', 'todo']);

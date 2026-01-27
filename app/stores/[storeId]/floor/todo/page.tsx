@@ -33,8 +33,11 @@ import {
 } from '@/core/selectors';
 import { proposalFromDecision } from '@/core/commands';
 import type { DecisionEvent, TimeBand } from '@/core/types';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Play,
+  Pause,
   CheckCircle,
   Clock,
   Star,
@@ -43,6 +46,8 @@ import {
   Zap,
   Trophy,
   Target,
+  AlertCircle,
+  RotateCcw,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -126,14 +131,18 @@ function TaskTimer({ startTime }: { startTime: string }) {
 // Quest Card Component
 interface QuestCardProps {
   quest: DecisionEvent;
-  status: 'waiting' | 'in_progress' | 'done';
+  status: 'waiting' | 'in_progress' | 'paused' | 'done';
   roleNames: string[];
   onStart?: () => void;
+  onPause?: () => void;
+  onResume?: () => void;
   onComplete?: () => void;
   disabled?: boolean;
+  disabledReason?: string;
 }
 
-function QuestCard({ quest, status, roleNames, onStart, onComplete, disabled }: QuestCardProps) {
+function QuestCard({ quest, status, roleNames, onStart, onPause, onResume, onComplete, disabled, disabledReason }: QuestCardProps) {
+  const { t } = useI18n();
   const difficulty = getDifficulty(quest.estimatedMinutes);
   
   const formatDeadline = (deadline: string) => {
@@ -149,20 +158,28 @@ function QuestCard({ quest, status, roleNames, onStart, onComplete, disabled }: 
         'p-4 rounded-lg border transition-all',
         status === 'waiting' && 'bg-card border-border hover:border-primary/50',
         status === 'in_progress' && 'bg-primary/5 border-primary',
+        status === 'paused' && 'bg-amber-50 border-amber-300',
         status === 'done' && 'bg-muted/50 border-muted',
         disabled && status === 'waiting' && 'opacity-60'
       )}
     >
-      {/* Header: Title + Difficulty */}
-      <div className="flex items-start justify-between gap-2 mb-3">
-        <h3 className={cn(
-          'font-bold',
-          status === 'done' && 'line-through text-muted-foreground'
-        )}>
-          {quest.title}
-        </h3>
-        <DifficultyStars difficulty={difficulty} />
-      </div>
+  {/* Header: Title + Difficulty */}
+  <div className="flex items-start justify-between gap-2 mb-3">
+  <div className="flex items-center gap-2">
+    <h3 className={cn(
+    'font-bold',
+    status === 'done' && 'line-through text-muted-foreground'
+    )}>
+    {quest.title}
+    </h3>
+    {status === 'paused' && (
+    <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-300 text-xs">
+      {t('quests.paused')}
+    </Badge>
+    )}
+  </div>
+  <DifficultyStars difficulty={difficulty} />
+  </div>
 
       {/* Meta info */}
       <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground mb-4">
@@ -202,17 +219,36 @@ function QuestCard({ quest, status, roleNames, onStart, onComplete, disabled }: 
         </div>
       )}
 
-      {/* Completion results for done */}
-      {status === 'done' && (quest.actualMinutes || quest.actualQuantity) && (
-        <div className="mb-4 p-2 bg-muted rounded text-sm">
-          <div className="flex items-center gap-4">
-            {quest.actualMinutes && (
-              <span>実績: {quest.actualMinutes}分</span>
-            )}
-            {quest.actualQuantity && (
-              <span>数量: {quest.actualQuantity}</span>
-            )}
-          </div>
+  {/* Completion results for done */}
+  {status === 'done' && (quest.actualMinutes || quest.actualQuantity || quest.qualityStatus) && (
+  <div className="mb-4 p-2 bg-muted rounded text-sm space-y-1">
+  <div className="flex items-center gap-4">
+  {quest.actualMinutes && (
+  <span>実績: {quest.actualMinutes}分</span>
+  )}
+  {quest.actualQuantity && (
+  <span>数量: {quest.actualQuantity}</span>
+  )}
+  </div>
+  {quest.qualityStatus && (
+  <div className="flex items-center gap-2">
+    <span className={cn(
+    'px-2 py-0.5 rounded text-xs font-medium',
+    quest.qualityStatus === 'ok' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
+    )}>
+    {quest.qualityStatus === 'ok' ? 'OK' : 'NG'}
+    </span>
+    {quest.qualityNote && <span className="text-xs text-muted-foreground">{quest.qualityNote}</span>}
+  </div>
+  )}
+  </div>
+  )}
+
+      {/* Disabled reason message */}
+      {disabled && disabledReason && status === 'waiting' && (
+        <div className="mb-3 p-2 bg-amber-50 border border-amber-200 rounded text-xs text-amber-800 flex items-start gap-2">
+          <AlertCircle className="h-3 w-3 mt-0.5 shrink-0" />
+          <span>{disabledReason}</span>
         </div>
       )}
 
@@ -223,18 +259,43 @@ function QuestCard({ quest, status, roleNames, onStart, onComplete, disabled }: 
             onClick={onStart} 
             disabled={disabled}
             className="flex-1 h-11 gap-2"
+            variant={disabled ? 'secondary' : 'default'}
           >
             <Play className="h-4 w-4" />
-            開始
+            {t('quests.start')}
           </Button>
         )}
-        {status === 'in_progress' && onComplete && (
+        {status === 'in_progress' && (
+          <>
+            {onPause && (
+              <Button 
+                onClick={onPause}
+                variant="outline"
+                className="h-11 gap-2"
+              >
+                <Pause className="h-4 w-4" />
+                {t('quests.pause')}
+              </Button>
+            )}
+            {onComplete && (
+              <Button 
+                onClick={onComplete}
+                className="flex-1 h-11 gap-2"
+              >
+                <CheckCircle className="h-4 w-4" />
+                {t('quests.complete')}
+              </Button>
+            )}
+          </>
+        )}
+        {status === 'paused' && onResume && (
           <Button 
-            onClick={onComplete}
-            className="flex-1 h-11 gap-2"
+            onClick={onResume}
+            variant="outline"
+            className="flex-1 h-11 gap-2 border-amber-400 text-amber-700 hover:bg-amber-50"
           >
-            <CheckCircle className="h-4 w-4" />
-            完了
+            <RotateCcw className="h-4 w-4" />
+            {t('quests.resume')}
           </Button>
         )}
       </div>
@@ -277,7 +338,13 @@ interface CompletionModalProps {
   quest: DecisionEvent | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (data: { actualMinutes: number; actualQuantity?: number; delayReason?: string }) => void;
+  onSubmit: (data: { 
+    actualMinutes: number; 
+    actualQuantity?: number; 
+    delayReason?: string;
+    qualityStatus: 'ok' | 'ng';
+    qualityNote?: string;
+  }) => void;
   elapsedMinutes: number;
 }
 
@@ -286,12 +353,16 @@ function CompletionModal({ quest, open, onOpenChange, onSubmit, elapsedMinutes }
   const [actualMinutes, setActualMinutes] = useState(elapsedMinutes);
   const [actualQuantity, setActualQuantity] = useState<number | undefined>(quest?.quantity);
   const [delayReason, setDelayReason] = useState<string>('none');
+  const [qualityStatus, setQualityStatus] = useState<'ok' | 'ng'>('ok');
+  const [qualityNote, setQualityNote] = useState('');
 
   useEffect(() => {
     if (quest) {
       setActualMinutes(elapsedMinutes || quest.estimatedMinutes || 0);
       setActualQuantity(quest.quantity);
       setDelayReason('none');
+      setQualityStatus('ok');
+      setQualityNote('');
     }
   }, [quest, elapsedMinutes]);
 
@@ -300,6 +371,8 @@ function CompletionModal({ quest, open, onOpenChange, onSubmit, elapsedMinutes }
       actualMinutes,
       actualQuantity,
       delayReason: delayReason !== 'none' ? delayReason : undefined,
+      qualityStatus,
+      qualityNote: qualityStatus === 'ng' ? qualityNote : undefined,
     });
   };
 
@@ -369,6 +442,59 @@ function CompletionModal({ quest, open, onOpenChange, onSubmit, elapsedMinutes }
               </SelectContent>
             </Select>
           </div>
+
+          {/* Quality Status */}
+          <div className="space-y-3 pt-2 border-t">
+            <Label>{t('quests.completeModal.qualityStatus')}</Label>
+            <RadioGroup 
+              value={qualityStatus} 
+              onValueChange={(v) => setQualityStatus(v as 'ok' | 'ng')}
+              className="flex gap-4"
+            >
+              <div className="flex items-center gap-2">
+                <RadioGroupItem value="ok" id="quality-ok" />
+                <Label 
+                  htmlFor="quality-ok" 
+                  className={cn(
+                    'cursor-pointer px-3 py-1.5 rounded-full text-sm transition-colors',
+                    qualityStatus === 'ok' 
+                      ? 'bg-emerald-100 text-emerald-800' 
+                      : 'bg-muted text-muted-foreground'
+                  )}
+                >
+                  {t('quests.completeModal.qualityOk')}
+                </Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <RadioGroupItem value="ng" id="quality-ng" />
+                <Label 
+                  htmlFor="quality-ng" 
+                  className={cn(
+                    'cursor-pointer px-3 py-1.5 rounded-full text-sm transition-colors',
+                    qualityStatus === 'ng' 
+                      ? 'bg-red-100 text-red-800' 
+                      : 'bg-muted text-muted-foreground'
+                  )}
+                >
+                  {t('quests.completeModal.qualityNg')}
+                </Label>
+              </div>
+            </RadioGroup>
+            
+            {/* Quality Note (only shown when NG) */}
+            {qualityStatus === 'ng' && (
+              <div className="space-y-2">
+                <Label htmlFor="qualityNote">{t('quests.completeModal.qualityNote')}</Label>
+                <Textarea
+                  id="qualityNote"
+                  value={qualityNote}
+                  onChange={(e) => setQualityNote(e.target.value)}
+                  placeholder="問題の詳細を入力..."
+                  className="min-h-[80px]"
+                />
+              </div>
+            )}
+          </div>
         </div>
 
         <DialogFooter>
@@ -389,11 +515,13 @@ function CompletionModal({ quest, open, onOpenChange, onSubmit, elapsedMinutes }
 function ProgressSummary({ 
   waiting, 
   inProgress, 
+  paused,
   done, 
   total 
 }: { 
   waiting: number; 
   inProgress: number; 
+  paused: number;
   done: number; 
   total: number;
 }) {
@@ -432,18 +560,24 @@ function ProgressSummary({
           </div>
 
           {/* Stats */}
-          <div className="flex-1 grid grid-cols-3 gap-4">
+          <div className="flex-1 grid grid-cols-4 gap-3">
             <div className="text-center">
-              <div className="text-2xl font-bold text-muted-foreground">{waiting}</div>
-              <div className="text-sm text-muted-foreground">待機中</div>
+              <div className="text-xl font-bold text-muted-foreground">{waiting}</div>
+              <div className="text-xs text-muted-foreground">待機</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-primary">{inProgress}</div>
-              <div className="text-sm text-muted-foreground">進行中</div>
+              <div className="text-xl font-bold text-primary">{inProgress}</div>
+              <div className="text-xs text-muted-foreground">進行中</div>
             </div>
+            {paused > 0 && (
+              <div className="text-center">
+                <div className="text-xl font-bold text-amber-600">{paused}</div>
+                <div className="text-xs text-muted-foreground">停止中</div>
+              </div>
+            )}
             <div className="text-center">
-              <div className="text-2xl font-bold text-emerald-600">{done}</div>
-              <div className="text-sm text-muted-foreground">完了</div>
+              <div className="text-xl font-bold text-emerald-600">{done}</div>
+              <div className="text-xs text-muted-foreground">完了</div>
             </div>
           </div>
 
@@ -498,18 +632,27 @@ export default function TodayQuestsPage() {
     [activeTodos]
   );
   
+  const pausedQuests = useMemo(() => 
+    activeTodos.filter((t) => t.action === 'paused'),
+    [activeTodos]
+  );
+  
   const doneQuests = useMemo(() => 
     completedTodos.slice(0, 10), // Show last 10 completed
     [completedTodos]
   );
 
   // Check if user already has a task in progress (1 task constraint)
+  // Paused tasks don't block starting new tasks
   const hasTaskInProgress = inProgressQuests.length > 0;
 
   const getRoleNames = (roleIds: string[]) =>
     roleIds.map((roleId) => state.roles.find((r) => r.id === roleId)?.name).filter(Boolean) as string[];
 
   const handleStart = (quest: DecisionEvent) => {
+    // Single-task constraint: don't allow starting if another task is in progress
+    if (hasTaskInProgress) return;
+    
     const proposal = proposalFromDecision(quest);
     actions.startDecision(proposal);
     
@@ -518,12 +661,31 @@ export default function TodayQuestsPage() {
     }
   };
 
+  const handlePause = (quest: DecisionEvent) => {
+    const proposal = proposalFromDecision(quest);
+    actions.pauseDecision(proposal);
+  };
+
+  const handleResume = (quest: DecisionEvent) => {
+    // Single-task constraint: don't allow resuming if another task is in progress
+    if (hasTaskInProgress) return;
+    
+    const proposal = proposalFromDecision(quest);
+    actions.resumeDecision(proposal);
+  };
+
   const handleCompleteClick = (quest: DecisionEvent) => {
     setInProgressStartTime(quest.timestamp);
     setCompletingQuest(quest);
   };
 
-  const handleCompleteSubmit = (data: { actualMinutes: number; actualQuantity?: number; delayReason?: string }) => {
+  const handleCompleteSubmit = (data: { 
+    actualMinutes: number; 
+    actualQuantity?: number; 
+    delayReason?: string;
+    qualityStatus: 'ok' | 'ng';
+    qualityNote?: string;
+  }) => {
     if (!completingQuest) return;
 
     const completedEvent: DecisionEvent = {
@@ -534,6 +696,8 @@ export default function TodayQuestsPage() {
       actualQuantity: data.actualQuantity,
       actualMinutes: data.actualMinutes,
       delayReason: data.delayReason,
+      qualityStatus: data.qualityStatus,
+      qualityNote: data.qualityNote,
     };
     actions.addEvent(completedEvent);
 
@@ -557,7 +721,7 @@ export default function TodayQuestsPage() {
     return Math.round((Date.now() - start) / 60000);
   };
 
-  const totalQuests = waitingQuests.length + inProgressQuests.length + doneQuests.length;
+  const totalQuests = waitingQuests.length + inProgressQuests.length + pausedQuests.length + doneQuests.length;
 
   if (!currentStore) {
     return null;
@@ -571,12 +735,13 @@ export default function TodayQuestsPage() {
       />
 
       {/* Progress Summary */}
-      <ProgressSummary
-        waiting={waitingQuests.length}
-        inProgress={inProgressQuests.length}
-        done={doneQuests.length}
-        total={totalQuests}
-      />
+<ProgressSummary
+  waiting={waitingQuests.length}
+  inProgress={inProgressQuests.length}
+  paused={pausedQuests.length}
+  done={doneQuests.length}
+  total={totalQuests}
+  />
 
       {/* 3-Column Kanban */}
       <div className="flex gap-4 overflow-x-auto pb-4">
@@ -590,43 +755,60 @@ export default function TodayQuestsPage() {
           {waitingQuests.length === 0 ? (
             <EmptyState type="no_data" title={t('quests.noQuests')} />
           ) : (
-            waitingQuests.map((quest) => (
-              <QuestCard
-                key={quest.id}
-                quest={quest}
-                status="waiting"
-                roleNames={getRoleNames(quest.distributedToRoles)}
-                onStart={() => handleStart(quest)}
-                disabled={hasTaskInProgress}
-              />
-            ))
+  waitingQuests.map((quest) => (
+  <QuestCard
+  key={quest.id}
+  quest={quest}
+  status="waiting"
+  roleNames={getRoleNames(quest.distributedToRoles)}
+  onStart={() => handleStart(quest)}
+  disabled={hasTaskInProgress}
+  disabledReason={hasTaskInProgress ? t('quests.singleTaskReason') : undefined}
+  />
+  ))
           )}
         </QuestColumn>
 
-        {/* In Progress Column */}
-        <QuestColumn
-          title={t('quests.inProgress')}
-          icon={<Play className="h-5 w-5 text-primary" />}
-          count={inProgressQuests.length}
-          accentColor="border-primary"
-        >
-          {inProgressQuests.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground">
-              <Play className="h-8 w-8 mb-2 opacity-30" />
-              <p>{t('quests.start')}</p>
-            </div>
-          ) : (
-            inProgressQuests.map((quest) => (
-              <QuestCard
-                key={quest.id}
-                quest={quest}
-                status="in_progress"
-                roleNames={getRoleNames(quest.distributedToRoles)}
-                onComplete={() => handleCompleteClick(quest)}
-              />
-            ))
-          )}
-        </QuestColumn>
+  {/* In Progress Column */}
+  <QuestColumn
+  title={t('quests.inProgress')}
+  icon={<Play className="h-5 w-5 text-primary" />}
+  count={inProgressQuests.length + pausedQuests.length}
+  accentColor="border-primary"
+  >
+  {inProgressQuests.length === 0 && pausedQuests.length === 0 ? (
+  <div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground">
+  <Play className="h-8 w-8 mb-2 opacity-30" />
+  <p>{t('quests.start')}</p>
+  </div>
+  ) : (
+  <>
+    {/* Active in-progress tasks */}
+    {inProgressQuests.map((quest) => (
+    <QuestCard
+    key={quest.id}
+    quest={quest}
+    status="in_progress"
+    roleNames={getRoleNames(quest.distributedToRoles)}
+    onPause={() => handlePause(quest)}
+    onComplete={() => handleCompleteClick(quest)}
+    />
+    ))}
+    {/* Paused tasks */}
+    {pausedQuests.map((quest) => (
+    <QuestCard
+    key={quest.id}
+    quest={quest}
+    status="paused"
+    roleNames={getRoleNames(quest.distributedToRoles)}
+    onResume={() => handleResume(quest)}
+    disabled={hasTaskInProgress}
+    disabledReason={hasTaskInProgress ? t('quests.singleTaskReason') : undefined}
+    />
+    ))}
+  </>
+  )}
+  </QuestColumn>
 
         {/* Done Column */}
         <QuestColumn

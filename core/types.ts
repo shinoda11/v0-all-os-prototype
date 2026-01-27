@@ -119,6 +119,12 @@ export interface DecisionEvent extends BaseEvent {
   delayReason?: string;
   hasIssue?: boolean;
   issueNote?: string;
+  // Quality flag (OK/NG) for completion quality tracking
+  qualityStatus?: 'ok' | 'ng';
+  qualityNote?: string;
+  // Pause tracking
+  pausedAt?: string;
+  pauseReason?: string;
 }
 
 export interface ForecastEvent extends BaseEvent {
