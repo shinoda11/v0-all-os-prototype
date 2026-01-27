@@ -15,6 +15,8 @@ import {
   selectTodayKeyIncidents,
   selectCriticalIncidents,
   selectIncidentByMenuName,
+  selectTodoStats,
+  selectTeamDailyScore,
 } from '@/core/selectors';
 import { detectDemandDrops, deriveLaborGuardrailSummary, type DemandDropDetectionResult, type LaborGuardrailInput } from '@/core/derive';
 import type { Proposal, ExceptionItem, DemandDropMeta, Incident } from '@/core/types';
@@ -32,6 +34,8 @@ import {
   FileWarning,
   ExternalLink,
   AlertTriangle,
+  Clock,
+  CheckSquare,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -115,6 +119,10 @@ export function AskDrawer({ open, onClose, onAddProposal, storeId }: AskDrawerPr
   
   // Get demand drops
   const demandDrops = detectDemandDrops(storeId);
+  
+  // Get todo stats and team score
+  const todoStats = selectTodoStats(state);
+  const teamScore = selectTeamDailyScore(state);
   
   // Removed debug logs
   
@@ -273,6 +281,97 @@ export function AskDrawer({ open, onClose, onAddProposal, storeId }: AskDrawerPr
     };
   }, [demandDrops, state, storeId, t]);
   
+  // Handler for "Why specific tasks are slow"
+  const handleTaskDelayReason = useCallback((): Message => {
+    const completionRate = todoStats.total > 0 
+      ? Math.round((todoStats.completed / todoStats.total) * 100)
+      : 100;
+    
+    // Analyze time variance from team score
+    const timeVarianceScore = teamScore.breakdown.timeVariance;
+    const maxTimeScore = 25;
+    const onTimeRate = Math.round((timeVarianceScore / maxTimeScore) * 100);
+    
+    // Find potential causes
+    const causes: string[] = [];
+    if (teamScore.breakdown.taskCompletion < 32) {
+      causes.push(t('ask.taskDelay.causeOverloaded'));
+    }
+    if (teamScore.breakdown.breakCompliance < 12) {
+      causes.push(t('ask.taskDelay.causeNoBreak'));
+    }
+    if (todoStats.inProgress > 3) {
+      causes.push(t('ask.taskDelay.causeTooManyWIP'));
+    }
+    if (causes.length === 0) {
+      causes.push(t('ask.taskDelay.causeEstimation'));
+    }
+    
+    const conclusionText = onTimeRate < 80
+      ? t('ask.taskDelay.conclusionSlow', { rate: onTimeRate })
+      : t('ask.taskDelay.conclusionGood', { rate: onTimeRate });
+    
+    return {
+      id: generateId(),
+      type: 'assistant',
+      content: '',
+      timestamp: new Date(),
+      conclusion: conclusionText,
+      evidence: [
+        { label: t('ask.taskDelay.onTimeRate'), value: `${onTimeRate}%` },
+        { label: t('ask.taskDelay.inProgress'), value: `${todoStats.inProgress}${t('ask.labor.tasks')}`, link: `/stores/${storeId}/floor/todo` },
+        { label: t('ask.taskDelay.completed'), value: `${todoStats.completed}/${todoStats.total}${t('ask.labor.tasks')}` },
+        { label: t('ask.taskDelay.possibleCauses'), value: causes.slice(0, 2).join('、') },
+      ],
+      confidence: onTimeRate < 70 ? 'high' : 'medium',
+      canCreateProposal: onTimeRate < 70,
+      proposalData: onTimeRate < 70 ? {
+        type: 'scope-reduction',
+        title: t('ask.taskDelay.proposalTitle'),
+        description: t('ask.taskDelay.proposalDesc'),
+        reason: causes[0],
+      } : undefined,
+    };
+  }, [todoStats, teamScore, storeId, t]);
+  
+  // Handler for "Why today's completion rate is low"
+  const handleLowCompletionReason = useCallback((): Message => {
+    const score = teamScore.total;
+    const completionRate = todoStats.total > 0 
+      ? Math.round((todoStats.completed / todoStats.total) * 100)
+      : 100;
+    
+    // Get bottlenecks from team score
+    const bottlenecks = teamScore.bottlenecks.slice(0, 3);
+    
+    const conclusionText = score < 70
+      ? t('ask.completion.conclusionLow', { score, rate: completionRate })
+      : t('ask.completion.conclusionGood', { score, rate: completionRate });
+    
+    return {
+      id: generateId(),
+      type: 'assistant',
+      content: '',
+      timestamp: new Date(),
+      conclusion: conclusionText,
+      evidence: [
+        { label: t('ask.completion.teamScore'), value: `${score}pts (${teamScore.grade})`, link: `/stores/${storeId}/os/cockpit` },
+        { label: t('ask.completion.questCompletion'), value: `${completionRate}%` },
+        { label: t('ask.completion.taskScore'), value: `${teamScore.breakdown.taskCompletion}/40pts` },
+        { label: t('ask.completion.timeScore'), value: `${teamScore.breakdown.timeVariance}/25pts` },
+        ...(bottlenecks.length > 0 ? [{ label: t('ask.completion.bottlenecks'), value: bottlenecks.join('、') }] : []),
+      ],
+      confidence: score < 60 ? 'high' : 'medium',
+      canCreateProposal: score < 60,
+      proposalData: score < 60 ? {
+        type: 'scope-reduction',
+        title: t('ask.completion.proposalTitle'),
+        description: t('ask.completion.proposalDesc', { bottleneck: bottlenecks[0] || t('ask.completion.general') }),
+        reason: teamScore.feedback,
+      } : undefined,
+    };
+  }, [todoStats, teamScore, storeId, t]);
+  
   // Handler for "Today's key incidents"
   const handleTodayKeyIncidents = useCallback((): Message => {
     if (todayIncidents.length === 0) {
@@ -322,6 +421,18 @@ export function AskDrawer({ open, onClose, onAddProposal, storeId }: AskDrawerPr
       labelKey: 'ask.chip.laborRateReason',
       icon: <DollarSign className="h-4 w-4" />,
       handler: handleLaborRateReason,
+    },
+    {
+      id: 'task-delay-reason',
+      labelKey: 'ask.chip.taskDelayReason',
+      icon: <Clock className="h-4 w-4" />,
+      handler: handleTaskDelayReason,
+    },
+    {
+      id: 'low-completion-reason',
+      labelKey: 'ask.chip.lowCompletionReason',
+      icon: <CheckSquare className="h-4 w-4" />,
+      handler: handleLowCompletionReason,
     },
     {
       id: 'demand-drop-products',

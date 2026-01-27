@@ -4,6 +4,7 @@ import React from "react";
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
+import { useI18n } from '@/i18n/I18nProvider';
 import {
   BarChart3,
   TrendingUp,
@@ -22,7 +23,7 @@ import {
 import { useState } from 'react';
 
 interface NavItem {
-  label: string;
+  labelKey: string; // i18n key
   path?: string; // relative path without storeId prefix
   icon: React.ReactNode;
   children?: NavItem[];
@@ -30,120 +31,93 @@ interface NavItem {
 }
 
 interface NavSection {
-  title: string;
-  description?: string;
+  titleKey: string; // i18n key
+  descriptionKey?: string; // i18n key
   items: NavItem[];
 }
 
-// Management section - 計画・マスター・分析
-const managementSection: NavSection = {
-  title: 'Management',
-  description: '計画・マスター・分析',
-  items: [
-    {
-      label: '売上管理',
-      icon: <TrendingUp className="h-4 w-4" />,
-      children: [
-        {
-          label: '売上予測入力',
-          path: '/food-service/stores/sales-forecast',
-          icon: <BarChart3 className="h-4 w-4" />,
-        },
-      ],
-    },
-    {
-      label: '分析・レポート',
-      icon: <BarChart3 className="h-4 w-4" />,
-      children: [
-        {
-          label: '日別売上分析',
-          path: '/food-service/stores/analytics/daily-sales',
-          icon: <TrendingUp className="h-4 w-4" />,
-        },
-      ],
-    },
-    {
-      label: 'メニュー',
-      icon: <UtensilsCrossed className="h-4 w-4" />,
-      children: [
-        {
-          label: 'メニュー管理',
-          path: '/menu',
-          icon: <UtensilsCrossed className="h-4 w-4" />,
-        },
-      ],
-    },
-    {
-      label: '仕込み',
-      icon: <ChefHat className="h-4 w-4" />,
-      children: [
-        {
-          label: '仕込み管理',
-          path: '/prep',
-          icon: <ChefHat className="h-4 w-4" />,
-        },
-      ],
-    },
-  ],
-};
+/**
+ * Navigation Structure (KOS / Ops OS / Incidents)
+ * 
+ * KOS (Manager): Cockpit, Weekly Review, Team Performance, Awards
+ * Ops OS (Floor): Today Quests, Time Clock, My Score
+ * Incidents: Incident Center (rare events)
+ */
 
-// OS section - 運用・意思決定
-const osSection: NavSection = {
-  title: 'All OS',
-  description: '運用・意思決定',
+// KOS section - 店長・経営向け
+const kosSection: NavSection = {
+  titleKey: 'nav.kos',
+  descriptionKey: 'nav.kosDesc',
   items: [
     {
-      label: '運用コックピット',
+      labelKey: 'nav.cockpit',
       path: '/os/cockpit',
       icon: <Gauge className="h-5 w-5" />,
     },
     {
-      label: '案件センター',
-      path: '/os/incidents',
-      icon: <FileWarning className="h-5 w-5" />,
+      labelKey: 'nav.weeklyReview',
+      path: '/os/weekly-review',
+      icon: <BarChart3 className="h-5 w-5" />,
     },
     {
-      label: '例外センター',
-      path: '/os/exceptions',
-      icon: <AlertTriangle className="h-5 w-5" />,
+      labelKey: 'nav.teamPerformance',
+      path: '/os/team-performance',
+      icon: <TrendingUp className="h-5 w-5" />,
     },
     {
-      label: '週次労務レビュー',
-      path: '/os/labor-weekly',
-      icon: <Clock className="h-5 w-5" />,
+      labelKey: 'nav.awards',
+      path: '/os/awards',
+      icon: <CheckSquare className="h-5 w-5" />,
     },
   ],
 };
 
-// Floor section - 現場実行
-const floorSection: NavSection = {
-  title: 'Floor',
-  description: '現場実行',
+// Ops OS section - 現場向け
+const opsOsSection: NavSection = {
+  titleKey: 'nav.opsOs',
+  descriptionKey: 'nav.opsOsDesc',
   items: [
     {
-      label: '現場ToDo',
+      labelKey: 'nav.todayQuests',
       path: '/floor/todo',
       icon: <CheckSquare className="h-5 w-5" />,
     },
     {
-      label: '勤怠',
+      labelKey: 'nav.timeClock',
       path: '/floor/timeclock',
       icon: <Clock className="h-5 w-5" />,
+    },
+    {
+      labelKey: 'nav.myScore',
+      path: '/floor/my-score',
+      icon: <TrendingUp className="h-5 w-5" />,
     },
   ],
 };
 
-const navSections: NavSection[] = [osSection, floorSection, managementSection];
+// Incidents section - レアイベント
+const incidentsSection: NavSection = {
+  titleKey: 'nav.incidents',
+  descriptionKey: 'nav.incidentsDesc',
+  items: [
+    {
+      labelKey: 'nav.incidentCenter',
+      path: '/os/incidents',
+      icon: <FileWarning className="h-5 w-5" />,
+    },
+  ],
+};
 
-const navItems = navSections.flatMap((section) => section.items);
+const navSections: NavSection[] = [kosSection, opsOsSection, incidentsSection];
 
 interface NavGroupProps {
   item: NavItem;
   pathname: string;
   storeId: string;
+  t: (key: string) => string;
 }
 
-function NavGroup({ item, pathname, storeId }: NavGroupProps) {
+function NavGroup({ item, pathname, storeId, t }: NavGroupProps) {
   const buildHref = (path: string | undefined) => {
     if (!path || path === '#') return '#';
     return `/stores/${storeId}${path}`;
@@ -171,7 +145,7 @@ function NavGroup({ item, pathname, storeId }: NavGroupProps) {
         )}
       >
         {item.icon}
-        {item.label}
+        {t(item.labelKey)}
       </Link>
     );
   }
@@ -189,7 +163,7 @@ function NavGroup({ item, pathname, storeId }: NavGroupProps) {
       >
         <span className="flex items-center gap-3">
           {item.icon}
-          {item.label}
+          {t(item.labelKey)}
         </span>
         {isOpen ? (
           <ChevronDown className="h-5 w-5" />
@@ -213,29 +187,11 @@ function NavGroup({ item, pathname, storeId }: NavGroupProps) {
                 )}
               >
                 {child.icon}
-                {child.label}
+                {t(child.labelKey)}
               </Link>
             );
           })}
         </div>
-      )}
-    </div>
-  );
-}
-
-interface SectionHeaderProps {
-  title: string;
-  description?: string;
-}
-
-function SectionHeader({ title, description }: SectionHeaderProps) {
-  return (
-    <div className="px-4 py-3">
-      <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-        {title}
-      </h3>
-      {description && (
-        <p className="text-sm text-muted-foreground/70">{description}</p>
       )}
     </div>
   );
@@ -247,15 +203,23 @@ interface SidebarNavProps {
 
 export function SidebarNav({ storeId }: SidebarNavProps) {
   const pathname = usePathname();
+  const { t } = useI18n();
 
   return (
     <nav className="flex flex-col gap-1 p-2">
       {navSections.map((section, sectionIndex) => (
-        <div key={section.title} className={cn(sectionIndex > 0 && 'mt-4 pt-4 border-t border-border')}>
-          <SectionHeader title={section.title} description={section.description} />
+        <div key={section.titleKey} className={cn(sectionIndex > 0 && 'mt-4 pt-4 border-t border-border')}>
+          <div className="px-4 py-3">
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+              {t(section.titleKey)}
+            </h3>
+            {section.descriptionKey && (
+              <p className="text-sm text-muted-foreground/70">{t(section.descriptionKey)}</p>
+            )}
+          </div>
           <div className="space-y-1">
             {section.items.map((item) => (
-              <NavGroup key={item.label} item={item} pathname={pathname} storeId={storeId} />
+              <NavGroup key={item.labelKey} item={item} pathname={pathname} storeId={storeId} t={t} />
             ))}
           </div>
         </div>

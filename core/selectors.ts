@@ -4,28 +4,28 @@
 // UI components should ONLY use selectors, never derive directly
 // ============================================================
 
-import { AppState, TimeBand, DailySalesMetrics, CockpitMetrics, ExceptionItem, DecisionEvent, ShiftSummary, SupplyDemandMetrics, WeeklyLaborMetrics, Incident, IncidentSeverity, IncidentStatus } from './types';
+import { AppState, TimeBand, DailySalesMetrics, CockpitMetrics, ExceptionItem, DecisionEvent, ShiftSummary, SupplyDemandMetrics, Incident, IncidentSeverity, IncidentStatus, ForecastCell, StaffState, CalendarCell, TodoStats, WeeklyLaborMetrics, DailyScore, TeamDailyScore } from './types';
 import {
-  deriveForecastTable,
-  deriveForecastForDate,
   deriveDailySalesMetrics,
   deriveLaborMetrics,
   derivePrepMetrics,
   deriveCockpitMetrics,
   deriveExceptions,
-  deriveActiveTodos,
-  deriveCompletedTodos,
-  deriveStaffStates,
-  deriveCalendarData,
-  deriveTodoStats,
-  deriveEnhancedCockpitMetrics,
+  deriveLaneEvents,
   deriveShiftSummary,
   deriveSupplyDemandMetrics,
+  deriveTodoStats,
+  deriveEnhancedCockpitMetrics,
   deriveWeeklyLaborMetrics,
-  ForecastCell,
-  StaffState,
-  CalendarCell,
-  TodoStats,
+  deriveLaborGuardrailSummary,
+  deriveCalendarData,
+  deriveStaffStates,
+  deriveDailyScore,
+  deriveTeamDailyScore,
+  deriveForecastTable,
+  deriveForecastForDate,
+  deriveActiveTodos,
+  deriveCompletedTodos,
 } from './derive';
 import type { EnhancedCockpitMetrics } from './types';
 
@@ -582,4 +582,54 @@ export const selectWeeklyLaborMetrics = (
   }
   
   return deriveWeeklyLaborMetrics(state.events, storeId, targetWeekStart, state.staff);
+};
+
+// ------------------------------------------------------------
+// Daily Score Selectors
+// ------------------------------------------------------------
+
+export const selectDailyScore = (
+  state: AppState,
+  staffId?: string,
+  date?: string
+): DailyScore => {
+  const storeId = state.selectedStoreId;
+  const targetDate = date ?? new Date().toISOString().split('T')[0];
+  
+  if (!storeId) {
+    return {
+      total: 0,
+      breakdown: { taskCompletion: 0, timeVariance: 0, breakCompliance: 0, zeroOvertime: 0 },
+      grade: 'D',
+      feedback: 'データがありません',
+      bottlenecks: [],
+      improvements: [],
+    };
+  }
+  
+  return deriveDailyScore(state.events, state.staff, storeId, targetDate, staffId);
+};
+
+export const selectTeamDailyScore = (
+  state: AppState,
+  date?: string
+): TeamDailyScore => {
+  const storeId = state.selectedStoreId;
+  const targetDate = date ?? new Date().toISOString().split('T')[0];
+  
+  if (!storeId) {
+    return {
+      total: 0,
+      breakdown: { taskCompletion: 0, timeVariance: 0, breakCompliance: 0, zeroOvertime: 0 },
+      grade: 'D',
+      feedback: 'データがありません',
+      bottlenecks: [],
+      improvements: [],
+      staffScores: [],
+      topPerformers: [],
+      needsSupport: [],
+    };
+  }
+  
+  return deriveTeamDailyScore(state.events, state.staff, storeId, targetDate);
 };

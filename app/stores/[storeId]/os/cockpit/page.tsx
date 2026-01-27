@@ -27,6 +27,8 @@ import {
   selectLaneEvents,
   selectShiftSummary,
   selectSupplyDemandMetrics,
+  selectTodoStats,
+  selectTeamDailyScore,
 } from '@/core/selectors';
 import { deriveLaborGuardrailSummary } from '@/core/derive';
 import { TodayBriefingModal, type OperationMode } from '@/components/cockpit/TodayBriefingModal';
@@ -46,6 +48,8 @@ import {
   SkipForward,
   RotateCcw,
   Target,
+  CheckSquare,
+  Trophy,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -136,82 +140,191 @@ function ReplayControls() {
   );
 }
 
-// Shift Summary Component (Read-only, dynamically calculated)
+// Shift Summary + Quest Progress Component
 function DynamicShiftSummary() {
   const { state } = useStore();
   const summary = selectShiftSummary(state);
+  const todoStats = selectTodoStats(state);
+  
+  // Calculate quest completion rate
+  const questTotal = todoStats.total;
+  const questDone = todoStats.completed;
+  const questInProgress = todoStats.inProgress;
+  const questCompletionRate = questTotal > 0 ? Math.round((questDone / questTotal) * 100) : 0;
   
   return (
     <Card>
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-sm font-medium flex items-center gap-2">
+          <CardTitle className="text-sm flex items-center gap-2">
             <Clock className="h-4 w-4" />
-            本日のシフト概要
-            {summary.isCalculating && (
-              <Badge variant="outline" className="text-[10px] text-muted-foreground">計算中</Badge>
-            )}
+            Staff & Quest Status
           </CardTitle>
           <FreshnessBadge lastUpdate={summary.lastUpdate} />
         </div>
       </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="flex justify-between items-center text-sm">
-          <span className="text-muted-foreground">人時</span>
-          <span className={cn('font-medium', summary.actualHours > summary.plannedHours && 'text-red-600')}>
-            {summary.actualHours.toFixed(1)}h / {summary.plannedHours}h
-          </span>
-        </div>
-        <div className="flex justify-between items-center text-sm">
-          <span className="text-muted-foreground">スキルミックス</span>
-          <div className="flex gap-2">
-            {summary.skillMix.star3 > 0 && (
-              <Badge variant="outline" className="text-xs gap-1">
-                <Star className="h-2.5 w-2.5 fill-yellow-400 text-yellow-400" />
-                <Star className="h-2.5 w-2.5 fill-yellow-400 text-yellow-400" />
-                <Star className="h-2.5 w-2.5 fill-yellow-400 text-yellow-400" />
-                {summary.skillMix.star3}
-              </Badge>
-            )}
-            {summary.skillMix.star2 > 0 && (
-              <Badge variant="outline" className="text-xs gap-1">
-                <Star className="h-2.5 w-2.5 fill-yellow-400 text-yellow-400" />
-                <Star className="h-2.5 w-2.5 fill-yellow-400 text-yellow-400" />
-                {summary.skillMix.star2}
-              </Badge>
-            )}
-            {summary.skillMix.star1 > 0 && (
-              <Badge variant="outline" className="text-xs gap-1">
-                <Star className="h-2.5 w-2.5 fill-yellow-400 text-yellow-400" />
-                {summary.skillMix.star1}
-              </Badge>
-            )}
-            {summary.skillMix.star3 === 0 && summary.skillMix.star2 === 0 && summary.skillMix.star1 === 0 && (
-              <span className="text-xs text-muted-foreground">--</span>
-            )}
+      <CardContent className="space-y-4">
+        {/* Staff Summary */}
+        <div className="space-y-2">
+          <div className="text-xs font-bold text-muted-foreground">STAFF</div>
+          <div className="flex justify-between items-center text-sm">
+            <span className="text-muted-foreground flex items-center gap-1">
+              <Users className="h-3 w-3" />
+              On Duty
+            </span>
+            <span className="font-bold">{summary.activeStaffCount}</span>
+          </div>
+          <div className="flex justify-between items-center text-sm">
+            <span className="text-muted-foreground flex items-center gap-1">
+              <Coffee className="h-3 w-3" />
+              On Break
+            </span>
+            <span className="font-bold">{summary.onBreakCount}</span>
+          </div>
+          <div className="flex justify-between items-center text-sm">
+            <span className="text-muted-foreground">Hours</span>
+            <span className={cn('font-bold', summary.actualHours > summary.plannedHours && 'text-red-700')}>
+              {summary.actualHours.toFixed(1)}h / {summary.plannedHours}h
+            </span>
           </div>
         </div>
-        <div className="flex justify-between items-center text-sm">
-          <span className="text-muted-foreground">役割構成</span>
-          <div className="flex gap-2">
-            {summary.roleMix.kitchen > 0 && (
-              <Badge variant="secondary" className="text-xs">厨房 {summary.roleMix.kitchen}</Badge>
-            )}
-            {summary.roleMix.floor > 0 && (
-              <Badge variant="secondary" className="text-xs">ホール {summary.roleMix.floor}</Badge>
-            )}
-            {summary.roleMix.delivery > 0 && (
-              <Badge variant="secondary" className="text-xs">配達 {summary.roleMix.delivery}</Badge>
-            )}
-            {summary.roleMix.kitchen === 0 && summary.roleMix.floor === 0 && summary.roleMix.delivery === 0 && (
-              <span className="text-xs text-muted-foreground">--</span>
-            )}
+        
+        {/* Quest Progress */}
+        <div className="space-y-2 pt-2 border-t border-border">
+          <div className="text-xs font-bold text-muted-foreground">QUESTS</div>
+          <div className="flex justify-between items-center text-sm">
+            <span className="text-muted-foreground flex items-center gap-1">
+              <CheckSquare className="h-3 w-3" />
+              Completion
+            </span>
+            <span className={cn(
+              'font-bold',
+              questCompletionRate >= 80 ? 'text-emerald-700' : 
+              questCompletionRate >= 50 ? 'text-amber-700' : 'text-red-700'
+            )}>
+              {questCompletionRate}%
+            </span>
+          </div>
+          <div className="flex justify-between items-center text-sm">
+            <span className="text-muted-foreground">In Progress</span>
+            <span className="font-bold">{questInProgress}</span>
+          </div>
+          <div className="flex justify-between items-center text-sm">
+            <span className="text-muted-foreground">Done / Total</span>
+            <span className="font-bold">{questDone} / {questTotal}</span>
+          </div>
+          {/* Progress bar */}
+          <div className="h-2 bg-muted rounded-full overflow-hidden">
+            <div 
+              className={cn(
+                'h-full transition-all',
+                questCompletionRate >= 80 ? 'bg-emerald-500' : 
+                questCompletionRate >= 50 ? 'bg-amber-500' : 'bg-red-500'
+              )}
+              style={{ width: `${questCompletionRate}%` }}
+            />
           </div>
         </div>
-        {summary.onBreakCount > 0 && (
-          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-            <Coffee className="h-3 w-3" />
-            <span>休憩中 {summary.onBreakCount}名</span>
+      </CardContent>
+    </Card>
+  );
+}
+
+// Team Daily Score Component
+function TeamScoreCard() {
+  const { state } = useStore();
+  const teamScore = selectTeamDailyScore(state);
+  
+  const gradeColors = {
+    S: 'bg-amber-100 text-amber-800',
+    A: 'bg-emerald-100 text-emerald-800',
+    B: 'bg-blue-100 text-blue-800',
+    C: 'bg-gray-100 text-gray-800',
+    D: 'bg-red-100 text-red-800',
+  };
+  
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <Trophy className="h-4 w-4" />
+            Team Score
+          </CardTitle>
+          <div className={cn(
+            'px-2 py-0.5 rounded text-sm font-bold',
+            gradeColors[teamScore.grade]
+          )}>
+            {teamScore.grade}
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Main Score */}
+        <div className="flex items-center justify-between">
+          <span className="text-3xl font-bold tabular-nums">{teamScore.total}</span>
+          <span className="text-sm text-muted-foreground">/ 100 pts</span>
+        </div>
+        
+        {/* Score Breakdown Mini */}
+        <div className="grid grid-cols-4 gap-2 text-center text-xs">
+          <div>
+            <div className="font-bold">{teamScore.breakdown.taskCompletion}</div>
+            <div className="text-muted-foreground">Task</div>
+          </div>
+          <div>
+            <div className="font-bold">{teamScore.breakdown.timeVariance}</div>
+            <div className="text-muted-foreground">Time</div>
+          </div>
+          <div>
+            <div className="font-bold">{teamScore.breakdown.breakCompliance}</div>
+            <div className="text-muted-foreground">Break</div>
+          </div>
+          <div>
+            <div className="font-bold">{teamScore.breakdown.zeroOvertime}</div>
+            <div className="text-muted-foreground">OT</div>
+          </div>
+        </div>
+        
+        {/* Bottlenecks */}
+        {teamScore.bottlenecks.length > 0 && (
+          <div className="space-y-1 pt-2 border-t border-border">
+            <div className="text-xs font-bold text-muted-foreground">BOTTLENECKS</div>
+            {teamScore.bottlenecks.slice(0, 2).map((b, i) => (
+              <div key={i} className="text-sm text-amber-700 flex items-center gap-1">
+                <AlertTriangle className="h-3 w-3 shrink-0" />
+                {b}
+              </div>
+            ))}
+          </div>
+        )}
+        
+        {/* Top Performers */}
+        {teamScore.topPerformers.length > 0 && (
+          <div className="space-y-1 pt-2 border-t border-border">
+            <div className="text-xs font-bold text-muted-foreground">TOP PERFORMERS</div>
+            {teamScore.topPerformers.slice(0, 2).map((p) => (
+              <div key={p.staffId} className="text-sm flex items-center justify-between">
+                <span className="flex items-center gap-1">
+                  <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                  {p.staffName}
+                </span>
+                <span className="font-bold">{p.score}pts</span>
+              </div>
+            ))}
+          </div>
+        )}
+        
+        {/* Needs Support */}
+        {teamScore.needsSupport.length > 0 && (
+          <div className="space-y-1 pt-2 border-t border-border">
+            <div className="text-xs font-bold text-muted-foreground">NEEDS SUPPORT</div>
+            {teamScore.needsSupport.slice(0, 2).map((s) => (
+              <div key={s.staffId} className="text-sm">
+                <span className="text-red-700">{s.staffName}</span>
+                <span className="text-muted-foreground"> - {s.issue}</span>
+              </div>
+            ))}
           </div>
         )}
       </CardContent>
@@ -486,6 +599,7 @@ export default function CockpitPage() {
   const laneEvents = selectLaneEvents(state, 5, timeBand);
   const shiftSummary = selectShiftSummary(state);
   const supplyDemandMetrics = selectSupplyDemandMetrics(state, undefined, timeBand);
+  const todoStats = selectTodoStats(state);
 
   // Calculate enhanced metrics - use bus update time for freshness
   const now = new Date();
@@ -823,9 +937,10 @@ export default function CockpitPage() {
         </MetricCard>
       </div>
 
-      {/* Shift Summary (Dynamic) + Lane Timeline */}
-      <div className="grid gap-6 lg:grid-cols-4">
+      {/* Staff Status + Team Score + Lane Timeline */}
+      <div className="grid gap-4 lg:grid-cols-5">
         <DynamicShiftSummary />
+        <TeamScoreCard />
         <div className="lg:col-span-3">
           <LaneTimeline laneEvents={laneEvents} maxPerLane={5} />
         </div>
