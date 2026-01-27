@@ -55,7 +55,7 @@ const kosSection: NavSection = {
     },
     {
       label: 'Weekly Review',
-      path: '/os/labor-weekly',
+      path: '/os/weekly-review',
       icon: <BarChart3 className="h-5 w-5" />,
     },
     {
