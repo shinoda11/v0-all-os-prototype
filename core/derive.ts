@@ -891,6 +891,7 @@ import type { ShiftSummary, SupplyDemandMetrics, RiskItem, Staff, Role, TodoEven
 // ------------------------------------------------------------
 // Daily Score Derivation
 // Score 0-100 based on: Task completion, Time variance, Break compliance, Zero overtime
+// All calculations are based on actual events (quest + attendance)
 // ------------------------------------------------------------
 
 export interface DailyScoreBreakdown {
@@ -900,6 +901,25 @@ export interface DailyScoreBreakdown {
   zeroOvertime: number;        // 0-20 points (20% weight)
 }
 
+// Deduction reason with link to source event
+export type DeductionCategory = 'task' | 'time' | 'break' | 'overtime';
+
+export interface ScoreDeduction {
+  id: string;
+  category: DeductionCategory;
+  points: number;              // Points deducted (positive number)
+  reason: string;              // Human-readable reason
+  eventId: string;             // Source event ID for navigation
+  eventType: 'quest' | 'attendance'; // Type of source event
+  timestamp: string;           // When the deduction occurred
+  details?: {
+    expected?: number | string;
+    actual?: number | string;
+    questTitle?: string;
+    staffName?: string;
+  };
+}
+
 export interface DailyScore {
   total: number;               // 0-100
   breakdown: DailyScoreBreakdown;
@@ -907,6 +927,19 @@ export interface DailyScore {
   feedback: string;
   bottlenecks: string[];
   improvements: string[];
+  // New: Event-based deduction tracking
+  deductions: ScoreDeduction[];
+  // Summary stats for transparency
+  stats: {
+    totalQuests: number;
+    completedQuests: number;
+    onTimeQuests: number;
+    breaksTaken: number;
+    breaksExpected: number;
+    plannedHours: number;
+    actualHours: number;
+    overtimeMinutes: number;
+  };
 }
 
 export interface StaffDailyScore extends DailyScore {
@@ -943,68 +976,232 @@ export const deriveDailyScore = (
   date: string,
   staffId?: string
 ): DailyScore => {
-  const laborEvents = filterByType(events, 'labor') as LaborEvent[];
-  const todoEvents = events.filter(e => 
-    e.type === 'todo' && 
-    e.storeId === storeId && 
-    e.timestamp.startsWith(date)
-  ) as TodoEvent[];
+  const deductions: ScoreDeduction[] = [];
   
-  // Filter by staff if specified
+  // Get labor events for attendance tracking
+  const laborEvents = filterByType(events, 'labor') as LaborEvent[];
   const filteredLabor = laborEvents.filter(e => 
     e.storeId === storeId && 
     e.timestamp.startsWith(date) &&
     (!staffId || e.staffId === staffId)
   );
   
-  const filteredTodo = todoEvents.filter(e => 
-    !staffId || e.assignedStaffId === staffId
+  // Get quest events (decision events with started/completed actions)
+  const decisionEvents = filterByType(events, 'decision') as DecisionEvent[];
+  const questEvents = decisionEvents.filter(e =>
+    e.storeId === storeId &&
+    e.timestamp.startsWith(date)
   );
   
+  // Build quest state map (latest status per proposal)
+  const questStates = new Map<string, DecisionEvent>();
+  for (const event of questEvents.sort((a, b) => 
+    new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+  )) {
+    questStates.set(event.proposalId, event);
+  }
+  
+  // Filter quests for this staff if specified
+  const relevantQuests = Array.from(questStates.values()).filter(q => {
+    if (!staffId) return true;
+    // Check if quest was assigned to this staff's role
+    const staffMember = staff.find(s => s.id === staffId);
+    if (!staffMember) return false;
+    return q.distributedToRoles.includes(staffMember.roleId);
+  });
+  
+  // ============================================================
   // 1. Task Completion (40 points max)
-  const totalTasks = filteredTodo.length || 5; // Default mock
-  const completedTasks = filteredTodo.filter(e => e.status === 'done').length || 3;
-  const taskCompletionRate = totalTasks > 0 ? completedTasks / totalTasks : 0;
-  const taskCompletion = Math.round(taskCompletionRate * 40);
+  // Based on: quest_start → quest_complete ratio and difficulty
+  // ============================================================
+  const totalQuests = relevantQuests.length;
+  const completedQuests = relevantQuests.filter(q => q.action === 'completed').length;
+  const startedButNotCompleted = relevantQuests.filter(q => 
+    q.action === 'started' || q.action === 'paused'
+  );
   
-  // 2. Time Variance (25 points max) - How close to estimated time
-  // Mock: assume 80% on-time for demo
-  const onTimeRate = 0.8;
-  const timeVariance = Math.round(onTimeRate * 25);
+  // Calculate task completion score
+  let taskCompletion = 40; // Start with full points
   
+  if (totalQuests > 0) {
+    const completionRate = completedQuests / totalQuests;
+    taskCompletion = Math.round(completionRate * 40);
+    
+    // Add deductions for incomplete quests
+    for (const quest of startedButNotCompleted) {
+      const pointsDeducted = Math.round(40 / totalQuests);
+      deductions.push({
+        id: `task-incomplete-${quest.proposalId}`,
+        category: 'task',
+        points: pointsDeducted,
+        reason: `未完了: ${quest.title}`,
+        eventId: quest.id,
+        eventType: 'quest',
+        timestamp: quest.timestamp,
+        details: {
+          questTitle: quest.title,
+        },
+      });
+    }
+    
+    // Add deductions for quests not even started
+    const notStarted = relevantQuests.filter(q => 
+      q.action === 'approved' || q.action === 'pending'
+    );
+    for (const quest of notStarted) {
+      const pointsDeducted = Math.round(40 / totalQuests);
+      deductions.push({
+        id: `task-notstarted-${quest.proposalId}`,
+        category: 'task',
+        points: pointsDeducted,
+        reason: `未着手: ${quest.title}`,
+        eventId: quest.id,
+        eventType: 'quest',
+        timestamp: quest.timestamp,
+        details: {
+          questTitle: quest.title,
+        },
+      });
+    }
+  }
+  
+  // ============================================================
+  // 2. Time Variance (25 points max)
+  // Based on: actual vs estimated time for completed quests
+  // ============================================================
+  let timeVariance = 25; // Start with full points
+  let onTimeQuests = 0;
+  
+  const completedQuestEvents = relevantQuests.filter(q => q.action === 'completed');
+  
+  if (completedQuestEvents.length > 0) {
+    for (const quest of completedQuestEvents) {
+      const estimatedMinutes = quest.estimatedMinutes ?? 30;
+      const actualMinutes = quest.actualMinutes ?? estimatedMinutes;
+      
+      // Quest is "on-time" if actual <= estimated * 1.2 (20% buffer)
+      if (actualMinutes <= estimatedMinutes * 1.2) {
+        onTimeQuests++;
+      } else {
+        // Deduct points for overtime
+        const overagePercent = (actualMinutes - estimatedMinutes) / estimatedMinutes;
+        const pointsDeducted = Math.min(5, Math.round(overagePercent * 10));
+        timeVariance -= pointsDeducted;
+        
+        deductions.push({
+          id: `time-overage-${quest.proposalId}`,
+          category: 'time',
+          points: pointsDeducted,
+          reason: `時間超過: ${quest.title}`,
+          eventId: quest.id,
+          eventType: 'quest',
+          timestamp: quest.timestamp,
+          details: {
+            expected: `${estimatedMinutes}分`,
+            actual: `${actualMinutes}分`,
+            questTitle: quest.title,
+          },
+        });
+      }
+    }
+    timeVariance = Math.max(0, timeVariance);
+  }
+  
+  // ============================================================
   // 3. Break Compliance (15 points max)
-  // Check if breaks were taken properly
-  const breakStarts = filteredLabor.filter(e => e.action === 'break-start').length;
-  const breakEnds = filteredLabor.filter(e => e.action === 'break-end').length;
-  const breaksTaken = Math.min(breakStarts, breakEnds);
-  const expectedBreaks = 1; // 1 break per shift expected
-  const breakComplianceRate = breaksTaken >= expectedBreaks ? 1 : breaksTaken / expectedBreaks;
-  const breakCompliance = Math.round(breakComplianceRate * 15);
+  // Based on: break-start/break-end events matching expected pattern
+  // ============================================================
+  const breakStarts = filteredLabor.filter(e => e.action === 'break-start');
+  const breakEnds = filteredLabor.filter(e => e.action === 'break-end');
+  const breaksTaken = Math.min(breakStarts.length, breakEnds.length);
   
-  // 4. Zero Overtime (20 points max)
-  // Mock: check if total hours <= planned hours
+  // Calculate expected breaks based on work hours
   const checkIns = filteredLabor.filter(e => e.action === 'check-in');
   const checkOuts = filteredLabor.filter(e => e.action === 'check-out');
-  const plannedHours = 8;
+  
   let actualHours = 0;
+  const sessions: Array<{ checkIn: LaborEvent; checkOut?: LaborEvent; hours: number }> = [];
   
   for (const checkIn of checkIns) {
     const checkOut = checkOuts.find(co => 
       co.staffId === checkIn.staffId && 
       new Date(co.timestamp) > new Date(checkIn.timestamp)
     );
+    
+    let hours = 0;
     if (checkOut) {
-      const duration = (new Date(checkOut.timestamp).getTime() - new Date(checkIn.timestamp).getTime()) / (1000 * 60 * 60);
-      actualHours += duration;
+      hours = (new Date(checkOut.timestamp).getTime() - new Date(checkIn.timestamp).getTime()) / (1000 * 60 * 60);
+    } else {
+      // Still working - calculate from check-in to now
+      const now = new Date();
+      if (new Date(checkIn.timestamp) <= now) {
+        hours = (now.getTime() - new Date(checkIn.timestamp).getTime()) / (1000 * 60 * 60);
+      }
+    }
+    
+    actualHours += hours;
+    sessions.push({ checkIn, checkOut, hours });
+  }
+  
+  // Expected breaks: 1 per 6 hours of work
+  const expectedBreaks = Math.max(1, Math.floor(actualHours / 6));
+  const breakComplianceRate = breaksTaken >= expectedBreaks ? 1 : breaksTaken / expectedBreaks;
+  let breakCompliance = Math.round(breakComplianceRate * 15);
+  
+  if (breaksTaken < expectedBreaks && actualHours > 0) {
+    const missedBreaks = expectedBreaks - breaksTaken;
+    const pointsPerMissedBreak = Math.round(15 / expectedBreaks);
+    
+    deductions.push({
+      id: `break-missed-${date}`,
+      category: 'break',
+      points: missedBreaks * pointsPerMissedBreak,
+      reason: `休憩未取得: ${missedBreaks}回`,
+      eventId: checkIns[0]?.id ?? `labor-${date}`,
+      eventType: 'attendance',
+      timestamp: checkIns[0]?.timestamp ?? date,
+      details: {
+        expected: `${expectedBreaks}回`,
+        actual: `${breaksTaken}回`,
+      },
+    });
+  }
+  
+  // ============================================================
+  // 4. Zero Overtime (20 points max)
+  // Based on: check-in/check-out vs planned hours
+  // ============================================================
+  const plannedHours = 8; // Default planned hours per day
+  const overtimeMinutes = Math.max(0, Math.round((actualHours - plannedHours) * 60));
+  
+  let zeroOvertime = 20;
+  if (overtimeMinutes > 0) {
+    // Deduct 2 points per 30 minutes of overtime
+    const pointsDeducted = Math.min(20, Math.round(overtimeMinutes / 30) * 2);
+    zeroOvertime = Math.max(0, 20 - pointsDeducted);
+    
+    // Find the checkout event that caused overtime
+    const lastSession = sessions[sessions.length - 1];
+    if (lastSession && lastSession.hours > plannedHours) {
+      deductions.push({
+        id: `overtime-${date}`,
+        category: 'overtime',
+        points: pointsDeducted,
+        reason: `残業: ${overtimeMinutes}分`,
+        eventId: lastSession.checkOut?.id ?? lastSession.checkIn.id,
+        eventType: 'attendance',
+        timestamp: lastSession.checkOut?.timestamp ?? lastSession.checkIn.timestamp,
+        details: {
+          expected: `${plannedHours}時間`,
+          actual: `${actualHours.toFixed(1)}時間`,
+        },
+      });
     }
   }
   
-  // If no data, use mock values
-  if (actualHours === 0) actualHours = 7.5;
-  
-  const overtimeHours = Math.max(0, actualHours - plannedHours);
-  const zeroOvertime = overtimeHours === 0 ? 20 : Math.max(0, 20 - Math.round(overtimeHours * 10));
-  
+  // ============================================================
+  // Calculate final score and summary
+  // ============================================================
   const breakdown: DailyScoreBreakdown = {
     taskCompletion,
     timeVariance,
@@ -1014,7 +1211,10 @@ export const deriveDailyScore = (
   
   const total = taskCompletion + timeVariance + breakCompliance + zeroOvertime;
   
-  // Determine bottlenecks
+  // Sort deductions by points (highest first)
+  deductions.sort((a, b) => b.points - a.points);
+  
+  // Determine bottlenecks based on actual deductions
   const bottlenecks: string[] = [];
   if (taskCompletion < 32) bottlenecks.push('タスク完了率が低い');
   if (timeVariance < 20) bottlenecks.push('作業時間の遅延が多い');
@@ -1035,6 +1235,17 @@ export const deriveDailyScore = (
     feedback: getFeedback(total, breakdown),
     bottlenecks,
     improvements,
+    deductions,
+    stats: {
+      totalQuests,
+      completedQuests,
+      onTimeQuests,
+      breaksTaken,
+      breaksExpected: expectedBreaks,
+      plannedHours,
+      actualHours: Math.round(actualHours * 10) / 10,
+      overtimeMinutes,
+    },
   };
 };
 
@@ -1108,6 +1319,28 @@ export const deriveTeamDailyScore = (
   const improvementSet = new Set(allImprovements);
   const teamImprovements = [...improvementSet].slice(0, 3);
   
+  // Aggregate team deductions (top deductions across all staff)
+  const allDeductions = staffScores.flatMap(s => 
+    s.deductions.map(d => ({
+      ...d,
+      details: { ...d.details, staffName: s.staffName },
+    }))
+  );
+  allDeductions.sort((a, b) => b.points - a.points);
+  const teamDeductions = allDeductions.slice(0, 5); // Top 5 team deductions
+  
+  // Aggregate team stats
+  const teamStats = {
+    totalQuests: staffScores.reduce((sum, s) => sum + s.stats.totalQuests, 0),
+    completedQuests: staffScores.reduce((sum, s) => sum + s.stats.completedQuests, 0),
+    onTimeQuests: staffScores.reduce((sum, s) => sum + s.stats.onTimeQuests, 0),
+    breaksTaken: staffScores.reduce((sum, s) => sum + s.stats.breaksTaken, 0),
+    breaksExpected: staffScores.reduce((sum, s) => sum + s.stats.breaksExpected, 0),
+    plannedHours: staffScores.reduce((sum, s) => sum + s.stats.plannedHours, 0),
+    actualHours: Math.round(staffScores.reduce((sum, s) => sum + s.stats.actualHours, 0) * 10) / 10,
+    overtimeMinutes: staffScores.reduce((sum, s) => sum + s.stats.overtimeMinutes, 0),
+  };
+  
   return {
     total: avgTotal,
     breakdown: avgBreakdown,
@@ -1115,6 +1348,8 @@ export const deriveTeamDailyScore = (
     feedback: getFeedback(avgTotal, avgBreakdown),
     bottlenecks: teamBottlenecks,
     improvements: teamImprovements,
+    deductions: teamDeductions,
+    stats: teamStats,
     staffScores,
     topPerformers,
     needsSupport,

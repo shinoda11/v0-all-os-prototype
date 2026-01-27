@@ -4,7 +4,7 @@
 // UI components should ONLY use selectors, never derive directly
 // ============================================================
 
-import { AppState, TimeBand, DailySalesMetrics, CockpitMetrics, ExceptionItem, DecisionEvent, ShiftSummary, SupplyDemandMetrics, Incident, IncidentSeverity, IncidentStatus, ForecastCell, StaffState, CalendarCell, TodoStats, WeeklyLaborMetrics, DailyScore, TeamDailyScore } from './types';
+import { AppState, TimeBand, DailySalesMetrics, CockpitMetrics, ExceptionItem, DecisionEvent, ShiftSummary, SupplyDemandMetrics, Incident, IncidentSeverity, IncidentStatus, ForecastCell, StaffState, CalendarCell, TodoStats, WeeklyLaborMetrics } from './types';
 import {
   deriveDailySalesMetrics,
   deriveLaborMetrics,
@@ -26,6 +26,13 @@ import {
   deriveForecastForDate,
   deriveActiveTodos,
   deriveCompletedTodos,
+  // Types from derive
+  type DailyScore,
+  type TeamDailyScore,
+  type StaffDailyScore,
+  type DailyScoreBreakdown,
+  type ScoreDeduction,
+  type DeductionCategory,
 } from './derive';
 import type { EnhancedCockpitMetrics } from './types';
 
@@ -613,6 +620,17 @@ export const selectDailyScore = (
       feedback: 'データがありません',
       bottlenecks: [],
       improvements: [],
+      deductions: [],
+      stats: {
+        totalQuests: 0,
+        completedQuests: 0,
+        onTimeQuests: 0,
+        breaksTaken: 0,
+        breaksExpected: 0,
+        plannedHours: 0,
+        actualHours: 0,
+        overtimeMinutes: 0,
+      },
     };
   }
   
@@ -634,6 +652,17 @@ export const selectTeamDailyScore = (
       feedback: 'データがありません',
       bottlenecks: [],
       improvements: [],
+      deductions: [],
+      stats: {
+        totalQuests: 0,
+        completedQuests: 0,
+        onTimeQuests: 0,
+        breaksTaken: 0,
+        breaksExpected: 0,
+        plannedHours: 0,
+        actualHours: 0,
+        overtimeMinutes: 0,
+      },
       staffScores: [],
       topPerformers: [],
       needsSupport: [],
@@ -642,3 +671,6 @@ export const selectTeamDailyScore = (
   
   return deriveTeamDailyScore(state.events, state.staff, storeId, targetDate);
 };
+
+// Re-export types from derive for easier access
+export type { DailyScore, TeamDailyScore, StaffDailyScore, ScoreDeduction, DeductionCategory, DailyScoreBreakdown } from './derive';

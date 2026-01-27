@@ -34,7 +34,11 @@ import {
   CheckSquare,
   Target,
   Trophy,
+  Info,
+  Coffee,
+  Briefcase,
 } from 'lucide-react';
+import type { ScoreDeduction, DeductionCategory } from '@/core/selectors';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import type { WeeklyLaborMetrics } from '@/core/types';
@@ -179,6 +183,14 @@ const priorityBadge: Record<WeeklyProposal['priority'], string> = {
   high: 'bg-red-100 text-red-800',
   medium: 'bg-amber-100 text-amber-800',
   low: 'bg-gray-100 text-gray-800',
+};
+
+// Deduction category icons and colors
+const DEDUCTION_CATEGORY_CONFIG: Record<DeductionCategory, { icon: typeof CheckSquare; color: string; bgColor: string }> = {
+  task: { icon: CheckSquare, color: 'text-blue-700', bgColor: 'bg-blue-50' },
+  time: { icon: Clock, color: 'text-amber-700', bgColor: 'bg-amber-50' },
+  break: { icon: Coffee, color: 'text-emerald-700', bgColor: 'bg-emerald-50' },
+  overtime: { icon: Briefcase, color: 'text-red-700', bgColor: 'bg-red-50' },
 };
 
 // Week selector options
@@ -389,6 +401,107 @@ export default function WeeklyReviewPage() {
             </CardContent>
           </Card>
         </div>
+        
+        {/* Team Score Deductions Panel - Why this score? */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Info className="h-5 w-5 text-blue-500" />
+              <CardTitle>{t('teamscore.whyThisScore')}</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Team Stats Summary */}
+            <div className="grid grid-cols-5 gap-4 text-center border-b border-border pb-4">
+              <div>
+                <div className="text-xl font-bold tabular-nums">
+                  {teamScore.stats.completedQuests}/{teamScore.stats.totalQuests}
+                </div>
+                <div className="text-xs text-muted-foreground">{t('myscore.stats.quests')}</div>
+              </div>
+              <div>
+                <div className="text-xl font-bold tabular-nums">
+                  {teamScore.stats.onTimeQuests}/{teamScore.stats.completedQuests || 0}
+                </div>
+                <div className="text-xs text-muted-foreground">{t('myscore.stats.onTime')}</div>
+              </div>
+              <div>
+                <div className="text-xl font-bold tabular-nums">
+                  {teamScore.stats.breaksTaken}/{teamScore.stats.breaksExpected}
+                </div>
+                <div className="text-xs text-muted-foreground">{t('myscore.stats.breaks')}</div>
+              </div>
+              <div>
+                <div className="text-xl font-bold tabular-nums">
+                  {teamScore.stats.actualHours}h
+                </div>
+                <div className="text-xs text-muted-foreground">{t('myscore.stats.hours')}</div>
+              </div>
+              <div>
+                <div className={cn(
+                  'text-xl font-bold tabular-nums',
+                  teamScore.stats.overtimeMinutes > 0 ? 'text-red-600' : 'text-emerald-600'
+                )}>
+                  {teamScore.stats.overtimeMinutes}m
+                </div>
+                <div className="text-xs text-muted-foreground">{t('myscore.stats.overtime')}</div>
+              </div>
+            </div>
+            
+            {/* Top Team Deductions */}
+            <div className="space-y-2">
+              <h4 className="text-sm font-bold text-muted-foreground uppercase">
+                {t('teamscore.teamDeductions')}
+              </h4>
+              
+              {teamScore.deductions.length === 0 ? (
+                <div className="text-sm text-emerald-700 flex items-center gap-2 py-2">
+                  <CheckSquare className="h-4 w-4" />
+                  {t('teamscore.noDeductions')}
+                </div>
+              ) : (
+                <ul className="space-y-3">
+                  {teamScore.deductions.slice(0, 5).map((deduction) => {
+                    const config = DEDUCTION_CATEGORY_CONFIG[deduction.category];
+                    const Icon = config.icon;
+                    
+                    return (
+                      <li key={deduction.id} className={cn(
+                        'flex items-start gap-3 p-3 rounded',
+                        config.bgColor
+                      )}>
+                        <Icon className={cn('h-4 w-4 mt-0.5 shrink-0', config.color)} />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-medium">{deduction.reason}</span>
+                            <span className="text-sm font-bold text-red-600 tabular-nums shrink-0">
+                              -{deduction.points}pt
+                            </span>
+                          </div>
+                          {deduction.details && (
+                            <div className="text-sm text-muted-foreground mt-1">
+                              {deduction.details.staffName && (
+                                <span className="mr-2">
+                                  <Users className="h-3 w-3 inline mr-1" />
+                                  {deduction.details.staffName}
+                                </span>
+                              )}
+                              {deduction.details.expected && deduction.details.actual && (
+                                <span>
+                                  {deduction.details.expected} → {deduction.details.actual}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          </CardContent>
+        </Card>
         
         {/* Improvement Proposals */}
         <Card>

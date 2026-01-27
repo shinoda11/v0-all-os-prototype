@@ -591,6 +591,25 @@ export const en = {
   'myscore.improvements': 'Tomorrow Improvements',
   'myscore.noImprovements': 'None. Keep it up!',
   'myscore.goToQuests': 'Go to Today Quests',
+  // Why this score panel
+  'myscore.whyThisScore': 'Why this score?',
+  'myscore.topDeductions': 'Top Deduction Reasons',
+  'myscore.noDeductions': 'Perfect! No deductions today.',
+  'myscore.viewDetail': 'View Detail',
+  'myscore.deductionCategory.task': 'Task',
+  'myscore.deductionCategory.time': 'Time',
+  'myscore.deductionCategory.break': 'Break',
+  'myscore.deductionCategory.overtime': 'Overtime',
+  'myscore.stats.quests': 'Quests',
+  'myscore.stats.onTime': 'On Time',
+  'myscore.stats.breaks': 'Breaks',
+  'myscore.stats.hours': 'Hours',
+  'myscore.stats.overtime': 'OT',
+  // Team Score panel
+  'teamscore.whyThisScore': 'Why this team score?',
+  'teamscore.teamDeductions': 'Top Team Deductions',
+  'teamscore.noDeductions': 'Perfect week! No deductions.',
+  'teamscore.staffMember': 'Staff',
   
   // Weekly Review
   'weeklyReview.title': 'Weekly Review',

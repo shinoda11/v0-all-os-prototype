@@ -591,6 +591,25 @@ export const ja = {
   'myscore.improvements': '明日への改善点',
   'myscore.noImprovements': '特になし。この調子で！',
   'myscore.goToQuests': 'Today Questsへ',
+  // Why this score panel
+  'myscore.whyThisScore': 'なぜこのスコア？',
+  'myscore.topDeductions': '減点理由トップ',
+  'myscore.noDeductions': '完璧！今日は減点なしです。',
+  'myscore.viewDetail': '詳細を見る',
+  'myscore.deductionCategory.task': 'タスク',
+  'myscore.deductionCategory.time': '時間',
+  'myscore.deductionCategory.break': '休憩',
+  'myscore.deductionCategory.overtime': '残業',
+  'myscore.stats.quests': 'クエスト',
+  'myscore.stats.onTime': '時間内',
+  'myscore.stats.breaks': '休憩',
+  'myscore.stats.hours': '稼働',
+  'myscore.stats.overtime': '残業',
+  // Team Score panel
+  'teamscore.whyThisScore': 'チームスコアの理由',
+  'teamscore.teamDeductions': 'チーム減点トップ',
+  'teamscore.noDeductions': '完璧な週！減点なしです。',
+  'teamscore.staffMember': 'スタッフ',
   
   // Weekly Review
   'weeklyReview.title': 'Weekly Review',

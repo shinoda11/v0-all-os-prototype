@@ -1,13 +1,15 @@
 'use client';
 
 import { useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { useStore } from '@/state/store';
 import { useI18n } from '@/i18n/I18nProvider';
 import { selectDailyScore } from '@/core/selectors';
+import type { ScoreDeduction, DeductionCategory } from '@/core/selectors';
 import { cn } from '@/lib/utils';
 import {
   Trophy,
@@ -18,6 +20,9 @@ import {
   TrendingUp,
   ChevronRight,
   Star,
+  AlertCircle,
+  ExternalLink,
+  Info,
 } from 'lucide-react';
 
 /**
@@ -62,6 +67,141 @@ const CATEGORY_CONFIG = {
     max: 20,
   },
 };
+
+// Deduction category icons and colors
+const DEDUCTION_CATEGORY_CONFIG: Record<DeductionCategory, { icon: typeof CheckCircle; color: string; bgColor: string }> = {
+  task: { icon: CheckCircle, color: 'text-blue-700', bgColor: 'bg-blue-50' },
+  time: { icon: Clock, color: 'text-amber-700', bgColor: 'bg-amber-50' },
+  break: { icon: Coffee, color: 'text-emerald-700', bgColor: 'bg-emerald-50' },
+  overtime: { icon: Briefcase, color: 'text-red-700', bgColor: 'bg-red-50' },
+};
+
+// Why This Score Panel Component
+function WhyThisScorePanel({ 
+  deductions, 
+  storeId,
+  stats,
+}: { 
+  deductions: ScoreDeduction[];
+  storeId: string;
+  stats: {
+    totalQuests: number;
+    completedQuests: number;
+    onTimeQuests: number;
+    breaksTaken: number;
+    breaksExpected: number;
+    plannedHours: number;
+    actualHours: number;
+    overtimeMinutes: number;
+  };
+}) {
+  const { t } = useI18n();
+  const topDeductions = deductions.slice(0, 3);
+  
+  // Generate link based on event type
+  const getEventLink = (deduction: ScoreDeduction): string => {
+    if (deduction.eventType === 'quest') {
+      return `/stores/${storeId}/floor/todo`;
+    }
+    return `/stores/${storeId}/floor/timeclock`;
+  };
+  
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm flex items-center gap-2">
+          <Info className="h-4 w-4" />
+          {t('myscore.whyThisScore')}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Stats summary */}
+        <div className="grid grid-cols-5 gap-2 text-center text-xs border-b border-border pb-3">
+          <div>
+            <div className="font-bold tabular-nums">{stats.completedQuests}/{stats.totalQuests}</div>
+            <div className="text-muted-foreground">{t('myscore.stats.quests')}</div>
+          </div>
+          <div>
+            <div className="font-bold tabular-nums">{stats.onTimeQuests}/{stats.completedQuests || 0}</div>
+            <div className="text-muted-foreground">{t('myscore.stats.onTime')}</div>
+          </div>
+          <div>
+            <div className="font-bold tabular-nums">{stats.breaksTaken}/{stats.breaksExpected}</div>
+            <div className="text-muted-foreground">{t('myscore.stats.breaks')}</div>
+          </div>
+          <div>
+            <div className="font-bold tabular-nums">{stats.actualHours}h</div>
+            <div className="text-muted-foreground">{t('myscore.stats.hours')}</div>
+          </div>
+          <div>
+            <div className={cn(
+              'font-bold tabular-nums',
+              stats.overtimeMinutes > 0 ? 'text-red-700' : 'text-emerald-700'
+            )}>
+              {stats.overtimeMinutes}m
+            </div>
+            <div className="text-muted-foreground">{t('myscore.stats.overtime')}</div>
+          </div>
+        </div>
+        
+        {/* Deductions list */}
+        <div className="space-y-2">
+          <div className="text-xs font-bold text-muted-foreground uppercase">
+            {t('myscore.topDeductions')}
+          </div>
+          
+          {topDeductions.length === 0 ? (
+            <div className="text-sm text-emerald-700 flex items-center gap-2 py-2">
+              <CheckCircle className="h-4 w-4" />
+              {t('myscore.noDeductions')}
+            </div>
+          ) : (
+            <ul className="space-y-2">
+              {topDeductions.map((deduction) => {
+                const config = DEDUCTION_CATEGORY_CONFIG[deduction.category];
+                const Icon = config.icon;
+                
+                return (
+                  <li key={deduction.id} className="flex items-start gap-2">
+                    <div className={cn(
+                      'p-1 rounded shrink-0',
+                      config.bgColor
+                    )}>
+                      <Icon className={cn('h-3 w-3', config.color)} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-sm truncate">{deduction.reason}</span>
+                        <span className="text-xs font-bold text-red-600 tabular-nums shrink-0">
+                          -{deduction.points}pt
+                        </span>
+                      </div>
+                      {deduction.details && (
+                        <div className="text-xs text-muted-foreground">
+                          {deduction.details.expected && deduction.details.actual && (
+                            <span>
+                              {deduction.details.expected} → {deduction.details.actual}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    <Link 
+                      href={getEventLink(deduction)}
+                      className="text-muted-foreground hover:text-foreground shrink-0"
+                    >
+                      <ExternalLink className="h-3 w-3" />
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function MyScorePage() {
   const params = useParams();
@@ -182,6 +322,13 @@ export default function MyScorePage() {
             })}
           </CardContent>
         </Card>
+        
+        {/* Why This Score Panel */}
+        <WhyThisScorePanel 
+          deductions={dailyScore.deductions}
+          storeId={storeId}
+          stats={dailyScore.stats}
+        />
         
         {/* Improvements for Tomorrow */}
         <Card>
