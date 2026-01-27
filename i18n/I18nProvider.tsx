@@ -144,5 +144,17 @@ export function useLocaleDateFormat() {
       }
       return `$${(amount / 150).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     },
+    formatNumber: (num: number, options?: Intl.NumberFormatOptions) => {
+      return num.toLocaleString(locale === 'ja' ? 'ja-JP' : 'en-US', options);
+    },
+    formatPercent: (num: number) => {
+      return `${num.toLocaleString(locale === 'ja' ? 'ja-JP' : 'en-US', { maximumFractionDigits: 1 })}%`;
+    },
+    formatHours: (hours: number) => {
+      if (locale === 'ja') {
+        return `${hours.toLocaleString('ja-JP', { maximumFractionDigits: 1 })}h`;
+      }
+      return `${hours.toLocaleString('en-US', { maximumFractionDigits: 1 })} hrs`;
+    },
   }), [locale]);
 }

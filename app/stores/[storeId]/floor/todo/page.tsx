@@ -60,13 +60,14 @@ import { cn } from '@/lib/utils';
 // Difficulty levels with star display
 type Difficulty = 1 | 2 | 3 | 4 | 5;
 
-const DELAY_REASONS = [
-  { value: 'material-shortage', label: '材料不足' },
-  { value: 'equipment-issue', label: '機器トラブル' },
-  { value: 'staff-shortage', label: '人手不足' },
-  { value: 'priority-change', label: '優先度変更' },
-  { value: 'unexpected-order', label: '想定外の注文' },
-  { value: 'other', label: 'その他' },
+const DELAY_REASON_KEYS = [
+  { value: 'none', labelKey: 'quests.delayReason.none' },
+  { value: 'material-shortage', labelKey: 'quests.delayReason.materialShortage' },
+  { value: 'equipment-issue', labelKey: 'quests.delayReason.equipmentIssue' },
+  { value: 'staff-shortage', labelKey: 'quests.delayReason.staffShortage' },
+  { value: 'priority-change', labelKey: 'quests.delayReason.priorityChange' },
+  { value: 'unexpected-order', labelKey: 'quests.delayReason.unexpectedOrder' },
+  { value: 'other', labelKey: 'quests.delayReason.other' },
 ];
 
 // Estimate difficulty from estimated minutes
@@ -281,6 +282,7 @@ interface CompletionModalProps {
 }
 
 function CompletionModal({ quest, open, onOpenChange, onSubmit, elapsedMinutes }: CompletionModalProps) {
+  const { t } = useI18n();
   const [actualMinutes, setActualMinutes] = useState(elapsedMinutes);
   const [actualQuantity, setActualQuantity] = useState<number | undefined>(quest?.quantity);
   const [delayReason, setDelayReason] = useState<string>('none');
@@ -289,7 +291,7 @@ function CompletionModal({ quest, open, onOpenChange, onSubmit, elapsedMinutes }
     if (quest) {
       setActualMinutes(elapsedMinutes || quest.estimatedMinutes || 0);
       setActualQuantity(quest.quantity);
-      setDelayReason('');
+      setDelayReason('none');
     }
   }, [quest, elapsedMinutes]);
 
@@ -297,7 +299,7 @@ function CompletionModal({ quest, open, onOpenChange, onSubmit, elapsedMinutes }
     onSubmit({
       actualMinutes,
       actualQuantity,
-      delayReason: delayReason || undefined,
+      delayReason: delayReason !== 'none' ? delayReason : undefined,
     });
   };
 
@@ -309,7 +311,7 @@ function CompletionModal({ quest, open, onOpenChange, onSubmit, elapsedMinutes }
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Trophy className="h-5 w-5 text-amber-500" />
-            クエスト完了
+            {t('quests.completeModal.title')}
           </DialogTitle>
           <DialogDescription>{quest.title}</DialogDescription>
         </DialogHeader>
@@ -317,7 +319,7 @@ function CompletionModal({ quest, open, onOpenChange, onSubmit, elapsedMinutes }
         <div className="space-y-4 py-4">
           {/* Actual Time */}
           <div className="space-y-2">
-            <Label htmlFor="actualMinutes">実績時間（分）</Label>
+            <Label htmlFor="actualMinutes">{t('quests.completeModal.actualTime')}</Label>
             <Input
               id="actualMinutes"
               type="number"
@@ -328,7 +330,7 @@ function CompletionModal({ quest, open, onOpenChange, onSubmit, elapsedMinutes }
             />
             {quest.estimatedMinutes && (
               <p className="text-sm text-muted-foreground">
-                想定: {quest.estimatedMinutes}分
+                {t('quests.estimatedTime')}: {quest.estimatedMinutes}min
               </p>
             )}
           </div>
@@ -336,7 +338,7 @@ function CompletionModal({ quest, open, onOpenChange, onSubmit, elapsedMinutes }
           {/* Actual Quantity (optional) */}
           {quest.quantity && (
             <div className="space-y-2">
-              <Label htmlFor="actualQuantity">実績数量（任意）</Label>
+              <Label htmlFor="actualQuantity">{t('quests.completeModal.quantity')}</Label>
               <Input
                 id="actualQuantity"
                 type="number"
@@ -346,23 +348,22 @@ function CompletionModal({ quest, open, onOpenChange, onSubmit, elapsedMinutes }
                 className="h-11"
               />
               <p className="text-sm text-muted-foreground">
-                想定: {quest.quantity}
+                {t('quests.estimatedTime')}: {quest.quantity}
               </p>
             </div>
           )}
 
           {/* Delay Reason (optional) */}
           <div className="space-y-2">
-            <Label htmlFor="delayReason">遅延理由（任意）</Label>
+            <Label htmlFor="delayReason">{t('quests.completeModal.delayReason')}</Label>
             <Select value={delayReason} onValueChange={setDelayReason}>
               <SelectTrigger className="h-11">
-                <SelectValue placeholder="選択してください" />
+                <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">なし</SelectItem>
-                {DELAY_REASONS.map((reason) => (
+                {DELAY_REASON_KEYS.map((reason) => (
                   <SelectItem key={reason.value} value={reason.value}>
-                    {reason.label}
+                    {t(reason.labelKey)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -372,11 +373,11 @@ function CompletionModal({ quest, open, onOpenChange, onSubmit, elapsedMinutes }
 
         <DialogFooter>
           <Button variant="secondary" onClick={() => onOpenChange(false)} className="h-11">
-            キャンセル
+            {t('common.cancel')}
           </Button>
           <Button onClick={handleSubmit} className="h-11 gap-2">
             <CheckCircle className="h-4 w-4" />
-            記録して完了
+            {t('quests.completeModal.submit')}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -556,17 +557,17 @@ export default function TodayQuestsPage() {
     return Math.round((Date.now() - start) / 60000);
   };
 
+  const totalQuests = waitingQuests.length + inProgressQuests.length + doneQuests.length;
+
   if (!currentStore) {
     return null;
   }
 
-  const totalQuests = waitingQuests.length + inProgressQuests.length + doneQuests.length;
-
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Today Quests"
-        subtitle={`${currentStore.name} - ${new Date().toLocaleDateString('ja-JP', { month: 'long', day: 'numeric' })}`}
+        title={t('quests.title')}
+        subtitle={`${currentStore.name} - ${new Date().toLocaleDateString(locale === 'ja' ? 'ja-JP' : 'en-US', { month: 'long', day: 'numeric' })}`}
       />
 
       {/* Progress Summary */}
@@ -581,13 +582,13 @@ export default function TodayQuestsPage() {
       <div className="flex gap-4 overflow-x-auto pb-4">
         {/* Waiting Column */}
         <QuestColumn
-          title="待機中"
+          title={t('quests.waiting')}
           icon={<Clock className="h-5 w-5 text-muted-foreground" />}
           count={waitingQuests.length}
           accentColor="border-muted-foreground"
         >
           {waitingQuests.length === 0 ? (
-            <EmptyState type="no_data" title="待機中のクエストなし" />
+            <EmptyState type="no_data" title={t('quests.noQuests')} />
           ) : (
             waitingQuests.map((quest) => (
               <QuestCard
@@ -604,7 +605,7 @@ export default function TodayQuestsPage() {
 
         {/* In Progress Column */}
         <QuestColumn
-          title="進行中"
+          title={t('quests.inProgress')}
           icon={<Play className="h-5 w-5 text-primary" />}
           count={inProgressQuests.length}
           accentColor="border-primary"
@@ -612,8 +613,7 @@ export default function TodayQuestsPage() {
           {inProgressQuests.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground">
               <Play className="h-8 w-8 mb-2 opacity-30" />
-              <p>クエストを開始してください</p>
-              <p className="text-sm">1つずつ集中して取り組もう</p>
+              <p>{t('quests.start')}</p>
             </div>
           ) : (
             inProgressQuests.map((quest) => (
@@ -630,7 +630,7 @@ export default function TodayQuestsPage() {
 
         {/* Done Column */}
         <QuestColumn
-          title="完了"
+          title={t('quests.done')}
           icon={<CheckCircle className="h-5 w-5 text-emerald-600" />}
           count={doneQuests.length}
           accentColor="border-emerald-600"
@@ -638,7 +638,7 @@ export default function TodayQuestsPage() {
           {doneQuests.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground">
               <Trophy className="h-8 w-8 mb-2 opacity-30" />
-              <p>完了したクエストがここに表示されます</p>
+              <p>{t('quests.noQuests')}</p>
             </div>
           ) : (
             doneQuests.map((quest) => (

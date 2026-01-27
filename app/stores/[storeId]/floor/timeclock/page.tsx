@@ -248,7 +248,7 @@ export default function TimeclockPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Time Clock"
+        title={t('timeclock.title')}
         subtitle={shortName}
       />
       
@@ -264,13 +264,13 @@ export default function TimeclockPage() {
         <CardHeader className="p-4 pb-2">
           <CardTitle className="text-sm flex items-center gap-2">
             <User className="h-4 w-4" />
-            Select Staff
+            {t('timeclock.selectStaff')}
           </CardTitle>
         </CardHeader>
         <CardContent className="p-4 pt-0">
           <Select value={selectedStaffId ?? ''} onValueChange={setSelectedStaffId}>
             <SelectTrigger className="h-12 text-lg">
-              <SelectValue placeholder="Select your name" />
+              <SelectValue placeholder={t('timeclock.selectStaff')} />
             </SelectTrigger>
             <SelectContent>
               {storeStaff.map((staff) => {
@@ -282,7 +282,7 @@ export default function TimeclockPage() {
                     <div className="flex items-center gap-2">
                       <span>{staff.name}</span>
                       <Badge variant="outline" className={cn('text-xs', statusConfig.className)}>
-                        {statusConfig.label}
+                        {locale === 'ja' ? statusConfig.label : statusConfig.labelEn}
                       </Badge>
                     </div>
                   </SelectItem>
@@ -323,17 +323,17 @@ export default function TimeclockPage() {
       <div className="grid gap-4 sm:grid-cols-3">
         <SummaryCard
           icon={<Users className="h-5 w-5 text-emerald-600" />}
-          label="On Duty"
-          value={laborMetrics.activeStaffCount}
+          label={t('timeclock.onDuty')}
+          value={`${laborMetrics.activeStaffCount}${t('timeclock.persons')}`}
         />
         <SummaryCard
           icon={<Coffee className="h-5 w-5 text-amber-600" />}
-          label="On Break"
-          value={laborMetrics.onBreakCount}
+          label={t('timeclock.onBreak')}
+          value={`${laborMetrics.onBreakCount}${t('timeclock.persons')}`}
         />
         <SummaryCard
           icon={<Clock className="h-5 w-5 text-blue-600" />}
-          label="Total Hours"
+          label={t('timeclock.workHours')}
           value={formatHours(laborMetrics.totalHoursToday, locale)}
         />
       </div>

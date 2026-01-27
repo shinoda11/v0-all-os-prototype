@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { useStore } from '@/state/store';
+import { useI18n } from '@/i18n/I18nProvider';
 import { selectDailyScore } from '@/core/selectors';
 import { cn } from '@/lib/utils';
 import {
@@ -70,10 +71,19 @@ export default function MyScorePage() {
   const params = useParams();
   const storeId = params.storeId as string;
   const { state } = useStore();
+  const { t, locale } = useI18n();
   const [selectedDate] = useState(new Date().toISOString().split('T')[0]);
   
   const dailyScore = selectDailyScore(state, MOCK_STAFF_ID, selectedDate);
   const gradeStyle = GRADE_STYLES[dailyScore.grade];
+  
+  // i18n category labels
+  const categoryLabels = {
+    taskCompletion: t('myscore.taskCompletion'),
+    timeVariance: t('myscore.timeVariance'),
+    breakCompliance: t('myscore.breakCompliance'),
+    zeroOvertime: t('myscore.zeroOvertime'),
+  };
   
   return (
     <div className="min-h-screen bg-background">
@@ -81,11 +91,11 @@ export default function MyScorePage() {
       <header className="border-b border-border bg-card p-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold">My Score</h1>
+            <h1 className="text-xl font-bold">{t('myscore.title')}</h1>
             <p className="text-sm text-muted-foreground">{MOCK_STAFF_NAME}</p>
           </div>
           <div className="text-sm text-muted-foreground">
-            {new Date(selectedDate).toLocaleDateString('ja-JP', { 
+            {new Date(selectedDate).toLocaleDateString(locale === 'ja' ? 'ja-JP' : 'en-US', { 
               month: 'long', 
               day: 'numeric',
               weekday: 'short',
