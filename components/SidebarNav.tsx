@@ -21,6 +21,7 @@ import {
   Settings,
   ExternalLink,
   FileWarning,
+  Users,
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -58,6 +59,11 @@ const kosSection: NavSection = {
       labelKey: 'nav.cockpit',
       path: '/os/cockpit',
       icon: <Gauge className="h-5 w-5" />,
+    },
+    {
+      labelKey: 'nav.liveStaff',
+      path: '/os/live-staff',
+      icon: <Users className="h-5 w-5" />,
     },
     {
       labelKey: 'nav.weeklyReview',

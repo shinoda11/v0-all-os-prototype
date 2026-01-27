@@ -598,6 +598,17 @@ export const en = {
   'timeclock.persons': '',
   'timeclock.hours': 'hrs',
   
+  // Live Staff (Manager View)
+  'liveStaff.title': 'Live Staff',
+  'liveStaff.onDuty': 'On Duty',
+  'liveStaff.onBreak': 'On Break',
+  'liveStaff.offDuty': 'Off Duty',
+  'liveStaff.totalHours': 'Total Hours',
+  'liveStaff.breakWarning': 'Break Warning',
+  'liveStaff.breakWarningTitle': 'Break Required',
+  'liveStaff.breakWarningDesc': 'Working 4+ hours without break',
+  'liveStaff.staffList': 'Staff Status',
+  
   // My Score
   'myscore.title': 'My Score',
   'myscore.subtitle': "Today's Achievement",
@@ -678,6 +689,7 @@ export const en = {
   'nav.incidents': 'Incidents',
   'nav.incidentsDesc': 'Rare Events',
   'nav.cockpit': 'Cockpit',
+  'nav.liveStaff': 'Live Staff',
   'nav.weeklyReview': 'Weekly Review',
   'nav.teamPerformance': 'Team Performance',
   'nav.awards': 'Awards',

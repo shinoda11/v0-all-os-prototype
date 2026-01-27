@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import Link from 'next/link';
+import { useParams } from 'next/navigation';
 import { PageHeader } from '@/components/PageHeader';
 import { OSHeader } from '@/components/OSHeader';
 import { TimeBandTabs } from '@/components/TimeBandTabs';
@@ -50,6 +52,7 @@ import {
   Target,
   CheckSquare,
   Trophy,
+  ExternalLink,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -144,6 +147,8 @@ function ReplayControls() {
 function DynamicShiftSummary() {
   const { state } = useStore();
   const { t } = useI18n();
+  const params = useParams();
+  const storeId = params.storeId as string;
   const summary = selectShiftSummary(state);
   const todoStats = selectTodoStats(state);
   
@@ -171,7 +176,15 @@ function DynamicShiftSummary() {
             <Clock className="h-4 w-4" />
             Staff & Quest Status
           </CardTitle>
-          <FreshnessBadge lastUpdate={summary.lastUpdate} />
+          <div className="flex items-center gap-2">
+            <FreshnessBadge lastUpdate={summary.lastUpdate} />
+            <Link href={`/stores/${storeId}/os/live-staff`}>
+              <Button variant="ghost" size="sm" className="h-6 px-2 text-xs gap-1">
+                詳細
+                <ExternalLink className="h-3 w-3" />
+              </Button>
+            </Link>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">

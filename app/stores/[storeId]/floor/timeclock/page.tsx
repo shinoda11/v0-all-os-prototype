@@ -5,18 +5,11 @@ import { PageHeader } from '@/components/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { useStore } from '@/state/store';
+import { useAuth } from '@/state/auth';
 import { useI18n } from '@/i18n/I18nProvider';
 import { formatHours } from '@/i18n/format';
 import { selectCurrentStore, selectLaborMetrics, selectStaffStates } from '@/core/selectors';
-import type { Staff, Role } from '@/core/types';
 import type { StaffStatus } from '@/core/derive';
 import {
   LogIn,
@@ -25,7 +18,6 @@ import {
   Play,
   Clock,
   Users,
-  User,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -183,6 +175,7 @@ function SummaryCard({ icon, label, value, className }: SummaryCardProps) {
 
 export default function TimeclockPage() {
   const { state, actions } = useStore();
+  const { currentUser } = useAuth();
   const currentStore = selectCurrentStore(state);
   const { t, locale } = useI18n();
   const today = new Date().toISOString().split('T')[0];
@@ -190,24 +183,18 @@ export default function TimeclockPage() {
   const laborMetrics = selectLaborMetrics(state, today);
   const staffStates = selectStaffStates(state, today);
   
-  const [selectedStaffId, setSelectedStaffId] = useState<string | null>(null);
+  // Self-service: only the current user can clock in/out
+  // Map auth user to staff record by matching staffId pattern
+  const myStaff = state.staff.find((s) => 
+    s.storeId === state.selectedStoreId && s.id === `staff-${currentUser.id}`
+  ) ?? state.staff.find((s) => s.storeId === state.selectedStoreId);
   
-  const storeStaff = state.staff.filter((s) => s.storeId === state.selectedStoreId);
-  
-  // Auto-select first staff if none selected
-  useEffect(() => {
-    if (!selectedStaffId && storeStaff.length > 0) {
-      setSelectedStaffId(storeStaff[0].id);
-    }
-  }, [selectedStaffId, storeStaff]);
-  
-  if (!currentStore) {
+  if (!currentStore || !myStaff) {
     return null;
   }
   
   const shortName = currentStore.name.replace('Aburi TORA 熟成鮨と炙り鮨 ', '');
-  const selectedStaff = storeStaff.find(s => s.id === selectedStaffId);
-  const staffState = selectedStaffId ? staffStates.get(selectedStaffId) : null;
+  const staffState = staffStates.get(myStaff.id);
   const currentStatus: StaffStatus = staffState?.status ?? 'out';
   
   // Determine available actions based on current status
@@ -227,20 +214,20 @@ export default function TimeclockPage() {
   const availableActions = getAvailableActions(currentStatus);
   
   const handleAction = (action: ClockAction) => {
-    if (!selectedStaffId) return;
+    if (!myStaff) return;
     
     switch (action) {
       case 'check-in':
-        actions.checkIn(selectedStaffId);
+        actions.checkIn(myStaff.id);
         break;
       case 'check-out':
-        actions.checkOut(selectedStaffId);
+        actions.checkOut(myStaff.id);
         break;
       case 'break-start':
-        actions.startBreak(selectedStaffId);
+        actions.startBreak(myStaff.id);
         break;
       case 'break-end':
-        actions.endBreak(selectedStaffId);
+        actions.endBreak(myStaff.id);
         break;
     }
   };
@@ -259,65 +246,27 @@ export default function TimeclockPage() {
         </CardContent>
       </Card>
       
-      {/* Staff Selector */}
-      <Card>
-        <CardHeader className="p-4 pb-2">
-          <CardTitle className="text-sm flex items-center gap-2">
-            <User className="h-4 w-4" />
-            {t('timeclock.selectStaff')}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-4 pt-0">
-          <Select value={selectedStaffId ?? ''} onValueChange={setSelectedStaffId}>
-            <SelectTrigger className="h-12 text-lg">
-              <SelectValue placeholder={t('timeclock.selectStaff')} />
-            </SelectTrigger>
-            <SelectContent>
-              {storeStaff.map((staff) => {
-                const state = staffStates.get(staff.id);
-                const status = state?.status ?? 'out';
-                const statusConfig = STATUS_CONFIG[status];
-                return (
-                  <SelectItem key={staff.id} value={staff.id} className="py-3">
-                    <div className="flex items-center gap-2">
-                      <span>{staff.name}</span>
-                      <Badge variant="outline" className={cn('text-xs', statusConfig.className)}>
-                        {locale === 'ja' ? statusConfig.label : statusConfig.labelEn}
-                      </Badge>
-                    </div>
-                  </SelectItem>
-                );
-              })}
-            </SelectContent>
-          </Select>
-        </CardContent>
-      </Card>
-      
-      {/* Current Status */}
-      {selectedStaff && (
-        <StatusCard
-          status={currentStatus}
-          staffName={selectedStaff.name}
-          lastAction={staffState?.lastAction}
-        />
-      )}
+      {/* Current Status - Self-service for current user only */}
+      <StatusCard
+        status={currentStatus}
+        staffName={myStaff.name}
+        lastAction={staffState?.lastAction}
+      />
       
       {/* Action Buttons */}
-      {selectedStaff && (
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex gap-3">
-              {availableActions.map((action) => (
-                <ClockButton
-                  key={action}
-                  action={action}
-                  onClick={() => handleAction(action)}
-                />
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex gap-3">
+            {availableActions.map((action) => (
+              <ClockButton
+                key={action}
+                action={action}
+                onClick={() => handleAction(action)}
+              />
+            ))}
+          </div>
+        </CardContent>
+      </Card>
       
       {/* Summary for Manager View */}
       <div className="grid gap-4 sm:grid-cols-3">

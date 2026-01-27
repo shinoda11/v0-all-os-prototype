@@ -598,6 +598,17 @@ export const ja = {
   'timeclock.persons': '名',
   'timeclock.hours': '時間',
   
+  // Live Staff (Manager View)
+  'liveStaff.title': 'Live Staff',
+  'liveStaff.onDuty': '出勤中',
+  'liveStaff.onBreak': '休憩中',
+  'liveStaff.offDuty': '未出勤',
+  'liveStaff.totalHours': '実績人時',
+  'liveStaff.breakWarning': '休憩未取得',
+  'liveStaff.breakWarningTitle': '休憩が必要です',
+  'liveStaff.breakWarningDesc': '4時間以上勤務で休憩未取得',
+  'liveStaff.staffList': 'スタッフ状況',
+  
   // My Score
   'myscore.title': 'My Score',
   'myscore.subtitle': '今日の達成状況',
@@ -678,6 +689,7 @@ export const ja = {
   'nav.incidents': 'Incidents',
   'nav.incidentsDesc': 'Rare Events',
   'nav.cockpit': 'コックピット',
+  'nav.liveStaff': 'Live Staff',
   'nav.weeklyReview': 'Weekly Review',
   'nav.teamPerformance': 'Team Performance',
   'nav.awards': 'Awards',
