@@ -23,6 +23,7 @@ import {
   FileWarning,
   Users,
   ClipboardList,
+  Trophy,
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -84,7 +85,7 @@ const kosSection: NavSection = {
     {
       labelKey: 'nav.awards',
       path: '/os/awards',
-      icon: <CheckSquare className="h-5 w-5" />,
+      icon: <Trophy className="h-5 w-5" />,
     },
   ],
 };

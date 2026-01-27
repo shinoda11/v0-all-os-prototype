@@ -26,6 +26,8 @@ import {
   deriveForecastForDate,
   deriveActiveTodos,
   deriveCompletedTodos,
+  deriveTeamPerformanceMetrics,
+  deriveAwards,
   // Types from derive
   type DailyScore,
   type TeamDailyScore,
@@ -33,6 +35,13 @@ import {
   type DailyScoreBreakdown,
   type ScoreDeduction,
   type DeductionCategory,
+  type Period,
+  type TeamPerformanceMetrics,
+  type AwardsMetrics,
+  type Award,
+  type AwardNominee,
+  type AwardEvidence,
+  type AwardCategory,
 } from './derive';
 import type { EnhancedCockpitMetrics } from './types';
 
@@ -672,5 +681,116 @@ export const selectTeamDailyScore = (
   return deriveTeamDailyScore(state.events, state.staff, storeId, targetDate);
 };
 
+// ------------------------------------------------------------
+// Team Performance Metrics Selector
+// ------------------------------------------------------------
+
+export const selectTeamPerformanceMetrics = (
+  state: AppState,
+  period: Period = 'today',
+  timeBand: TimeBand = 'all'
+): TeamPerformanceMetrics => {
+  const storeId = state.selectedStoreId;
+  
+  if (!storeId) {
+    return {
+      teamSnapshot: {
+        teamScoreAvg: null,
+        questCompletion: { completed: 0, total: 0, rate: null },
+        delayRate: null,
+        breakCompliance: null,
+        overtimeRate: null,
+        qualityNgRate: null,
+      },
+      skillMixCoverage: {
+        starMix: { star1: 0, star2: 0, star3: 0 },
+        roleMix: new Map(),
+        peakCoverage: null,
+        peakCoverageReason: 'No store selected',
+      },
+      individuals: [],
+      coachingActions: [],
+      promotionCandidates: [],
+      period,
+      timeBand,
+      lastUpdate: new Date().toISOString(),
+      dataAvailability: {
+        hasLaborData: false,
+        hasQuestData: false,
+        hasQualityData: false,
+      },
+    };
+  }
+  
+  return deriveTeamPerformanceMetrics(
+    state.events,
+    state.staff,
+    state.roles,
+    storeId,
+    period,
+    timeBand
+  );
+};
+
+// ------------------------------------------------------------
+// Awards Selector
+// ------------------------------------------------------------
+
+export const selectAwards = (
+  state: AppState,
+  period: Period = 'today',
+  timeBand: TimeBand = 'all'
+): AwardsMetrics => {
+  const storeId = state.selectedStoreId;
+  
+  if (!storeId) {
+    return {
+      snapshot: {
+        winnersCount: 0,
+        eligibleStaffCount: 0,
+        lastUpdated: new Date().toISOString(),
+        period,
+        timeBand,
+      },
+      awards: [],
+      nominees: [],
+      dataAvailability: {
+        hasLaborData: false,
+        hasQuestData: false,
+        hasQualityData: false,
+        hasScoreTrendData: false,
+      },
+    };
+  }
+  
+  return deriveAwards(
+    state.events,
+    state.staff,
+    state.roles,
+    storeId,
+    period,
+    timeBand
+  );
+};
+
 // Re-export types from derive for easier access
-export type { DailyScore, TeamDailyScore, StaffDailyScore, ScoreDeduction, DeductionCategory, DailyScoreBreakdown } from './derive';
+export type { 
+  DailyScore, 
+  TeamDailyScore, 
+  StaffDailyScore, 
+  ScoreDeduction, 
+  DeductionCategory, 
+  DailyScoreBreakdown, 
+  Period, 
+  TeamPerformanceMetrics,
+  TeamSnapshot,
+  SkillMixCoverage,
+  IndividualPerformance,
+  CoachingAction,
+  PromotionCandidate,
+  AwardsMetrics,
+  Award,
+  AwardNominee,
+  AwardEvidence,
+  AwardCategory,
+} from './derive';
