@@ -637,6 +637,26 @@ export const en = {
   'weeklyReview.priority.medium': 'Medium',
   'weeklyReview.priority.low': 'Low',
   'weeklyReview.goToManagement': 'Edit Plan in All Management',
+  // Daily Table
+  'weeklyReview.dailyTable.title': 'Daily Breakdown',
+  'weeklyReview.dailyTable.day': 'Day',
+  'weeklyReview.dailyTable.score': 'Score',
+  'weeklyReview.dailyTable.starMix': 'Star Mix',
+  'weeklyReview.dailyTable.overtime': 'OT',
+  'weeklyReview.dailyTable.questDelay': 'Delays',
+  'weeklyReview.dailyTable.hours': 'Hours',
+  'weeklyReview.dailyTable.laborRate': 'L.Rate',
+  // HR-focused proposals
+  'weeklyReview.winningMix': 'Winning Mix',
+  'weeklyReview.winningMix.desc': 'Best performing staff combination',
+  'weeklyReview.weakTimeBand': 'Weak Time Band',
+  'weeklyReview.weakTimeBand.lowScore': 'Low score on {day}',
+  'weeklyReview.weakTimeBand.overtime': 'Overtime on {day}',
+  'weeklyReview.weakTimeBand.questDelay': 'Quest delays on {day}',
+  'weeklyReview.chronicDelay': 'Chronic Delay Quest',
+  'weeklyReview.chronicDelay.desc': 'Delayed {count} times, avg +{minutes}min',
+  'weeklyReview.hrProposals': 'HR Insights (Max 5)',
+  'weeklyReview.noHrProposals': 'No HR issues detected',
   
   // Sidebar Navigation
   'nav.kos': 'KOS',

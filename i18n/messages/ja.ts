@@ -637,6 +637,26 @@ export const ja = {
   'weeklyReview.priority.medium': '中',
   'weeklyReview.priority.low': '低',
   'weeklyReview.goToManagement': 'All Managementで計画修正',
+  // Daily Table
+  'weeklyReview.dailyTable.title': '日別詳細',
+  'weeklyReview.dailyTable.day': '曜日',
+  'weeklyReview.dailyTable.score': 'スコア',
+  'weeklyReview.dailyTable.starMix': '星ミックス',
+  'weeklyReview.dailyTable.overtime': '残業',
+  'weeklyReview.dailyTable.questDelay': '遅延',
+  'weeklyReview.dailyTable.hours': '稼働',
+  'weeklyReview.dailyTable.laborRate': '人件費率',
+  // HR-focused proposals
+  'weeklyReview.winningMix': '勝ちミックス',
+  'weeklyReview.winningMix.desc': '最高パフォーマンスの人員構成',
+  'weeklyReview.weakTimeBand': '弱い時間帯',
+  'weeklyReview.weakTimeBand.lowScore': '{day}曜のスコア低下',
+  'weeklyReview.weakTimeBand.overtime': '{day}曜の残業発生',
+  'weeklyReview.weakTimeBand.questDelay': '{day}曜のクエスト遅延',
+  'weeklyReview.chronicDelay': '遅延常習クエスト',
+  'weeklyReview.chronicDelay.desc': '{count}回遅延、平均+{minutes}分',
+  'weeklyReview.hrProposals': 'HR提案 (最大5件)',
+  'weeklyReview.noHrProposals': 'HR課題は検出されませんでした',
   
   // Sidebar Navigation
   'nav.kos': 'KOS',

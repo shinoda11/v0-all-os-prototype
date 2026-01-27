@@ -1670,9 +1670,10 @@ export const deriveWeeklyLaborMetrics = (
   }
   const weekEnd = dates[6];
   
-  // Filter labor and sales events for this store
+  // Filter labor, sales, and decision events for this store
   const laborEvents = filterByType(events, 'labor') as LaborEvent[];
   const salesEvents = filterByType(events, 'sales') as SalesEvent[];
+  const decisionEvents = filterByType(events, 'decision') as DecisionEvent[];
   
   const dailyRows: WeeklyLaborDailyRow[] = [];
   let totalHours = 0;
@@ -1681,6 +1682,17 @@ export const deriveWeeklyLaborMetrics = (
   let hasSalesData = false;
   const staffIdsAllWeek = new Set<string>();
   const starMixTotal = { star3: 0, star2: 0, star1: 0 };
+  
+  // HR-focused tracking
+  let totalOvertimeMinutes = 0;
+  let overtimeDays = 0;
+  let totalQuestDelays = 0;
+  let totalQuestsCompleted = 0;
+  let totalQuestsCount = 0;
+  const dayScores: number[] = [];
+  
+  // Track quest delays by title for chronic delay detection
+  const questDelayTracker = new Map<string, { count: number; totalDelayMinutes: number }>();
   
   for (const date of dates) {
     const dayOfWeek = new Date(date).getDay();
@@ -1699,7 +1711,7 @@ export const deriveWeeklyLaborMetrics = (
     // Calculate daily sales
     let daySales: number | null = null;
     if (daySalesEvents.length > 0) {
-      daySales = daySalesEvents.reduce((sum, e) => sum + e.amount, 0);
+      daySales = daySalesEvents.reduce((sum, e) => sum + e.total, 0);
       totalSales = (totalSales ?? 0) + daySales;
       hasSalesData = true;
     }
@@ -1808,6 +1820,73 @@ export const deriveWeeklyLaborMetrics = (
     starMixTotal.star2 += dayStarMix.star2;
     starMixTotal.star1 += dayStarMix.star1;
     
+    // Calculate overtime (assume 8h standard shift per staff)
+    const standardHours = dayStaffIds.size * 8;
+    const dayOvertimeMinutes = Math.max(0, Math.round((dayHours - standardHours) * 60));
+    const hasOvertime = dayOvertimeMinutes > 0;
+    if (hasOvertime) {
+      overtimeDays++;
+      totalOvertimeMinutes += dayOvertimeMinutes;
+    }
+    
+    // Get quest/decision events for this day
+    const dayDecisionEvents = decisionEvents.filter(
+      e => e.storeId === storeId && e.timestamp.startsWith(date)
+    );
+    
+    // Track quests by proposalId to get latest status
+    const questStatus = new Map<string, DecisionEvent>();
+    for (const evt of dayDecisionEvents) {
+      const existing = questStatus.get(evt.proposalId);
+      if (!existing || new Date(evt.timestamp) > new Date(existing.timestamp)) {
+        questStatus.set(evt.proposalId, evt);
+      }
+    }
+    
+    let dayQuestDelayCount = 0;
+    let dayQuestCompletedCount = 0;
+    let dayQuestTotalCount = 0;
+    
+    for (const [, quest] of questStatus) {
+      if (quest.action === 'completed' || quest.action === 'started' || quest.action === 'paused') {
+        dayQuestTotalCount++;
+        
+        if (quest.action === 'completed') {
+          dayQuestCompletedCount++;
+          
+          // Check if delayed (actual > estimated)
+          if (quest.actualMinutes && quest.estimatedMinutes && quest.actualMinutes > quest.estimatedMinutes) {
+            dayQuestDelayCount++;
+            const delayMinutes = quest.actualMinutes - quest.estimatedMinutes;
+            
+            // Track for chronic delay detection
+            const tracker = questDelayTracker.get(quest.title) || { count: 0, totalDelayMinutes: 0 };
+            tracker.count++;
+            tracker.totalDelayMinutes += delayMinutes;
+            questDelayTracker.set(quest.title, tracker);
+          }
+        }
+      }
+    }
+    
+    totalQuestDelays += dayQuestDelayCount;
+    totalQuestsCompleted += dayQuestCompletedCount;
+    totalQuestsCount += dayQuestTotalCount;
+    
+    // Calculate day score (simplified: based on task completion and overtime)
+    let dayScore: number | null = null;
+    if (dayQuestTotalCount > 0 || dayStaffIds.size > 0) {
+      const taskCompletionScore = dayQuestTotalCount > 0 
+        ? (dayQuestCompletedCount / dayQuestTotalCount) * 40 
+        : 40;
+      const onTimeScore = dayQuestCompletedCount > 0 
+        ? ((dayQuestCompletedCount - dayQuestDelayCount) / dayQuestCompletedCount) * 30 
+        : 30;
+      const overtimeScore = hasOvertime ? Math.max(0, 30 - dayOvertimeMinutes / 2) : 30;
+      dayScore = Math.round(taskCompletionScore + onTimeScore + overtimeScore);
+      dayScores.push(dayScore);
+    }
+    
     dailyRows.push({
       date,
       dayLabel,
@@ -1818,6 +1897,12 @@ export const deriveWeeklyLaborMetrics = (
       staffCount: dayStaffIds.size,
       starMix: dayStarMix,
       sales: daySales,
+      dayScore,
+      overtimeFlag: hasOvertime,
+      overtimeMinutes: dayOvertimeMinutes,
+      questDelayCount: dayQuestDelayCount,
+      questCompletedCount: dayQuestCompletedCount,
+      questTotalCount: dayQuestTotalCount,
     });
   }
   
@@ -1829,6 +1914,60 @@ export const deriveWeeklyLaborMetrics = (
     ? Math.round((totalSales / totalLaborCost) * 100) / 100
     : null;
   
+  // HR-focused summary calculations
+  const avgDayScore = dayScores.length > 0 
+    ? Math.round(dayScores.reduce((a, b) => a + b, 0) / dayScores.length)
+    : null;
+  const questCompletionRate = totalQuestsCount > 0
+    ? Math.round((totalQuestsCompleted / totalQuestsCount) * 100) / 100
+    : 1;
+  
+  // Find winning mix (highest scoring day)
+  const scoredRows = dailyRows.filter(r => r.dayScore !== null);
+  const winningDay = scoredRows.length > 0
+    ? scoredRows.reduce((best, row) => 
+        (row.dayScore ?? 0) > (best.dayScore ?? 0) ? row : best
+      )
+    : null;
+  const winningMix = winningDay ? {
+    dayLabel: winningDay.dayLabel,
+    starMix: winningDay.starMix,
+    score: winningDay.dayScore ?? 0,
+  } : null;
+  
+  // Find weak time bands
+  const weakTimeBands: WeeklyLaborMetrics['weakTimeBands'] = [];
+  for (const row of dailyRows) {
+    if (row.dayScore !== null && row.dayScore < 70) {
+      weakTimeBands.push({ dayLabel: row.dayLabel, issue: 'low_score', value: row.dayScore });
+    }
+    if (row.overtimeFlag && row.overtimeMinutes > 30) {
+      weakTimeBands.push({ dayLabel: row.dayLabel, issue: 'overtime', value: row.overtimeMinutes });
+    }
+    if (row.questDelayCount >= 2) {
+      weakTimeBands.push({ dayLabel: row.dayLabel, issue: 'quest_delay', value: row.questDelayCount });
+    }
+  }
+  // Sort by severity (low score first, then overtime, then delays)
+  weakTimeBands.sort((a, b) => {
+    if (a.issue === 'low_score' && b.issue !== 'low_score') return -1;
+    if (a.issue !== 'low_score' && b.issue === 'low_score') return 1;
+    return b.value - a.value;
+  });
+  
+  // Find chronic delay quests (delayed 2+ times)
+  const chronicDelayQuests: WeeklyLaborMetrics['chronicDelayQuests'] = [];
+  for (const [title, tracker] of questDelayTracker) {
+    if (tracker.count >= 2) {
+      chronicDelayQuests.push({
+        questTitle: title,
+        delayCount: tracker.count,
+        avgDelayMinutes: Math.round(tracker.totalDelayMinutes / tracker.count),
+      });
+    }
+  }
+  chronicDelayQuests.sort((a, b) => b.delayCount - a.delayCount);
+  
   return {
     weekSummary: {
       totalHours: Math.round(totalHours * 10) / 10,
@@ -1838,8 +1977,16 @@ export const deriveWeeklyLaborMetrics = (
       totalSales: hasSalesData ? totalSales : null,
       staffCountTotal: staffIdsAllWeek.size,
       starMixTotal,
+      avgDayScore,
+      overtimeDays,
+      totalOvertimeMinutes,
+      totalQuestDelays,
+      questCompletionRate,
     },
     dailyRows,
+    winningMix,
+    weakTimeBands: weakTimeBands.slice(0, 5),
+    chronicDelayQuests: chronicDelayQuests.slice(0, 5),
     weekStart: weekStartDate,
     weekEnd,
     lastUpdate: now.toISOString(),

@@ -6,6 +6,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -27,6 +35,7 @@ import {
   Star,
   Clock,
   AlertTriangle,
+  AlertOctagon,
   ExternalLink,
   DollarSign,
   Calendar,
@@ -37,6 +46,8 @@ import {
   Info,
   Coffee,
   Briefcase,
+  Sparkles,
+  Timer,
 } from 'lucide-react';
 import type { ScoreDeduction, DeductionCategory } from '@/core/selectors';
 import { cn } from '@/lib/utils';
@@ -225,16 +236,15 @@ export default function WeeklyReviewPage() {
   
   const laborMetrics = selectWeeklyLaborMetrics(state, selectedWeek);
   const teamScore = selectTeamDailyScore(state, selectedWeek);
+  const { weekSummary } = laborMetrics;
   
-  // Mock task completion rate (would come from todo stats aggregation)
-  const taskCompletionRate = teamScore.breakdown.taskCompletion / 40; // 40 is max points
+  // Use task completion rate from weekly metrics
+  const taskCompletionRate = weekSummary.questCompletionRate;
   
   const proposals = useMemo(() => 
     generateWeeklyProposals(laborMetrics, teamScore.total, taskCompletionRate),
     [laborMetrics, teamScore, taskCompletionRate]
   );
-  
-  const { weekSummary } = laborMetrics;
   
   // Grade color
   const gradeColors = {
@@ -388,16 +398,120 @@ export default function WeeklyReviewPage() {
             <CardContent>
               <div className="flex items-center gap-2">
                 <span className="text-3xl font-bold tabular-nums">
-                  {Math.round(taskCompletionRate * 100)}
+                  {Math.round(weekSummary.questCompletionRate * 100)}
                 </span>
                 <span className="text-lg text-muted-foreground">%</span>
-                {taskCompletionRate >= TARGETS.taskCompletionRate ? (
+                {weekSummary.questCompletionRate >= TARGETS.taskCompletionRate ? (
                   <TrendingUp className="h-4 w-4 text-emerald-600" />
                 ) : (
                   <TrendingDown className="h-4 w-4 text-red-600" />
                 )}
               </div>
               <p className="text-sm text-muted-foreground">目標: {Math.round(TARGETS.taskCompletionRate * 100)}%</p>
+            </CardContent>
+          </Card>
+        </div>
+        
+        {/* HR Focused Summary Row */}
+        <div className="grid gap-4 md:grid-cols-4">
+          {/* Avg Day Score */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Sparkles className="h-4 w-4" />
+                平均スコア
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-2">
+                <span className={cn(
+                  'text-3xl font-bold tabular-nums',
+                  weekSummary.avgDayScore === null ? 'text-muted-foreground' :
+                  weekSummary.avgDayScore >= 90 ? 'text-emerald-600' :
+                  weekSummary.avgDayScore >= 70 ? 'text-blue-600' :
+                  'text-red-600'
+                )}>
+                  {weekSummary.avgDayScore ?? '--'}
+                </span>
+                <span className="text-lg text-muted-foreground">pt</span>
+              </div>
+              <p className="text-sm text-muted-foreground">週間平均</p>
+            </CardContent>
+          </Card>
+          
+          {/* Overtime Days */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Clock className="h-4 w-4" />
+                残業発生日
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-2">
+                <span className={cn(
+                  'text-3xl font-bold tabular-nums',
+                  weekSummary.overtimeDays === 0 ? 'text-emerald-600' :
+                  weekSummary.overtimeDays <= 2 ? 'text-amber-600' :
+                  'text-red-600'
+                )}>
+                  {weekSummary.overtimeDays}
+                </span>
+                <span className="text-lg text-muted-foreground">日</span>
+              </div>
+              <p className="text-sm text-muted-foreground">計 {weekSummary.totalOvertimeMinutes}分</p>
+            </CardContent>
+          </Card>
+          
+          {/* Quest Delays */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Timer className="h-4 w-4" />
+                クエスト遅延
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-2">
+                <span className={cn(
+                  'text-3xl font-bold tabular-nums',
+                  weekSummary.totalQuestDelays === 0 ? 'text-emerald-600' :
+                  weekSummary.totalQuestDelays <= 3 ? 'text-amber-600' :
+                  'text-red-600'
+                )}>
+                  {weekSummary.totalQuestDelays}
+                </span>
+                <span className="text-lg text-muted-foreground">件</span>
+              </div>
+              <p className="text-sm text-muted-foreground">週間合計</p>
+            </CardContent>
+          </Card>
+          
+          {/* Winning Mix Day */}
+          <Card className={laborMetrics.winningMix ? 'border-emerald-200 bg-emerald-50/50' : ''}>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Trophy className="h-4 w-4" />
+                ベストDay
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {laborMetrics.winningMix ? (
+                <>
+                  <div className="flex items-center gap-2">
+                    <span className="text-3xl font-bold tabular-nums text-emerald-600">
+                      {laborMetrics.winningMix.dayLabel}
+                    </span>
+                    <span className="text-lg text-muted-foreground">{laborMetrics.winningMix.score}pt</span>
+                  </div>
+                  <div className="flex items-center gap-1 text-xs mt-1">
+                    <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                    <span>{laborMetrics.winningMix.starMix.star3}/{laborMetrics.winningMix.starMix.star2}/{laborMetrics.winningMix.starMix.star1}</span>
+                  </div>
+                </>
+              ) : (
+                <span className="text-muted-foreground">--</span>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -565,6 +679,232 @@ export default function WeeklyReviewPage() {
             {proposals.length === 0 && (
               <div className="text-center py-8 text-muted-foreground">
                 {t('weeklyReview.noProposals')}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+        
+        {/* Daily Breakdown Table */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Calendar className="h-5 w-5 text-blue-500" />
+              <CardTitle>{t('weeklyReview.dailyTable.title')}</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[60px]">{t('weeklyReview.dailyTable.day')}</TableHead>
+                    <TableHead className="text-center">{t('weeklyReview.dailyTable.score')}</TableHead>
+                    <TableHead className="text-center">{t('weeklyReview.dailyTable.starMix')}</TableHead>
+                    <TableHead className="text-center">{t('weeklyReview.dailyTable.overtime')}</TableHead>
+                    <TableHead className="text-center">{t('weeklyReview.dailyTable.questDelay')}</TableHead>
+                    <TableHead className="text-right">{t('weeklyReview.dailyTable.hours')}</TableHead>
+                    <TableHead className="text-right">{t('weeklyReview.dailyTable.laborRate')}</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {laborMetrics.dailyRows.map((row) => (
+                    <TableRow key={row.date} className={cn(
+                      row.dayScore !== null && row.dayScore < 70 && 'bg-red-50',
+                      row.overtimeFlag && 'bg-amber-50/50'
+                    )}>
+                      <TableCell className="font-medium">{row.dayLabel}</TableCell>
+                      <TableCell className="text-center">
+                        {row.dayScore !== null ? (
+                          <span className={cn(
+                            'font-bold tabular-nums',
+                            row.dayScore >= 90 ? 'text-emerald-600' :
+                            row.dayScore >= 70 ? 'text-blue-600' :
+                            'text-red-600'
+                          )}>
+                            {row.dayScore}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <div className="flex items-center justify-center gap-1 text-xs">
+                          <span className="flex items-center gap-0.5">
+                            <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                            <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                            <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                            <span className="font-medium ml-0.5">{row.starMix.star3}</span>
+                          </span>
+                          <span className="text-muted-foreground">/</span>
+                          <span className="flex items-center gap-0.5">
+                            <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                            <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                            <span className="font-medium ml-0.5">{row.starMix.star2}</span>
+                          </span>
+                          <span className="text-muted-foreground">/</span>
+                          <span className="flex items-center gap-0.5">
+                            <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                            <span className="font-medium ml-0.5">{row.starMix.star1}</span>
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {row.overtimeFlag ? (
+                          <Badge variant="outline" className="bg-red-100 text-red-800 border-red-200">
+                            +{row.overtimeMinutes}m
+                          </Badge>
+                        ) : (
+                          <span className="text-emerald-600 text-sm">OK</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {row.questDelayCount > 0 ? (
+                          <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-200">
+                            {row.questDelayCount}
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground">0</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">{row.hours}h</TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {row.laborRate !== null ? `${row.laborRate}%` : '-'}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+        
+        {/* HR Proposals - Max 5 */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Users className="h-5 w-5 text-purple-500" />
+                <CardTitle>{t('weeklyReview.hrProposals')}</CardTitle>
+              </div>
+              <Badge variant="outline">
+                {(laborMetrics.winningMix ? 1 : 0) + laborMetrics.weakTimeBands.length + laborMetrics.chronicDelayQuests.length}
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Winning Mix */}
+            {laborMetrics.winningMix && (
+              <div className="p-4 rounded border border-emerald-200 bg-emerald-50">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className="p-1 rounded text-emerald-700">
+                        <Sparkles className="h-4 w-4" />
+                      </span>
+                      <h3 className="font-bold">{t('weeklyReview.winningMix')}</h3>
+                      <Badge className="bg-emerald-100 text-emerald-800">
+                        {laborMetrics.winningMix.dayLabel}曜 {laborMetrics.winningMix.score}pt
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      {t('weeklyReview.winningMix.desc')}
+                    </p>
+                    <div className="flex items-center gap-4 text-sm">
+                      <span className="flex items-center gap-1">
+                        <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                        <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                        <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                        <span className="font-bold ml-1">{laborMetrics.winningMix.starMix.star3}</span>
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                        <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                        <span className="font-bold ml-1">{laborMetrics.winningMix.starMix.star2}</span>
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                        <span className="font-bold ml-1">{laborMetrics.winningMix.starMix.star1}</span>
+                      </span>
+                    </div>
+                  </div>
+                  <Link href="/management/shifts">
+                    <Button variant="secondary" size="sm" className="shrink-0 gap-1">
+                      シフト参考
+                      <ExternalLink className="h-3 w-3" />
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            )}
+            
+            {/* Weak Time Bands */}
+            {laborMetrics.weakTimeBands.slice(0, 3).map((weak, idx) => (
+              <div key={`weak-${idx}`} className="p-4 rounded border border-amber-200 bg-amber-50">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className="p-1 rounded text-amber-700">
+                        {weak.issue === 'overtime' ? <Clock className="h-4 w-4" /> :
+                         weak.issue === 'quest_delay' ? <Timer className="h-4 w-4" /> :
+                         <AlertTriangle className="h-4 w-4" />}
+                      </span>
+                      <h3 className="font-bold">{t('weeklyReview.weakTimeBand')}</h3>
+                      <Badge className="bg-amber-100 text-amber-800">
+                        {weak.issue === 'low_score' ? `${weak.dayLabel}曜 ${weak.value}pt` :
+                         weak.issue === 'overtime' ? `${weak.dayLabel}曜 +${weak.value}m` :
+                         `${weak.dayLabel}曜 ${weak.value}件遅延`}
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      {weak.issue === 'low_score' && t('weeklyReview.weakTimeBand.lowScore').replace('{day}', weak.dayLabel)}
+                      {weak.issue === 'overtime' && t('weeklyReview.weakTimeBand.overtime').replace('{day}', weak.dayLabel)}
+                      {weak.issue === 'quest_delay' && t('weeklyReview.weakTimeBand.questDelay').replace('{day}', weak.dayLabel)}
+                    </p>
+                  </div>
+                  <Link href="/management/labor-plan">
+                    <Button variant="secondary" size="sm" className="shrink-0 gap-1">
+                      人員計画
+                      <ExternalLink className="h-3 w-3" />
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            ))}
+            
+            {/* Chronic Delay Quests */}
+            {laborMetrics.chronicDelayQuests.slice(0, 2).map((quest, idx) => (
+              <div key={`delay-${idx}`} className="p-4 rounded border border-red-200 bg-red-50">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className="p-1 rounded text-red-700">
+                        <AlertOctagon className="h-4 w-4" />
+                      </span>
+                      <h3 className="font-bold">{t('weeklyReview.chronicDelay')}</h3>
+                      <Badge className="bg-red-100 text-red-800">
+                        {quest.delayCount}回遅延
+                      </Badge>
+                    </div>
+                    <p className="text-sm font-medium">{quest.questTitle}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {t('weeklyReview.chronicDelay.desc')
+                        .replace('{count}', String(quest.delayCount))
+                        .replace('{minutes}', String(quest.avgDelayMinutes))}
+                    </p>
+                  </div>
+                  <Link href="/floor/todo">
+                    <Button variant="secondary" size="sm" className="shrink-0 gap-1">
+                      クエスト確認
+                      <ExternalLink className="h-3 w-3" />
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            ))}
+            
+            {!laborMetrics.winningMix && laborMetrics.weakTimeBands.length === 0 && laborMetrics.chronicDelayQuests.length === 0 && (
+              <div className="text-center py-8 text-muted-foreground">
+                {t('weeklyReview.noHrProposals')}
               </div>
             )}
           </CardContent>

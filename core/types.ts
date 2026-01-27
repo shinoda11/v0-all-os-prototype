@@ -365,6 +365,13 @@ export interface WeeklyLaborDailyRow {
   staffCount: number;
   starMix: { star3: number; star2: number; star1: number };
   sales: number | null; // null if sales_event not available
+  // HR-focused fields for weekly review
+  dayScore: number | null; // Daily team score (0-100)
+  overtimeFlag: boolean; // True if overtime occurred
+  overtimeMinutes: number; // Minutes of overtime
+  questDelayCount: number; // Number of delayed quests
+  questCompletedCount: number; // Number of completed quests
+  questTotalCount: number; // Total quests for the day
 }
 
 export interface WeeklyLaborMetrics {
@@ -376,8 +383,30 @@ export interface WeeklyLaborMetrics {
     totalSales: number | null;
     staffCountTotal: number;
     starMixTotal: { star3: number; star2: number; star1: number };
+    // HR-focused summary fields
+    avgDayScore: number | null; // Average daily score
+    overtimeDays: number; // Number of days with overtime
+    totalOvertimeMinutes: number; // Total overtime across week
+    totalQuestDelays: number; // Total delayed quests
+    questCompletionRate: number; // Overall quest completion rate
   };
   dailyRows: WeeklyLaborDailyRow[];
+  // Winning patterns analysis
+  winningMix: {
+    dayLabel: string;
+    starMix: { star3: number; star2: number; star1: number };
+    score: number;
+  } | null;
+  weakTimeBands: Array<{
+    dayLabel: string;
+    issue: 'low_score' | 'overtime' | 'quest_delay';
+    value: number;
+  }>;
+  chronicDelayQuests: Array<{
+    questTitle: string;
+    delayCount: number;
+    avgDelayMinutes: number;
+  }>;
   weekStart: string;
   weekEnd: string;
   lastUpdate: string;
