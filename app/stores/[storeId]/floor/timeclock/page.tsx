@@ -340,6 +340,7 @@ export default function TimeclockPage() {
         basePay={todayEarnings?.basePay ?? null}
         projectedBonus={myShare?.estimatedShare ?? 0}
         hasQualityPenalty={(todayEarnings?.qualityNgCount ?? 0) > 0}
+        adHocQuestCount={todayEarnings?.adHocQuestCount ?? 0}
         t={t}
       />
       

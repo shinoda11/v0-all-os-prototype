@@ -166,7 +166,7 @@ function QuestCard({ quest, status, roleNames, onStart, onPause, onResume, onCom
     >
   {/* Header: Title + Difficulty */}
   <div className="flex items-start justify-between gap-2 mb-3">
-  <div className="flex items-center gap-2">
+  <div className="flex items-center gap-2 flex-wrap">
     <h3 className={cn(
     'font-bold',
     status === 'done' && 'line-through text-muted-foreground'
@@ -176,6 +176,17 @@ function QuestCard({ quest, status, roleNames, onStart, onPause, onResume, onCom
     {status === 'paused' && (
     <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-300 text-xs">
       {t('quests.paused')}
+    </Badge>
+    )}
+    {/* Ad-hoc quest indicator - no points unless manager approved */}
+    {quest.source === 'ad-hoc' && !quest.managerApprovedForPoints && (
+    <Badge variant="outline" className="bg-slate-100 text-slate-600 border-slate-300 text-xs">
+      {t('quests.adHoc')} (0pt)
+    </Badge>
+    )}
+    {quest.source === 'ad-hoc' && quest.managerApprovedForPoints && (
+    <Badge variant="outline" className="bg-emerald-100 text-emerald-700 border-emerald-300 text-xs">
+      {t('quests.managerApproved')}
     </Badge>
     )}
   </div>

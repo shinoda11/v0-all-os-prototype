@@ -213,6 +213,9 @@ export interface Proposal {
   expectedEffects: ExpectedEffect[];
   todoCount: number; // Number of todos that will be generated on approval
   status: 'pending' | 'approved' | 'rejected';
+  // Source tracking for incentive abuse prevention
+  source?: 'system' | 'manager' | 'ad-hoc'; // system=auto-generated, manager=assigned, ad-hoc=self-created
+  managerApprovedForPoints?: boolean; // true if manager approved ad-hoc for points
 }
 
 // ------------------------------------------------------------
