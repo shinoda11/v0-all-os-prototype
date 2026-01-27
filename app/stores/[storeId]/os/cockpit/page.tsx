@@ -28,6 +28,7 @@ import {
   selectShiftSummary,
   selectSupplyDemandMetrics,
   selectTodoStats,
+  selectTeamDailyScore,
 } from '@/core/selectors';
 import { deriveLaborGuardrailSummary } from '@/core/derive';
 import { TodayBriefingModal, type OperationMode } from '@/components/cockpit/TodayBriefingModal';
@@ -48,6 +49,7 @@ import {
   RotateCcw,
   Target,
   CheckSquare,
+  Trophy,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -223,6 +225,108 @@ function DynamicShiftSummary() {
             />
           </div>
         </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// Team Daily Score Component
+function TeamScoreCard() {
+  const { state } = useStore();
+  const teamScore = selectTeamDailyScore(state);
+  
+  const gradeColors = {
+    S: 'bg-amber-100 text-amber-800',
+    A: 'bg-emerald-100 text-emerald-800',
+    B: 'bg-blue-100 text-blue-800',
+    C: 'bg-gray-100 text-gray-800',
+    D: 'bg-red-100 text-red-800',
+  };
+  
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <Trophy className="h-4 w-4" />
+            Team Score
+          </CardTitle>
+          <div className={cn(
+            'px-2 py-0.5 rounded text-sm font-bold',
+            gradeColors[teamScore.grade]
+          )}>
+            {teamScore.grade}
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Main Score */}
+        <div className="flex items-center justify-between">
+          <span className="text-3xl font-bold tabular-nums">{teamScore.total}</span>
+          <span className="text-sm text-muted-foreground">/ 100 pts</span>
+        </div>
+        
+        {/* Score Breakdown Mini */}
+        <div className="grid grid-cols-4 gap-2 text-center text-xs">
+          <div>
+            <div className="font-bold">{teamScore.breakdown.taskCompletion}</div>
+            <div className="text-muted-foreground">Task</div>
+          </div>
+          <div>
+            <div className="font-bold">{teamScore.breakdown.timeVariance}</div>
+            <div className="text-muted-foreground">Time</div>
+          </div>
+          <div>
+            <div className="font-bold">{teamScore.breakdown.breakCompliance}</div>
+            <div className="text-muted-foreground">Break</div>
+          </div>
+          <div>
+            <div className="font-bold">{teamScore.breakdown.zeroOvertime}</div>
+            <div className="text-muted-foreground">OT</div>
+          </div>
+        </div>
+        
+        {/* Bottlenecks */}
+        {teamScore.bottlenecks.length > 0 && (
+          <div className="space-y-1 pt-2 border-t border-border">
+            <div className="text-xs font-bold text-muted-foreground">BOTTLENECKS</div>
+            {teamScore.bottlenecks.slice(0, 2).map((b, i) => (
+              <div key={i} className="text-sm text-amber-700 flex items-center gap-1">
+                <AlertTriangle className="h-3 w-3 shrink-0" />
+                {b}
+              </div>
+            ))}
+          </div>
+        )}
+        
+        {/* Top Performers */}
+        {teamScore.topPerformers.length > 0 && (
+          <div className="space-y-1 pt-2 border-t border-border">
+            <div className="text-xs font-bold text-muted-foreground">TOP PERFORMERS</div>
+            {teamScore.topPerformers.slice(0, 2).map((p) => (
+              <div key={p.staffId} className="text-sm flex items-center justify-between">
+                <span className="flex items-center gap-1">
+                  <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                  {p.staffName}
+                </span>
+                <span className="font-bold">{p.score}pts</span>
+              </div>
+            ))}
+          </div>
+        )}
+        
+        {/* Needs Support */}
+        {teamScore.needsSupport.length > 0 && (
+          <div className="space-y-1 pt-2 border-t border-border">
+            <div className="text-xs font-bold text-muted-foreground">NEEDS SUPPORT</div>
+            {teamScore.needsSupport.slice(0, 2).map((s) => (
+              <div key={s.staffId} className="text-sm">
+                <span className="text-red-700">{s.staffName}</span>
+                <span className="text-muted-foreground"> - {s.issue}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </CardContent>
     </Card>
   );
@@ -833,9 +937,10 @@ export default function CockpitPage() {
         </MetricCard>
       </div>
 
-      {/* Shift Summary (Dynamic) + Lane Timeline */}
-      <div className="grid gap-6 lg:grid-cols-4">
+      {/* Staff Status + Team Score + Lane Timeline */}
+      <div className="grid gap-4 lg:grid-cols-5">
         <DynamicShiftSummary />
+        <TeamScoreCard />
         <div className="lg:col-span-3">
           <LaneTimeline laneEvents={laneEvents} maxPerLane={5} />
         </div>

@@ -878,7 +878,240 @@ export const deriveEnhancedCockpitMetrics = (
 // Shift Summary Derivation (replaces MOCK_SHIFT_SUMMARY)
 // ------------------------------------------------------------
 
-import type { ShiftSummary, SupplyDemandMetrics, RiskItem, Staff, Role } from './types';
+import type { ShiftSummary, SupplyDemandMetrics, RiskItem, Staff, Role, TodoEvent } from './types';
+
+// ------------------------------------------------------------
+// Daily Score Derivation
+// Score 0-100 based on: Task completion, Time variance, Break compliance, Zero overtime
+// ------------------------------------------------------------
+
+export interface DailyScoreBreakdown {
+  taskCompletion: number;      // 0-40 points (40% weight)
+  timeVariance: number;        // 0-25 points (25% weight)
+  breakCompliance: number;     // 0-15 points (15% weight)
+  zeroOvertime: number;        // 0-20 points (20% weight)
+}
+
+export interface DailyScore {
+  total: number;               // 0-100
+  breakdown: DailyScoreBreakdown;
+  grade: 'S' | 'A' | 'B' | 'C' | 'D';
+  feedback: string;
+  bottlenecks: string[];
+  improvements: string[];
+}
+
+export interface StaffDailyScore extends DailyScore {
+  staffId: string;
+  staffName: string;
+}
+
+export interface TeamDailyScore extends DailyScore {
+  staffScores: StaffDailyScore[];
+  topPerformers: Array<{ staffId: string; staffName: string; score: number }>;
+  needsSupport: Array<{ staffId: string; staffName: string; issue: string }>;
+}
+
+const getGrade = (score: number): DailyScore['grade'] => {
+  if (score >= 90) return 'S';
+  if (score >= 80) return 'A';
+  if (score >= 70) return 'B';
+  if (score >= 50) return 'C';
+  return 'D';
+};
+
+const getFeedback = (score: number, breakdown: DailyScoreBreakdown): string => {
+  if (score >= 90) return '素晴らしい一日でした！全ての目標を達成しています。';
+  if (score >= 80) return '良い一日でした。あと少しで完璧です！';
+  if (score >= 70) return 'まずまずの一日。改善点を意識して明日に活かしましょう。';
+  if (score >= 50) return '課題が残る一日でした。ボトルネックを確認しましょう。';
+  return '厳しい一日でした。チームでサポートが必要かもしれません。';
+};
+
+export const deriveDailyScore = (
+  events: DomainEvent[],
+  staff: Staff[],
+  storeId: string,
+  date: string,
+  staffId?: string
+): DailyScore => {
+  const laborEvents = filterByType(events, 'labor') as LaborEvent[];
+  const todoEvents = events.filter(e => 
+    e.type === 'todo' && 
+    e.storeId === storeId && 
+    e.timestamp.startsWith(date)
+  ) as TodoEvent[];
+  
+  // Filter by staff if specified
+  const filteredLabor = laborEvents.filter(e => 
+    e.storeId === storeId && 
+    e.timestamp.startsWith(date) &&
+    (!staffId || e.staffId === staffId)
+  );
+  
+  const filteredTodo = todoEvents.filter(e => 
+    !staffId || e.assignedStaffId === staffId
+  );
+  
+  // 1. Task Completion (40 points max)
+  const totalTasks = filteredTodo.length || 5; // Default mock
+  const completedTasks = filteredTodo.filter(e => e.status === 'done').length || 3;
+  const taskCompletionRate = totalTasks > 0 ? completedTasks / totalTasks : 0;
+  const taskCompletion = Math.round(taskCompletionRate * 40);
+  
+  // 2. Time Variance (25 points max) - How close to estimated time
+  // Mock: assume 80% on-time for demo
+  const onTimeRate = 0.8;
+  const timeVariance = Math.round(onTimeRate * 25);
+  
+  // 3. Break Compliance (15 points max)
+  // Check if breaks were taken properly
+  const breakStarts = filteredLabor.filter(e => e.action === 'break-start').length;
+  const breakEnds = filteredLabor.filter(e => e.action === 'break-end').length;
+  const breaksTaken = Math.min(breakStarts, breakEnds);
+  const expectedBreaks = 1; // 1 break per shift expected
+  const breakComplianceRate = breaksTaken >= expectedBreaks ? 1 : breaksTaken / expectedBreaks;
+  const breakCompliance = Math.round(breakComplianceRate * 15);
+  
+  // 4. Zero Overtime (20 points max)
+  // Mock: check if total hours <= planned hours
+  const checkIns = filteredLabor.filter(e => e.action === 'check-in');
+  const checkOuts = filteredLabor.filter(e => e.action === 'check-out');
+  const plannedHours = 8;
+  let actualHours = 0;
+  
+  for (const checkIn of checkIns) {
+    const checkOut = checkOuts.find(co => 
+      co.staffId === checkIn.staffId && 
+      new Date(co.timestamp) > new Date(checkIn.timestamp)
+    );
+    if (checkOut) {
+      const duration = (new Date(checkOut.timestamp).getTime() - new Date(checkIn.timestamp).getTime()) / (1000 * 60 * 60);
+      actualHours += duration;
+    }
+  }
+  
+  // If no data, use mock values
+  if (actualHours === 0) actualHours = 7.5;
+  
+  const overtimeHours = Math.max(0, actualHours - plannedHours);
+  const zeroOvertime = overtimeHours === 0 ? 20 : Math.max(0, 20 - Math.round(overtimeHours * 10));
+  
+  const breakdown: DailyScoreBreakdown = {
+    taskCompletion,
+    timeVariance,
+    breakCompliance,
+    zeroOvertime,
+  };
+  
+  const total = taskCompletion + timeVariance + breakCompliance + zeroOvertime;
+  
+  // Determine bottlenecks
+  const bottlenecks: string[] = [];
+  if (taskCompletion < 32) bottlenecks.push('タスク完了率が低い');
+  if (timeVariance < 20) bottlenecks.push('作業時間の遅延が多い');
+  if (breakCompliance < 12) bottlenecks.push('休憩が適切に取れていない');
+  if (zeroOvertime < 16) bottlenecks.push('残業が発生している');
+  
+  // Improvements for tomorrow
+  const improvements: string[] = [];
+  if (taskCompletion < 32) improvements.push('優先度の高いタスクから着手する');
+  if (timeVariance < 20) improvements.push('見積り時間を意識して作業する');
+  if (breakCompliance < 12) improvements.push('休憩時間を確保する');
+  if (zeroOvertime < 16) improvements.push('定時退勤を心がける');
+  
+  return {
+    total,
+    breakdown,
+    grade: getGrade(total),
+    feedback: getFeedback(total, breakdown),
+    bottlenecks,
+    improvements,
+  };
+};
+
+export const deriveTeamDailyScore = (
+  events: DomainEvent[],
+  staff: Staff[],
+  storeId: string,
+  date: string
+): TeamDailyScore => {
+  const storeStaff = staff.filter(s => s.storeId === storeId);
+  
+  // Calculate individual scores
+  const staffScores: StaffDailyScore[] = storeStaff.map(s => {
+    const score = deriveDailyScore(events, staff, storeId, date, s.id);
+    return {
+      ...score,
+      staffId: s.id,
+      staffName: s.name,
+    };
+  });
+  
+  // Calculate team average
+  const avgTotal = staffScores.length > 0 
+    ? Math.round(staffScores.reduce((sum, s) => sum + s.total, 0) / staffScores.length)
+    : 0;
+  
+  const avgBreakdown: DailyScoreBreakdown = {
+    taskCompletion: staffScores.length > 0
+      ? Math.round(staffScores.reduce((sum, s) => sum + s.breakdown.taskCompletion, 0) / staffScores.length)
+      : 0,
+    timeVariance: staffScores.length > 0
+      ? Math.round(staffScores.reduce((sum, s) => sum + s.breakdown.timeVariance, 0) / staffScores.length)
+      : 0,
+    breakCompliance: staffScores.length > 0
+      ? Math.round(staffScores.reduce((sum, s) => sum + s.breakdown.breakCompliance, 0) / staffScores.length)
+      : 0,
+    zeroOvertime: staffScores.length > 0
+      ? Math.round(staffScores.reduce((sum, s) => sum + s.breakdown.zeroOvertime, 0) / staffScores.length)
+      : 0,
+  };
+  
+  // Top performers (score >= 80)
+  const topPerformers = staffScores
+    .filter(s => s.total >= 80)
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 3)
+    .map(s => ({ staffId: s.staffId, staffName: s.staffName, score: s.total }));
+  
+  // Needs support (score < 60 or has bottlenecks)
+  const needsSupport = staffScores
+    .filter(s => s.total < 60)
+    .map(s => ({ 
+      staffId: s.staffId, 
+      staffName: s.staffName, 
+      issue: s.bottlenecks[0] || '全体的にサポートが必要' 
+    }));
+  
+  // Team bottlenecks (most common)
+  const allBottlenecks = staffScores.flatMap(s => s.bottlenecks);
+  const bottleneckCounts = new Map<string, number>();
+  for (const b of allBottlenecks) {
+    bottleneckCounts.set(b, (bottleneckCounts.get(b) || 0) + 1);
+  }
+  const teamBottlenecks = [...bottleneckCounts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([b]) => b);
+  
+  // Team improvements
+  const allImprovements = staffScores.flatMap(s => s.improvements);
+  const improvementSet = new Set(allImprovements);
+  const teamImprovements = [...improvementSet].slice(0, 3);
+  
+  return {
+    total: avgTotal,
+    breakdown: avgBreakdown,
+    grade: getGrade(avgTotal),
+    feedback: getFeedback(avgTotal, avgBreakdown),
+    bottlenecks: teamBottlenecks,
+    improvements: teamImprovements,
+    staffScores,
+    topPerformers,
+    needsSupport,
+  };
+};
 
 export const deriveShiftSummary = (
   events: DomainEvent[],
