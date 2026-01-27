@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/i18n/I18nProvider';
+import { useAuth } from '@/state/auth';
+import type { UserRole } from '@/core/types';
 import {
   BarChart3,
   TrendingUp,
@@ -28,12 +30,14 @@ interface NavItem {
   icon: React.ReactNode;
   children?: NavItem[];
   isExternal?: boolean; // For management links from OS pages
+  requiredRole?: UserRole; // Minimum role required to see this item
 }
 
 interface NavSection {
   titleKey: string; // i18n key
   descriptionKey?: string; // i18n key
   items: NavItem[];
+  requiredRole?: UserRole; // Minimum role required to see this section
 }
 
 /**
@@ -44,10 +48,11 @@ interface NavSection {
  * Incidents: Incident Center (rare events)
  */
 
-// KOS section - 店長・経営向け
+// KOS section - 店長・経営向け (Manager+)
 const kosSection: NavSection = {
   titleKey: 'nav.kos',
   descriptionKey: 'nav.kosDesc',
+  requiredRole: 'manager',
   items: [
     {
       labelKey: 'nav.cockpit',
@@ -72,10 +77,11 @@ const kosSection: NavSection = {
   ],
 };
 
-// Ops OS section - 現場向け
+// Ops OS section - 現場向け (All roles)
 const opsOsSection: NavSection = {
   titleKey: 'nav.opsOs',
   descriptionKey: 'nav.opsOsDesc',
+  requiredRole: 'staff',
   items: [
     {
       labelKey: 'nav.todayQuests',
@@ -95,10 +101,11 @@ const opsOsSection: NavSection = {
   ],
 };
 
-// Incidents section - レアイベント
+// Incidents section - レアイベント (Manager+)
 const incidentsSection: NavSection = {
   titleKey: 'nav.incidents',
   descriptionKey: 'nav.incidentsDesc',
+  requiredRole: 'manager',
   items: [
     {
       labelKey: 'nav.incidentCenter',
@@ -204,10 +211,16 @@ interface SidebarNavProps {
 export function SidebarNav({ storeId }: SidebarNavProps) {
   const pathname = usePathname();
   const { t } = useI18n();
+  const { hasRole } = useAuth();
+
+  // Filter sections based on user role
+  const visibleSections = navSections.filter(section => 
+    !section.requiredRole || hasRole(section.requiredRole)
+  );
 
   return (
     <nav className="flex flex-col gap-1 p-2">
-      {navSections.map((section, sectionIndex) => (
+      {visibleSections.map((section, sectionIndex) => (
         <div key={section.titleKey} className={cn(sectionIndex > 0 && 'mt-4 pt-4 border-t border-border')}>
           <div className="px-4 py-3">
             <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">

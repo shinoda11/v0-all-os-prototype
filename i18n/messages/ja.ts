@@ -32,6 +32,18 @@ export const ja = {
   'os.header.businessDate': '営業日',
   'os.header.lastUpdated': '更新',
   'os.header.askOS': 'Ask OS',
+  
+  // View Switcher
+  'view.label': '表示',
+  'view.manager': '店長',
+  'view.staff': 'スタッフ',
+  
+  // Error Pages
+  'error.forbidden.title': 'アクセス権限がありません',
+  'error.forbidden.message': 'このページにアクセスする権限がありません。アクセスが必要な場合は店長に連絡してください。',
+  'error.forbidden.goBack': '戻る',
+  'error.forbidden.goHome': 'ホームへ',
+  'error.forbidden.currentRole': '現在のロール',
 
   // Cockpit
   'cockpit.title': '運用コックピット',

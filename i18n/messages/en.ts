@@ -32,6 +32,18 @@ export const en = {
   'os.header.businessDate': 'Business Date',
   'os.header.lastUpdated': 'Updated',
   'os.header.askOS': 'Ask OS',
+  
+  // View Switcher
+  'view.label': 'View',
+  'view.manager': 'Manager',
+  'view.staff': 'Staff',
+  
+  // Error Pages
+  'error.forbidden.title': 'Access Denied',
+  'error.forbidden.message': 'You do not have permission to access this page. Please contact your manager if you need access.',
+  'error.forbidden.goBack': 'Go Back',
+  'error.forbidden.goHome': 'Go Home',
+  'error.forbidden.currentRole': 'Current Role',
 
   // Cockpit
   'cockpit.title': 'Operations Cockpit',

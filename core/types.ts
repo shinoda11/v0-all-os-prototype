@@ -4,6 +4,31 @@
 // ============================================================
 
 // ------------------------------------------------------------
+// User Role Types (RBAC)
+// ------------------------------------------------------------
+
+export type UserRole = 'staff' | 'manager' | 'sv';
+
+export interface CurrentUser {
+  id: string;
+  name: string;
+  role: UserRole;
+  storeId: string;
+}
+
+// Role hierarchy for permission checks
+export const ROLE_HIERARCHY: Record<UserRole, number> = {
+  staff: 1,
+  manager: 2,
+  sv: 3,
+};
+
+// Check if user has at least the required role level
+export const hasRoleLevel = (userRole: UserRole, requiredRole: UserRole): boolean => {
+  return ROLE_HIERARCHY[userRole] >= ROLE_HIERARCHY[requiredRole];
+};
+
+// ------------------------------------------------------------
 // Master Data Types
 // ------------------------------------------------------------
 
