@@ -22,6 +22,7 @@ import {
   ExternalLink,
   FileWarning,
   Users,
+  ClipboardList,
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -64,6 +65,11 @@ const kosSection: NavSection = {
       labelKey: 'nav.liveStaff',
       path: '/os/live-staff',
       icon: <Users className="h-5 w-5" />,
+    },
+    {
+      labelKey: 'nav.opsMonitor',
+      path: '/os/ops-monitor',
+      icon: <ClipboardList className="h-5 w-5" />,
     },
     {
       labelKey: 'nav.weeklyReview',

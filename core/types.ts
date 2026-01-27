@@ -138,6 +138,9 @@ export interface DecisionEvent extends BaseEvent {
   priority: 'low' | 'medium' | 'high' | 'critical';
   estimatedMinutes?: number;
   linkedExceptionId?: string;
+  // Assignee tracking
+  assigneeId?: string; // Staff ID of assigned person
+  assigneeName?: string; // Staff name for display
   // Completion result fields
   actualQuantity?: number;
   actualMinutes?: number;

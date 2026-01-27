@@ -24,6 +24,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useStore } from '@/state/store';
+import { useAuth } from '@/state/auth';
 import { useI18n } from '@/i18n/I18nProvider';
 import { useStateSubscription } from '@/state/eventBus';
 import {
@@ -610,6 +611,7 @@ function ProgressSummary({
 export default function TodayQuestsPage() {
   const { t, locale } = useI18n();
   const { state, actions } = useStore();
+  const { currentUser } = useAuth();
   const currentStore = selectCurrentStore(state);
   const [completingQuest, setCompletingQuest] = useState<DecisionEvent | null>(null);
   const [inProgressStartTime, setInProgressStartTime] = useState<string | null>(null);
@@ -617,9 +619,32 @@ export default function TodayQuestsPage() {
   // Subscribe to state updates
   useStateSubscription(['todo', 'decision', 'prep']);
 
-  // Get quests
-  const activeTodos = selectActiveTodos(state, undefined);
-  const completedTodos = selectCompletedTodos(state);
+  // Get quests - filter by current user's assigned quests or role
+  const allActiveTodos = selectActiveTodos(state, undefined);
+  const allCompletedTodos = selectCompletedTodos(state);
+  
+  // Find current user's staff record
+  const myStaff = state.staff.find((s) => 
+    s.storeId === state.selectedStoreId && s.id === `staff-${currentUser.id}`
+  ) ?? state.staff.find((s) => s.storeId === state.selectedStoreId);
+  const myRoleId = myStaff?.roleId;
+  
+  // Filter to only show quests assigned to current user or their role
+  const activeTodos = useMemo(() => 
+    allActiveTodos.filter((quest) => 
+      quest.assigneeId === myStaff?.id || 
+      (myRoleId && quest.distributedToRoles.includes(myRoleId))
+    ),
+    [allActiveTodos, myStaff?.id, myRoleId]
+  );
+  
+  const completedTodos = useMemo(() => 
+    allCompletedTodos.filter((quest) => 
+      quest.assigneeId === myStaff?.id || 
+      (myRoleId && quest.distributedToRoles.includes(myRoleId))
+    ),
+    [allCompletedTodos, myStaff?.id, myRoleId]
+  );
 
   // Categorize quests
   const waitingQuests = useMemo(() => 
