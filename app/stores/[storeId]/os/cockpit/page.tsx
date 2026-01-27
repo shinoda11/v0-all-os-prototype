@@ -51,7 +51,6 @@ import {
   Trophy,
   Gift,
   ExternalLink,
-  ExternalLink,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
