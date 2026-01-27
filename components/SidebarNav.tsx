@@ -4,6 +4,7 @@ import React from "react";
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
+import { useI18n } from '@/i18n/I18nProvider';
 import {
   BarChart3,
   TrendingUp,
@@ -22,7 +23,7 @@ import {
 import { useState } from 'react';
 
 interface NavItem {
-  label: string;
+  labelKey: string; // i18n key
   path?: string; // relative path without storeId prefix
   icon: React.ReactNode;
   children?: NavItem[];
@@ -30,8 +31,8 @@ interface NavItem {
 }
 
 interface NavSection {
-  title: string;
-  description?: string;
+  titleKey: string; // i18n key
+  descriptionKey?: string; // i18n key
   items: NavItem[];
 }
 
@@ -45,26 +46,26 @@ interface NavSection {
 
 // KOS section - 店長・経営向け
 const kosSection: NavSection = {
-  title: 'KOS',
-  description: 'Manager',
+  titleKey: 'nav.kos',
+  descriptionKey: 'nav.kosDesc',
   items: [
     {
-      label: 'コックピット',
+      labelKey: 'nav.cockpit',
       path: '/os/cockpit',
       icon: <Gauge className="h-5 w-5" />,
     },
     {
-      label: 'Weekly Review',
+      labelKey: 'nav.weeklyReview',
       path: '/os/weekly-review',
       icon: <BarChart3 className="h-5 w-5" />,
     },
     {
-      label: 'Team Performance',
+      labelKey: 'nav.teamPerformance',
       path: '/os/team-performance',
       icon: <TrendingUp className="h-5 w-5" />,
     },
     {
-      label: 'Awards',
+      labelKey: 'nav.awards',
       path: '/os/awards',
       icon: <CheckSquare className="h-5 w-5" />,
     },
@@ -73,21 +74,21 @@ const kosSection: NavSection = {
 
 // Ops OS section - 現場向け
 const opsOsSection: NavSection = {
-  title: 'Ops OS',
-  description: 'Floor',
+  titleKey: 'nav.opsOs',
+  descriptionKey: 'nav.opsOsDesc',
   items: [
     {
-      label: 'Today Quests',
+      labelKey: 'nav.todayQuests',
       path: '/floor/todo',
       icon: <CheckSquare className="h-5 w-5" />,
     },
     {
-      label: 'Time Clock',
+      labelKey: 'nav.timeClock',
       path: '/floor/timeclock',
       icon: <Clock className="h-5 w-5" />,
     },
     {
-      label: 'My Score',
+      labelKey: 'nav.myScore',
       path: '/floor/my-score',
       icon: <TrendingUp className="h-5 w-5" />,
     },
@@ -96,11 +97,11 @@ const opsOsSection: NavSection = {
 
 // Incidents section - レアイベント
 const incidentsSection: NavSection = {
-  title: 'Incidents',
-  description: 'Rare Events',
+  titleKey: 'nav.incidents',
+  descriptionKey: 'nav.incidentsDesc',
   items: [
     {
-      label: 'Incident Center',
+      labelKey: 'nav.incidentCenter',
       path: '/os/incidents',
       icon: <FileWarning className="h-5 w-5" />,
     },
@@ -109,15 +110,14 @@ const incidentsSection: NavSection = {
 
 const navSections: NavSection[] = [kosSection, opsOsSection, incidentsSection];
 
-const navItems = navSections.flatMap((section) => section.items);
-
 interface NavGroupProps {
   item: NavItem;
   pathname: string;
   storeId: string;
+  t: (key: string) => string;
 }
 
-function NavGroup({ item, pathname, storeId }: NavGroupProps) {
+function NavGroup({ item, pathname, storeId, t }: NavGroupProps) {
   const buildHref = (path: string | undefined) => {
     if (!path || path === '#') return '#';
     return `/stores/${storeId}${path}`;
@@ -145,7 +145,7 @@ function NavGroup({ item, pathname, storeId }: NavGroupProps) {
         )}
       >
         {item.icon}
-        {item.label}
+        {t(item.labelKey)}
       </Link>
     );
   }
@@ -163,7 +163,7 @@ function NavGroup({ item, pathname, storeId }: NavGroupProps) {
       >
         <span className="flex items-center gap-3">
           {item.icon}
-          {item.label}
+          {t(item.labelKey)}
         </span>
         {isOpen ? (
           <ChevronDown className="h-5 w-5" />
@@ -187,29 +187,11 @@ function NavGroup({ item, pathname, storeId }: NavGroupProps) {
                 )}
               >
                 {child.icon}
-                {child.label}
+                {t(child.labelKey)}
               </Link>
             );
           })}
         </div>
-      )}
-    </div>
-  );
-}
-
-interface SectionHeaderProps {
-  title: string;
-  description?: string;
-}
-
-function SectionHeader({ title, description }: SectionHeaderProps) {
-  return (
-    <div className="px-4 py-3">
-      <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-        {title}
-      </h3>
-      {description && (
-        <p className="text-sm text-muted-foreground/70">{description}</p>
       )}
     </div>
   );
@@ -221,15 +203,23 @@ interface SidebarNavProps {
 
 export function SidebarNav({ storeId }: SidebarNavProps) {
   const pathname = usePathname();
+  const { t } = useI18n();
 
   return (
     <nav className="flex flex-col gap-1 p-2">
       {navSections.map((section, sectionIndex) => (
-        <div key={section.title} className={cn(sectionIndex > 0 && 'mt-4 pt-4 border-t border-border')}>
-          <SectionHeader title={section.title} description={section.description} />
+        <div key={section.titleKey} className={cn(sectionIndex > 0 && 'mt-4 pt-4 border-t border-border')}>
+          <div className="px-4 py-3">
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+              {t(section.titleKey)}
+            </h3>
+            {section.descriptionKey && (
+              <p className="text-sm text-muted-foreground/70">{t(section.descriptionKey)}</p>
+            )}
+          </div>
           <div className="space-y-1">
             {section.items.map((item) => (
-              <NavGroup key={item.label} item={item} pathname={pathname} storeId={storeId} />
+              <NavGroup key={item.labelKey} item={item} pathname={pathname} storeId={storeId} t={t} />
             ))}
           </div>
         </div>

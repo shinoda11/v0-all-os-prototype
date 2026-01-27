@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useStore } from '@/state/store';
+import { useI18n } from '@/i18n/I18nProvider';
 import {
   selectCurrentStore,
   selectWeeklyLaborMetrics,
@@ -205,6 +206,7 @@ function getWeekOptions() {
 
 export default function WeeklyReviewPage() {
   const { state } = useStore();
+  const { t, locale } = useI18n();
   const store = selectCurrentStore(state);
   const weekOptions = useMemo(() => getWeekOptions(), []);
   const [selectedWeek, setSelectedWeek] = useState(weekOptions[0]?.value ?? '');
@@ -240,11 +242,11 @@ export default function WeeklyReviewPage() {
       />
       
       <main className="container mx-auto p-4 space-y-6">
-        {/* Header */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+{/* Header */}
+        <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold">Weekly Review</h1>
-            <p className="text-muted-foreground">週次の振り返りと改善提案</p>
+            <h2 className="text-xl font-bold">{t('weeklyReview.title')}</h2>
+            <p className="text-sm text-muted-foreground">{store?.shortName ?? 'Store'} - {t('weeklyReview.subtitle')}</p>
           </div>
           <div className="flex items-center gap-4">
             <Select value={selectedWeek} onValueChange={setSelectedWeek}>
@@ -293,7 +295,7 @@ export default function WeeklyReviewPage() {
             <CardHeader className="pb-2">
               <CardTitle className="text-sm flex items-center gap-2">
                 <DollarSign className="h-4 w-4" />
-                人件費率
+                {t('weeklyReview.laborCostRate')}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -319,7 +321,7 @@ export default function WeeklyReviewPage() {
             <CardHeader className="pb-2">
               <CardTitle className="text-sm flex items-center gap-2">
                 <Target className="h-4 w-4" />
-                生産性
+                {t('weeklyReview.productivity')}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -338,7 +340,7 @@ export default function WeeklyReviewPage() {
             <CardHeader className="pb-2">
               <CardTitle className="text-sm flex items-center gap-2">
                 <Star className="h-4 w-4" />
-                星ミックス
+                {t('weeklyReview.skillMix')}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -368,7 +370,7 @@ export default function WeeklyReviewPage() {
             <CardHeader className="pb-2">
               <CardTitle className="text-sm flex items-center gap-2">
                 <CheckSquare className="h-4 w-4" />
-                タスク完了度
+                {t('weeklyReview.taskCompletion')}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -394,9 +396,9 @@ export default function WeeklyReviewPage() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Lightbulb className="h-5 w-5 text-amber-500" />
-                <CardTitle>改善提案</CardTitle>
+                <CardTitle>{t('weeklyReview.proposals')}</CardTitle>
               </div>
-              <Badge variant="outline">{proposals.length}件</Badge>
+              <Badge variant="outline">{proposals.length}</Badge>
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -419,7 +421,7 @@ export default function WeeklyReviewPage() {
                         </span>
                         <h3 className="font-bold">{proposal.title}</h3>
                         <Badge className={priorityBadge[proposal.priority]}>
-                          {proposal.priority === 'high' ? '高' : proposal.priority === 'medium' ? '中' : '低'}
+                          {t(`weeklyReview.priority.${proposal.priority}`)}
                         </Badge>
                       </div>
                       
@@ -449,7 +451,7 @@ export default function WeeklyReviewPage() {
             
             {proposals.length === 0 && (
               <div className="text-center py-8 text-muted-foreground">
-                改善提案はありません。素晴らしい週でした！
+                {t('weeklyReview.noProposals')}
               </div>
             )}
           </CardContent>
@@ -459,7 +461,7 @@ export default function WeeklyReviewPage() {
         <div className="flex justify-end">
           <Link href="/management">
             <Button className="gap-2">
-              計画修正へ
+              {t('weeklyReview.goToManagement')}
               <ExternalLink className="h-4 w-4" />
             </Button>
           </Link>

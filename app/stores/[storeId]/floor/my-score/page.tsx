@@ -42,28 +42,24 @@ const GRADE_STYLES = {
 // Score category config
 const CATEGORY_CONFIG = {
   taskCompletion: {
-    label: 'タスク完了',
+    labelKey: 'myscore.taskCompletion',
     icon: CheckCircle,
     max: 40,
-    description: 'クエストの完了率',
   },
   timeVariance: {
-    label: '時間管理',
+    labelKey: 'myscore.timeVariance',
     icon: Clock,
     max: 25,
-    description: '予定時間との差分',
   },
   breakCompliance: {
-    label: '休憩遵守',
+    labelKey: 'myscore.breakCompliance',
     icon: Coffee,
     max: 15,
-    description: '適切な休憩取得',
   },
   zeroOvertime: {
-    label: '残業ゼロ',
+    labelKey: 'myscore.zeroOvertime',
     icon: Briefcase,
     max: 20,
-    description: '定時退勤の達成',
   },
 };
 
@@ -152,7 +148,7 @@ export default function MyScorePage() {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
               <Trophy className="h-4 w-4" />
-              スコア内訳
+              {t('myscore.breakdown')}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -166,7 +162,7 @@ export default function MyScorePage() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Icon className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm">{config.label}</span>
+                      <span className="text-sm">{t(config.labelKey)}</span>
                     </div>
                     <span className="text-sm font-bold tabular-nums">
                       {score} / {config.max}
@@ -181,42 +177,22 @@ export default function MyScorePage() {
                       '[&>div]:bg-red-500'
                     )}
                   />
-                  <p className="text-xs text-muted-foreground">{config.description}</p>
                 </div>
               );
             })}
           </CardContent>
         </Card>
         
-        {/* Bottlenecks */}
-        {dailyScore.bottlenecks.length > 0 && (
-          <Card className="border-amber-200 bg-amber-50/50">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm text-amber-800">改善ポイント</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ul className="space-y-2">
-                {dailyScore.bottlenecks.map((bottleneck, i) => (
-                  <li key={i} className="flex items-start gap-2 text-sm text-amber-900">
-                    <ChevronRight className="h-4 w-4 mt-0.5 shrink-0" />
-                    {bottleneck}
-                  </li>
-                ))}
-              </ul>
-            </CardContent>
-          </Card>
-        )}
-        
-        {/* Tomorrow's Actions */}
-        {dailyScore.improvements.length > 0 && (
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <TrendingUp className="h-4 w-4" />
-                明日への行動
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
+        {/* Improvements for Tomorrow */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <TrendingUp className="h-4 w-4" />
+              {t('myscore.improvements')}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {dailyScore.improvements.length > 0 ? (
               <ul className="space-y-2">
                 {dailyScore.improvements.map((improvement, i) => (
                   <li key={i} className="flex items-start gap-2 text-sm">
@@ -225,14 +201,16 @@ export default function MyScorePage() {
                   </li>
                 ))}
               </ul>
-            </CardContent>
-          </Card>
-        )}
+            ) : (
+              <p className="text-sm text-muted-foreground">{t('myscore.noImprovements')}</p>
+            )}
+          </CardContent>
+        </Card>
         
         {/* CTA */}
         <Button className="w-full h-11" asChild>
           <a href={`/stores/${storeId}/floor/todo`}>
-            Today Quests を見る
+            {t('myscore.goToQuests')}
             <ChevronRight className="h-4 w-4 ml-1" />
           </a>
         </Button>
