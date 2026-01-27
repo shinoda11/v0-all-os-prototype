@@ -2859,7 +2859,8 @@ export interface TodayEarnings {
   basePay: number | null;
   // Quest XP
   questsCompleted: number;
-  questXP: number;
+  questXP: number; // Only from eligible quests (excludes unapproved ad-hoc)
+  adHocQuestCount: number; // Count of unapproved ad-hoc quests (0 points)
   qualityNgCount: number;
   // Points
   pointsFromHours: number | null;
@@ -2927,6 +2928,7 @@ export const deriveTodayEarnings = (
       basePay: null,
       questsCompleted: 0,
       questXP: 0,
+      adHocQuestCount: 0,
       qualityNgCount: 0,
       pointsFromHours: null,
       pointsFromQuests: 0,
@@ -3016,9 +3018,22 @@ export const deriveTodayEarnings = (
   const questsCompleted = completedQuests.length;
   
   // Calculate quest XP (based on estimated minutes - simplified)
-  const questXP = completedQuests.reduce((sum, q) => sum + (q.estimatedMinutes ?? 10), 0);
+  // ANTI-ABUSE: Ad-hoc quests earn 0 points unless manager-approved
+  const isQuestEligibleForPoints = (q: DecisionEvent): boolean => {
+    // System-generated or manager-assigned quests are always eligible
+    if (!q.source || q.source === 'system' || q.source === 'manager') return true;
+    // Ad-hoc quests only eligible if manager approved for points
+    if (q.source === 'ad-hoc' && q.managerApprovedForPoints) return true;
+    return false;
+  };
   
-  // Quality NG count
+  const eligibleQuests = completedQuests.filter(isQuestEligibleForPoints);
+  const adHocQuests = completedQuests.filter(q => q.source === 'ad-hoc' && !q.managerApprovedForPoints);
+  
+  const questXP = eligibleQuests.reduce((sum, q) => sum + (q.estimatedMinutes ?? 10), 0);
+  const adHocQuestCount = adHocQuests.length;
+  
+  // Quality NG count (applies to all quests, not just eligible ones)
   const qualityNgCount = completedQuests.filter(q => q.qualityStatus === 'ng').length;
   
   // Calculate points
@@ -3046,6 +3061,7 @@ export const deriveTodayEarnings = (
     basePay,
     questsCompleted,
     questXP,
+    adHocQuestCount,
     qualityNgCount,
     pointsFromHours,
     pointsFromQuests,

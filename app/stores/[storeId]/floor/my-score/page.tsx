@@ -385,6 +385,13 @@ export default function MyScorePage() {
                   </div>
                 )}
                 
+                {todayEarnings.adHocQuestCount > 0 && (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted rounded px-2 py-1">
+                    <Info className="h-3 w-3" />
+                    {t('earnings.adHocNote').replace('{count}', String(todayEarnings.adHocQuestCount))}
+                  </div>
+                )}
+                
                 <div className="text-xs text-muted-foreground text-center">
                   {t('earnings.estimated')}
                 </div>

@@ -555,6 +555,12 @@ export const ja = {
   'quests.paused': '停止中',
   'quests.singleTaskConstraint': '現在のタスクを完了または一時停止してください',
   'quests.singleTaskReason': '品質維持のため、同時に進行できるタスクは1つまでです',
+  // Ad-hoc quest incentive rules
+  'quests.adHoc': 'アドホック',
+  'quests.adHocNoPoints': 'アドホッククエストは店長承認がない限りポイント対象外です',
+  'quests.managerApproved': '店長承認済',
+  'quests.requestApproval': '承認を依頼',
+  'earnings.adHocNote': '{count}件のアドホッククエストがポイント対象外',
   'quests.completeModal.title': 'タスク完了',
   'quests.completeModal.actualTime': '実績時間（分）',
   'quests.completeModal.quantity': '数量（任意）',

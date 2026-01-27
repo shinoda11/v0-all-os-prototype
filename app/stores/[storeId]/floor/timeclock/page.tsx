@@ -182,10 +182,11 @@ interface EarningsCardProps {
   basePay: number | null;
   projectedBonus: number;
   hasQualityPenalty: boolean;
+  adHocQuestCount: number;
   t: (key: string) => string;
 }
 
-function EarningsCard({ hoursWorked, basePay, projectedBonus, hasQualityPenalty, t }: EarningsCardProps) {
+function EarningsCard({ hoursWorked, basePay, projectedBonus, hasQualityPenalty, adHocQuestCount, t }: EarningsCardProps) {
   const projectedTotal = (basePay ?? 0) + projectedBonus;
   const notWorked = hoursWorked === null || hoursWorked === 0;
   
@@ -237,6 +238,12 @@ function EarningsCard({ hoursWorked, basePay, projectedBonus, hasQualityPenalty,
               <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 rounded px-2 py-1">
                 <AlertTriangle className="h-3 w-3" />
                 {t('earnings.qualityPenalty')}
+              </div>
+            )}
+            {adHocQuestCount > 0 && (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted rounded px-2 py-1">
+                <AlertTriangle className="h-3 w-3" />
+                {t('earnings.adHocNote').replace('{count}', String(adHocQuestCount))}
               </div>
             )}
             <div className="text-xs text-muted-foreground text-center">

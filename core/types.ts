@@ -141,6 +141,9 @@ export interface DecisionEvent extends BaseEvent {
   // Assignee tracking
   assigneeId?: string; // Staff ID of assigned person
   assigneeName?: string; // Staff name for display
+  // Source tracking for incentive abuse prevention
+  source?: 'system' | 'manager' | 'ad-hoc'; // system=auto-generated, manager=assigned, ad-hoc=self-created
+  managerApprovedForPoints?: boolean; // true if manager approved ad-hoc quest for points
   // Completion result fields
   actualQuantity?: number;
   actualMinutes?: number;

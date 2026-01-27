@@ -555,6 +555,12 @@ export const en = {
   'quests.paused': 'Paused',
   'quests.singleTaskConstraint': 'Complete or pause current task first',
   'quests.singleTaskReason': 'Only one task can be in progress at a time to maintain quality',
+  // Ad-hoc quest incentive rules
+  'quests.adHoc': 'Ad-hoc',
+  'quests.adHocNoPoints': 'Ad-hoc quests earn 0 points unless manager-approved',
+  'quests.managerApproved': 'Manager Approved',
+  'quests.requestApproval': 'Request Approval',
+  'earnings.adHocNote': '{count} ad-hoc quests not earning points',
   'quests.completeModal.title': 'Complete Task',
   'quests.completeModal.actualTime': 'Actual Time (min)',
   'quests.completeModal.quantity': 'Quantity (optional)',
