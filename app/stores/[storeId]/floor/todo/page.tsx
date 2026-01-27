@@ -1,18 +1,13 @@
 'use client';
 
-import React from "react"
-
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { PageHeader } from '@/components/PageHeader';
-import { StatsGrid } from '@/components/StatsGrid';
 import { EmptyState } from '@/components/EmptyState';
-import { TimeBandTabs } from '@/components/TimeBandTabs';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -28,7 +23,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
 import { useStore } from '@/state/store';
 import { useI18n } from '@/i18n/I18nProvider';
 import { useStateSubscription } from '@/state/eventBus';
@@ -36,350 +30,353 @@ import {
   selectActiveTodos,
   selectCompletedTodos,
   selectCurrentStore,
-  selectTodoStats,
 } from '@/core/selectors';
 import { proposalFromDecision } from '@/core/commands';
-import type { DecisionEvent, Proposal, TimeBand } from '@/core/types';
+import type { DecisionEvent, TimeBand } from '@/core/types';
 import {
-  CheckCircle,
   Play,
-  Pause,
+  CheckCircle,
   Clock,
-  AlertCircle,
-  AlertTriangle,
-  CheckSquare,
+  Star,
   Timer,
-  Package,
   Users,
-  RefreshCw,
+  Zap,
+  Trophy,
+  Target,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-const PRIORITY_CONFIG: Record<Proposal['priority'], { labelKey: string; color: string; icon: React.ReactNode }> = {
-  critical: { labelKey: 'exceptions.critical', color: 'bg-red-100 text-red-800 border-red-200', icon: <AlertCircle className="h-3 w-3" /> },
-  high: { labelKey: 'todo.high', color: 'bg-orange-100 text-orange-800 border-orange-200', icon: <AlertTriangle className="h-3 w-3" /> },
-  medium: { labelKey: 'todo.medium', color: 'bg-yellow-100 text-yellow-800 border-yellow-200', icon: null },
-  low: { labelKey: 'todo.low', color: 'bg-gray-100 text-gray-800 border-gray-200', icon: null },
-};
+/**
+ * Today Quests - Floor Worker Task Management
+ * 
+ * Design Guidelines Compliance:
+ * - 2.1: Spacing scale 4/8/12/16/24/32
+ * - 2.3: State with icon + label
+ * - 2.4: Touch targets 44x44 minimum
+ * - 2.5: Typography Regular/Bold only
+ * - 3.2: Queue card with summary, urgency, recommended action
+ */
+
+// Difficulty levels with star display
+type Difficulty = 1 | 2 | 3 | 4 | 5;
 
 const DELAY_REASONS = [
-  { value: 'material-shortage', labelKey: 'completion.materialShortage' },
-  { value: 'equipment-issue', labelKey: 'completion.equipmentIssue' },
-  { value: 'staff-shortage', labelKey: 'completion.staffShortage' },
-  { value: 'priority-change', labelKey: 'completion.priorityChange' },
-  { value: 'unexpected-order', labelKey: 'completion.unexpectedOrder' },
-  { value: 'other', labelKey: 'completion.other' },
+  { value: 'material-shortage', label: '材料不足' },
+  { value: 'equipment-issue', label: '機器トラブル' },
+  { value: 'staff-shortage', label: '人手不足' },
+  { value: 'priority-change', label: '優先度変更' },
+  { value: 'unexpected-order', label: '想定外の注文' },
+  { value: 'other', label: 'その他' },
 ];
 
-interface CompletionData {
-  actualQuantity: number;
-  actualMinutes: number;
-  delayReason?: string;
-  hasIssue: boolean;
-  issueNote?: string;
+// Estimate difficulty from estimated minutes
+function getDifficulty(estimatedMinutes?: number): Difficulty {
+  if (!estimatedMinutes) return 2;
+  if (estimatedMinutes <= 5) return 1;
+  if (estimatedMinutes <= 15) return 2;
+  if (estimatedMinutes <= 30) return 3;
+  if (estimatedMinutes <= 60) return 4;
+  return 5;
 }
 
-interface TodoCardProps {
-  todo: DecisionEvent;
+// Star display component
+function DifficultyStars({ difficulty }: { difficulty: Difficulty }) {
+  return (
+    <div className="flex items-center gap-0.5" title={`難易度: ${difficulty}`}>
+      {[1, 2, 3, 4, 5].map((i) => (
+        <Star
+          key={i}
+          className={cn(
+            'h-3 w-3',
+            i <= difficulty ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/30'
+          )}
+        />
+      ))}
+    </div>
+  );
+}
+
+// Timer display for in-progress tasks
+function TaskTimer({ startTime }: { startTime: string }) {
+  const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    const start = new Date(startTime).getTime();
+    const updateTimer = () => {
+      const now = Date.now();
+      setElapsed(Math.floor((now - start) / 1000));
+    };
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
+    return () => clearInterval(interval);
+  }, [startTime]);
+
+  const minutes = Math.floor(elapsed / 60);
+  const seconds = elapsed % 60;
+
+  return (
+    <div className="flex items-center gap-2 text-lg font-bold tabular-nums text-primary">
+      <Timer className="h-5 w-5 animate-pulse" />
+      <span>{String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}</span>
+    </div>
+  );
+}
+
+// Quest Card Component
+interface QuestCardProps {
+  quest: DecisionEvent;
+  status: 'waiting' | 'in_progress' | 'done';
   roleNames: string[];
-  status: 'pending' | 'active' | 'paused' | 'completed';
   onStart?: () => void;
-  onPause?: () => void;
-  onResume?: () => void;
   onComplete?: () => void;
+  disabled?: boolean;
 }
 
-function TodoCard({ todo, roleNames, status, onStart, onPause, onResume, onComplete }: TodoCardProps) {
-  const { t, locale } = useI18n();
-  const priority = PRIORITY_CONFIG[todo.priority];
-  const isCompleted = status === 'completed';
-  const isPaused = status === 'paused';
-
+function QuestCard({ quest, status, roleNames, onStart, onComplete, disabled }: QuestCardProps) {
+  const difficulty = getDifficulty(quest.estimatedMinutes);
+  
   const formatDeadline = (deadline: string) => {
     const date = new Date(deadline);
-    const now = new Date();
-    const diffMs = date.getTime() - now.getTime();
-    const diffMins = Math.floor(diffMs / (1000 * 60));
-    
-    if (diffMins < 0) {
-      return { text: locale === 'ja' ? `${Math.abs(diffMins)}分超過` : `${Math.abs(diffMins)}min over`, isOverdue: true };
-    }
-    if (diffMins < 60) {
-      return { text: locale === 'ja' ? `残り${diffMins}分` : `${diffMins}min left`, isOverdue: false };
-    }
-    return { text: date.toLocaleTimeString(locale === 'ja' ? 'ja-JP' : 'en-US', { hour: '2-digit', minute: '2-digit' }), isOverdue: false };
+    return date.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
   };
 
-  const deadlineInfo = todo.deadline ? formatDeadline(todo.deadline) : null;
+  const isOverdue = quest.deadline && new Date(quest.deadline) < new Date();
 
   return (
     <div
       className={cn(
-        'rounded-lg border p-4 transition-all',
-        isCompleted
-          ? 'bg-muted/30 border-muted'
-          : isPaused
-          ? 'bg-yellow-50/50 border-yellow-200'
-          : todo.priority === 'critical'
-          ? 'border-red-200 bg-red-50/30'
-          : 'hover:shadow-sm'
+        'p-4 rounded-lg border transition-all',
+        status === 'waiting' && 'bg-card border-border hover:border-primary/50',
+        status === 'in_progress' && 'bg-primary/5 border-primary',
+        status === 'done' && 'bg-muted/50 border-muted',
+        disabled && status === 'waiting' && 'opacity-60'
       )}
     >
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex-1 space-y-3">
-          {/* Priority and Role Badges */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <Badge variant="outline" className={cn(priority.color, 'gap-1')}>
-              {priority.icon}
-              {t(priority.labelKey)}
-            </Badge>
-            {roleNames.map((name) => (
-              <Badge key={name} variant="secondary" className="gap-1">
-                <Users className="h-3 w-3" />
-                {name}
-              </Badge>
-            ))}
-            {todo.linkedExceptionId && (
-              <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-200 gap-1">
-                <AlertTriangle className="h-3 w-3" />
-                {t('todo.exceptionResponse')}
-              </Badge>
-            )}
-            {isCompleted && (
-              <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200 gap-1">
-                <CheckSquare className="h-3 w-3" />
-                {t('todo.completed')}
-              </Badge>
-            )}
-            {isPaused && (
-              <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-200 gap-1">
-                <Pause className="h-3 w-3" />
-                {t('todo.paused')}
-              </Badge>
-            )}
-          </div>
+      {/* Header: Title + Difficulty */}
+      <div className="flex items-start justify-between gap-2 mb-3">
+        <h3 className={cn(
+          'font-bold',
+          status === 'done' && 'line-through text-muted-foreground'
+        )}>
+          {quest.title}
+        </h3>
+        <DifficultyStars difficulty={difficulty} />
+      </div>
 
-          {/* Title and Description */}
-          <div>
-            <h4 className={cn('font-semibold text-base', isCompleted && 'line-through text-muted-foreground')}>
-              {todo.title}
-            </h4>
-            <p className="text-sm text-muted-foreground mt-1">{todo.description}</p>
-          </div>
+      {/* Meta info */}
+      <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground mb-4">
+        {/* Role */}
+        {roleNames.length > 0 && (
+          <span className="flex items-center gap-1">
+            <Users className="h-4 w-4" />
+            {roleNames.join(', ')}
+          </span>
+        )}
+        
+        {/* Deadline */}
+        {quest.deadline && (
+          <span className={cn(
+            'flex items-center gap-1',
+            isOverdue && status !== 'done' && 'text-red-600 font-bold'
+          )}>
+            <Clock className="h-4 w-4" />
+            {formatDeadline(quest.deadline)}
+            {isOverdue && status !== 'done' && ' (超過)'}
+          </span>
+        )}
+        
+        {/* Estimated time */}
+        {quest.estimatedMinutes && (
+          <span className="flex items-center gap-1">
+            <Timer className="h-4 w-4" />
+            {quest.estimatedMinutes}分
+          </span>
+        )}
+      </div>
 
-          {/* Details Grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
-            {todo.quantity && todo.quantity > 0 && (
-              <div className="flex items-center gap-1.5">
-                <Package className="h-4 w-4 text-muted-foreground" />
-                <span className="text-muted-foreground">{t('todo.quantity')}:</span>
-                <span className="font-medium">{todo.quantity}</span>
-              </div>
-            )}
-            {todo.estimatedMinutes && (
-              <div className="flex items-center gap-1.5">
-                <Timer className="h-4 w-4 text-muted-foreground" />
-                <span className="text-muted-foreground">{t('todo.estimate')}:</span>
-                <span className="font-medium">{todo.estimatedMinutes}{locale === 'ja' ? '分' : 'min'}</span>
-              </div>
-            )}
-            {deadlineInfo && (
-              <div className={cn(
-                'flex items-center gap-1.5',
-                deadlineInfo.isOverdue && 'text-red-600'
-              )}>
-                <Clock className="h-4 w-4" />
-                <span className={deadlineInfo.isOverdue ? '' : 'text-muted-foreground'}>{t('todo.deadline')}:</span>
-                <span className="font-medium">{deadlineInfo.text}</span>
-              </div>
-            )}
-          </div>
-
-          {/* Completion Results (if completed) */}
-          {isCompleted && (todo.actualQuantity || todo.actualMinutes) && (
-            <div className="pt-2 border-t border-muted text-sm text-muted-foreground">
-              <div className="flex gap-4">
-                {todo.actualQuantity && (
-                  <span>{t('todo.actual')}: {todo.actualQuantity}</span>
-                )}
-                {todo.actualMinutes && (
-                  <span>{locale === 'ja' ? '所要時間' : 'Time'}: {todo.actualMinutes}{locale === 'ja' ? '分' : 'min'}</span>
-                )}
-                {todo.delayReason && (
-                  <span>{t('completion.delayReason')}: {t(DELAY_REASONS.find(r => r.value === todo.delayReason)?.labelKey || 'completion.none')}</span>
-                )}
-              </div>
-            </div>
-          )}
+      {/* Timer for in-progress */}
+      {status === 'in_progress' && quest.timestamp && (
+        <div className="mb-4">
+          <TaskTimer startTime={quest.timestamp} />
         </div>
+      )}
 
-        {/* Action Buttons */}
-        <div className="flex flex-col gap-2">
-          {status === 'pending' && onStart && (
-            <Button size="sm" onClick={onStart} className="gap-1">
-              <Play className="h-4 w-4" />
-              {t('todo.start')}
-            </Button>
-          )}
-          {status === 'active' && (
-            <>
-              {onPause && (
-                <Button size="sm" variant="outline" onClick={onPause} className="gap-1 bg-transparent">
-                  <Pause className="h-4 w-4" />
-                  {t('todo.pause')}
-                </Button>
-              )}
-              {onComplete && (
-                <Button size="sm" onClick={onComplete} className="gap-1">
-                  <CheckCircle className="h-4 w-4" />
-                  {t('todo.complete')}
-                </Button>
-              )}
-            </>
-          )}
-          {status === 'paused' && onResume && (
-            <Button size="sm" onClick={onResume} className="gap-1">
-              <Play className="h-4 w-4" />
-              {t('todo.resume')}
-            </Button>
-          )}
+      {/* Completion results for done */}
+      {status === 'done' && (quest.actualMinutes || quest.actualQuantity) && (
+        <div className="mb-4 p-2 bg-muted rounded text-sm">
+          <div className="flex items-center gap-4">
+            {quest.actualMinutes && (
+              <span>実績: {quest.actualMinutes}分</span>
+            )}
+            {quest.actualQuantity && (
+              <span>数量: {quest.actualQuantity}</span>
+            )}
+          </div>
         </div>
+      )}
+
+      {/* Actions */}
+      <div className="flex gap-2">
+        {status === 'waiting' && onStart && (
+          <Button 
+            onClick={onStart} 
+            disabled={disabled}
+            className="flex-1 h-11 gap-2"
+          >
+            <Play className="h-4 w-4" />
+            開始
+          </Button>
+        )}
+        {status === 'in_progress' && onComplete && (
+          <Button 
+            onClick={onComplete}
+            className="flex-1 h-11 gap-2"
+          >
+            <CheckCircle className="h-4 w-4" />
+            完了
+          </Button>
+        )}
       </div>
     </div>
   );
 }
 
-interface CompletionModalProps {
-  todo: DecisionEvent | null;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onSubmit: (data: CompletionData) => void;
+// Column Component
+interface QuestColumnProps {
+  title: string;
+  icon: React.ReactNode;
+  count: number;
+  accentColor?: string;
+  children: React.ReactNode;
 }
 
-function CompletionModal({ todo, open, onOpenChange, onSubmit }: CompletionModalProps) {
-  const { t, locale } = useI18n();
-  const [actualQuantity, setActualQuantity] = useState(todo?.quantity ?? 0);
-  const [actualMinutes, setActualMinutes] = useState(todo?.estimatedMinutes ?? 0);
-  const [delayReason, setDelayReason] = useState<string>('none'); // Updated default value
-  const [hasIssue, setHasIssue] = useState(false);
-  const [issueNote, setIssueNote] = useState('');
+function QuestColumn({ title, icon, count, accentColor, children }: QuestColumnProps) {
+  return (
+    <div className="flex flex-col min-w-[300px] flex-1">
+      {/* Column Header */}
+      <div className={cn(
+        'flex items-center gap-2 p-4 rounded-t-lg border-b-2',
+        accentColor || 'border-border'
+      )}>
+        {icon}
+        <span className="font-bold">{title}</span>
+        <Badge variant="secondary" className="ml-auto">{count}</Badge>
+      </div>
+      
+      {/* Column Content */}
+      <div className="flex-1 p-4 space-y-3 bg-muted/30 rounded-b-lg min-h-[400px]">
+        {children}
+      </div>
+    </div>
+  );
+}
 
-  // Reset form when todo changes
-  useState(() => {
-    if (todo) {
-      setActualQuantity(todo.quantity ?? 0);
-      setActualMinutes(todo.estimatedMinutes ?? 0);
-      setDelayReason('none'); // Updated default value
-      setHasIssue(false);
-      setIssueNote('');
+// Completion Modal
+interface CompletionModalProps {
+  quest: DecisionEvent | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSubmit: (data: { actualMinutes: number; actualQuantity?: number; delayReason?: string }) => void;
+  elapsedMinutes: number;
+}
+
+function CompletionModal({ quest, open, onOpenChange, onSubmit, elapsedMinutes }: CompletionModalProps) {
+  const [actualMinutes, setActualMinutes] = useState(elapsedMinutes);
+  const [actualQuantity, setActualQuantity] = useState<number | undefined>(quest?.quantity);
+  const [delayReason, setDelayReason] = useState<string>('none');
+
+  useEffect(() => {
+    if (quest) {
+      setActualMinutes(elapsedMinutes || quest.estimatedMinutes || 0);
+      setActualQuantity(quest.quantity);
+      setDelayReason('');
     }
-  });
+  }, [quest, elapsedMinutes]);
 
   const handleSubmit = () => {
     onSubmit({
-      actualQuantity,
       actualMinutes,
+      actualQuantity,
       delayReason: delayReason || undefined,
-      hasIssue,
-      issueNote: hasIssue ? issueNote : undefined,
     });
-    onOpenChange(false);
   };
 
-  if (!todo) return null;
+  if (!quest) return null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{t('completion.title')}</DialogTitle>
-          <DialogDescription>
-            {todo.title}
-          </DialogDescription>
+          <DialogTitle className="flex items-center gap-2">
+            <Trophy className="h-5 w-5 text-amber-500" />
+            クエスト完了
+          </DialogTitle>
+          <DialogDescription>{quest.title}</DialogDescription>
         </DialogHeader>
-        
-        <div className="space-y-4 py-4">
-          {/* Actual Quantity */}
-          <div className="space-y-2">
-            <Label htmlFor="actualQuantity">{t('completion.actualQuantity')}</Label>
-            <Input
-              id="actualQuantity"
-              type="number"
-              min={0}
-              value={actualQuantity}
-              onChange={(e) => setActualQuantity(Number(e.target.value))}
-            />
-            {todo.quantity && (
-              <p className="text-xs text-muted-foreground">{t('completion.recommended')}: {todo.quantity}</p>
-            )}
-          </div>
 
-          {/* Actual Minutes */}
+        <div className="space-y-4 py-4">
+          {/* Actual Time */}
           <div className="space-y-2">
-            <Label htmlFor="actualMinutes">{t('completion.timeTaken')}</Label>
+            <Label htmlFor="actualMinutes">実績時間（分）</Label>
             <Input
               id="actualMinutes"
               type="number"
               min={0}
               value={actualMinutes}
               onChange={(e) => setActualMinutes(Number(e.target.value))}
+              className="h-11"
             />
-            {todo.estimatedMinutes && (
-              <p className="text-xs text-muted-foreground">{t('completion.estimate')}: {todo.estimatedMinutes}{locale === 'ja' ? '分' : 'min'}</p>
+            {quest.estimatedMinutes && (
+              <p className="text-sm text-muted-foreground">
+                想定: {quest.estimatedMinutes}分
+              </p>
             )}
           </div>
 
+          {/* Actual Quantity (optional) */}
+          {quest.quantity && (
+            <div className="space-y-2">
+              <Label htmlFor="actualQuantity">実績数量（任意）</Label>
+              <Input
+                id="actualQuantity"
+                type="number"
+                min={0}
+                value={actualQuantity ?? ''}
+                onChange={(e) => setActualQuantity(e.target.value ? Number(e.target.value) : undefined)}
+                className="h-11"
+              />
+              <p className="text-sm text-muted-foreground">
+                想定: {quest.quantity}
+              </p>
+            </div>
+          )}
+
           {/* Delay Reason (optional) */}
           <div className="space-y-2">
-            <Label htmlFor="delayReason">{t('completion.delayReason')}</Label>
+            <Label htmlFor="delayReason">遅延理由（任意）</Label>
             <Select value={delayReason} onValueChange={setDelayReason}>
-              <SelectTrigger>
-                <SelectValue />
+              <SelectTrigger className="h-11">
+                <SelectValue placeholder="選択してください" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">{t('completion.none')}</SelectItem>
+                <SelectItem value="none">なし</SelectItem>
                 {DELAY_REASONS.map((reason) => (
                   <SelectItem key={reason.value} value={reason.value}>
-                    {t(reason.labelKey)}
+                    {reason.label}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
-
-          {/* Issue Checkbox */}
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="hasIssue"
-              checked={hasIssue}
-              onCheckedChange={(checked) => setHasIssue(checked === true)}
-            />
-            <Label htmlFor="hasIssue" className="text-sm font-normal">
-              {t('completion.hasIssue')}
-            </Label>
-          </div>
-
-          {/* Issue Note (if has issue) */}
-          {hasIssue && (
-            <div className="space-y-2">
-              <Label htmlFor="issueNote">{t('completion.issueContent')}</Label>
-              <Textarea
-                id="issueNote"
-                value={issueNote}
-                onChange={(e) => setIssueNote(e.target.value)}
-                placeholder={t('completion.issueContentPlaceholder')}
-                rows={3}
-              />
-            </div>
-          )}
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            {t('common.cancel')}
+          <Button variant="secondary" onClick={() => onOpenChange(false)} className="h-11">
+            キャンセル
           </Button>
-          <Button onClick={handleSubmit}>
-            {t('completion.record')}
+          <Button onClick={handleSubmit} className="h-11 gap-2">
+            <CheckCircle className="h-4 w-4" />
+            記録して完了
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -387,308 +384,282 @@ function CompletionModal({ todo, open, onOpenChange, onSubmit }: CompletionModal
   );
 }
 
-export default function TodoPage() {
+// Progress Summary
+function ProgressSummary({ 
+  waiting, 
+  inProgress, 
+  done, 
+  total 
+}: { 
+  waiting: number; 
+  inProgress: number; 
+  done: number; 
+  total: number;
+}) {
+  const percentage = total > 0 ? Math.round((done / total) * 100) : 0;
+
+  return (
+    <Card>
+      <CardContent className="p-4">
+        <div className="flex items-center gap-6">
+          {/* Progress Circle */}
+          <div className="relative h-16 w-16">
+            <svg className="h-16 w-16 -rotate-90" viewBox="0 0 64 64">
+              <circle
+                cx="32"
+                cy="32"
+                r="28"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="6"
+                className="text-muted"
+              />
+              <circle
+                cx="32"
+                cy="32"
+                r="28"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="6"
+                strokeDasharray={`${percentage * 1.76} 176`}
+                className="text-primary"
+              />
+            </svg>
+            <span className="absolute inset-0 flex items-center justify-center text-lg font-bold">
+              {percentage}%
+            </span>
+          </div>
+
+          {/* Stats */}
+          <div className="flex-1 grid grid-cols-3 gap-4">
+            <div className="text-center">
+              <div className="text-2xl font-bold text-muted-foreground">{waiting}</div>
+              <div className="text-sm text-muted-foreground">待機中</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-primary">{inProgress}</div>
+              <div className="text-sm text-muted-foreground">進行中</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-emerald-600">{done}</div>
+              <div className="text-sm text-muted-foreground">完了</div>
+            </div>
+          </div>
+
+          {/* Motivation */}
+          <div className="flex items-center gap-2 text-sm">
+            {percentage === 100 ? (
+              <>
+                <Trophy className="h-5 w-5 text-amber-500" />
+                <span className="font-bold text-amber-600">全クエスト達成!</span>
+              </>
+            ) : percentage >= 50 ? (
+              <>
+                <Zap className="h-5 w-5 text-primary" />
+                <span>あと{total - done}件!</span>
+              </>
+            ) : (
+              <>
+                <Target className="h-5 w-5 text-muted-foreground" />
+                <span>今日のクエスト</span>
+              </>
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// Main Page Component
+export default function TodayQuestsPage() {
   const { t, locale } = useI18n();
   const { state, actions } = useStore();
   const currentStore = selectCurrentStore(state);
-  const [selectedRole, setSelectedRole] = useState<string | undefined>(undefined);
-  const [timeBand, setTimeBand] = useState<TimeBand>(state.selectedTimeBand);
-  const [completingTodo, setCompletingTodo] = useState<DecisionEvent | null>(null);
+  const [completingQuest, setCompletingQuest] = useState<DecisionEvent | null>(null);
+  const [inProgressStartTime, setInProgressStartTime] = useState<string | null>(null);
 
-  // Subscribe to state updates via event bus
-  const { lastUpdateTime: busUpdateTime } = useStateSubscription(['todo', 'decision', 'prep']);
-  const [lastUpdate, setLastUpdate] = useState(new Date());
+  // Subscribe to state updates
+  useStateSubscription(['todo', 'decision', 'prep']);
 
-  const activeTodos = selectActiveTodos(state, selectedRole);
+  // Get quests
+  const activeTodos = selectActiveTodos(state, undefined);
   const completedTodos = selectCompletedTodos(state);
-  const todoStats = selectTodoStats(state, selectedRole);
 
-  // Update last update time from event bus or periodically
-  useEffect(() => {
-    setLastUpdate(new Date(busUpdateTime));
-  }, [busUpdateTime]);
+  // Categorize quests
+  const waitingQuests = useMemo(() => 
+    activeTodos.filter((t) => t.action === 'pending' || t.action === 'approved'),
+    [activeTodos]
+  );
   
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setLastUpdate(new Date());
-    }, 30000); // Update every 30 seconds as fallback
-    return () => clearInterval(interval);
-  }, []);
+  const inProgressQuests = useMemo(() => 
+    activeTodos.filter((t) => t.action === 'started'),
+    [activeTodos]
+  );
+  
+  const doneQuests = useMemo(() => 
+    completedTodos.slice(0, 10), // Show last 10 completed
+    [completedTodos]
+  );
 
-  // Update last update when time band changes
-  const handleTimeBandChange = useCallback((newTimeBand: TimeBand) => {
-    setTimeBand(newTimeBand);
-    setLastUpdate(new Date());
-  }, []);
+  // Check if user already has a task in progress (1 task constraint)
+  const hasTaskInProgress = inProgressQuests.length > 0;
 
-  // Filter todos by time band
-  const filteredActiveTodos = useMemo(() => {
-    if (timeBand === 'all') return activeTodos;
-    return activeTodos.filter((todo) => todo.timeBand === timeBand || todo.timeBand === 'all');
-  }, [activeTodos, timeBand]);
+  const getRoleNames = (roleIds: string[]) =>
+    roleIds.map((roleId) => state.roles.find((r) => r.id === roleId)?.name).filter(Boolean) as string[];
 
-  const filteredCompletedTodos = useMemo(() => {
-    if (timeBand === 'all') return completedTodos;
-    return completedTodos.filter((todo) => todo.timeBand === timeBand || todo.timeBand === 'all');
-  }, [completedTodos, timeBand]);
-
-  // pending = distributed todos waiting to start, approved = legacy approval events
-  const pendingTodos = filteredActiveTodos.filter((t) => t.action === 'pending' || t.action === 'approved');
-  const inProgressTodos = filteredActiveTodos.filter((t) => t.action === 'started');
-  const pausedTodos = filteredActiveTodos.filter((t) => t.action === 'paused');
-
-  const handleStart = (todo: DecisionEvent) => {
-    const proposal = proposalFromDecision(todo);
+  const handleStart = (quest: DecisionEvent) => {
+    const proposal = proposalFromDecision(quest);
     actions.startDecision(proposal);
     
-    if (todo.targetPrepItemIds && todo.targetPrepItemIds.length > 0) {
-      actions.startPrep(todo.targetPrepItemIds[0], todo.quantity || 1, undefined, todo.proposalId);
+    if (quest.targetPrepItemIds && quest.targetPrepItemIds.length > 0) {
+      actions.startPrep(quest.targetPrepItemIds[0], quest.quantity || 1, undefined, quest.proposalId);
     }
   };
 
-  const handlePause = (todo: DecisionEvent) => {
-    // Add paused event
-    const pausedEvent: DecisionEvent = {
-      ...todo,
-      id: `${todo.proposalId}-paused-${Date.now()}`,
-      action: 'paused',
-      timestamp: new Date().toISOString(),
-    };
-    actions.addEvent(pausedEvent);
+  const handleCompleteClick = (quest: DecisionEvent) => {
+    setInProgressStartTime(quest.timestamp);
+    setCompletingQuest(quest);
   };
 
-  const handleResume = (todo: DecisionEvent) => {
-    // Resume by adding started event again
-    const startedEvent: DecisionEvent = {
-      ...todo,
-      id: `${todo.proposalId}-resumed-${Date.now()}`,
-      action: 'started',
-      timestamp: new Date().toISOString(),
-    };
-    actions.addEvent(startedEvent);
-  };
+  const handleCompleteSubmit = (data: { actualMinutes: number; actualQuantity?: number; delayReason?: string }) => {
+    if (!completingQuest) return;
 
-  const handleCompleteClick = (todo: DecisionEvent) => {
-    setCompletingTodo(todo);
-  };
-
-  const handleCompleteSubmit = (data: CompletionData) => {
-    if (!completingTodo) return;
-
-    const proposal = proposalFromDecision(completingTodo);
-    
-    // Add completed event with results
     const completedEvent: DecisionEvent = {
-      ...completingTodo,
-      id: `${completingTodo.proposalId}-completed-${Date.now()}`,
+      ...completingQuest,
+      id: `${completingQuest.proposalId}-completed-${Date.now()}`,
       action: 'completed',
       timestamp: new Date().toISOString(),
       actualQuantity: data.actualQuantity,
       actualMinutes: data.actualMinutes,
       delayReason: data.delayReason,
-      hasIssue: data.hasIssue,
-      issueNote: data.issueNote,
     };
     actions.addEvent(completedEvent);
 
-    // Also complete prep if linked - this creates prep_event that updates cockpit metrics
-    if (completingTodo.targetPrepItemIds && completingTodo.targetPrepItemIds.length > 0) {
+    if (completingQuest.targetPrepItemIds && completingQuest.targetPrepItemIds.length > 0) {
       actions.completePrep(
-        completingTodo.targetPrepItemIds[0],
-        data.actualQuantity,
+        completingQuest.targetPrepItemIds[0],
+        data.actualQuantity ?? completingQuest.quantity ?? 0,
         undefined,
-        completingTodo.proposalId
+        completingQuest.proposalId
       );
     }
 
-    setCompletingTodo(null);
-    setLastUpdate(new Date()); // Update last refresh time
+    setCompletingQuest(null);
+    setInProgressStartTime(null);
   };
 
-  const getRoleNames = (roleIds: string[]) =>
-    roleIds.map((roleId) => state.roles.find((r) => r.id === roleId)?.name).filter(Boolean) as string[];
-
-  const getTodoStatus = (todo: DecisionEvent): 'pending' | 'active' | 'paused' | 'completed' => {
-    if (todo.action === 'completed') return 'completed';
-    if (todo.action === 'paused') return 'paused';
-    if (todo.action === 'started') return 'active';
-    return 'pending';
+  // Calculate elapsed minutes for modal
+  const getElapsedMinutes = () => {
+    if (!inProgressStartTime) return 0;
+    const start = new Date(inProgressStartTime).getTime();
+    return Math.round((Date.now() - start) / 60000);
   };
 
   if (!currentStore) {
     return null;
   }
 
-  const shortName = currentStore.name.replace('Aburi TORA 熟成鮨と炙り鮨 ', '');
-
-  const stats = [
-    {
-      icon: <Clock className="h-6 w-6 text-yellow-600" />,
-      iconBgColor: 'bg-yellow-100',
-      value: pendingTodos.length,
-      label: t('todo.pending'),
-    },
-    {
-      icon: <Play className="h-6 w-6 text-blue-600" />,
-      iconBgColor: 'bg-blue-100',
-      value: inProgressTodos.length + pausedTodos.length,
-      label: t('todo.inProgress'),
-    },
-    {
-      icon: <CheckCircle className="h-6 w-6 text-green-600" />,
-      iconBgColor: 'bg-green-100',
-      value: filteredCompletedTodos.length,
-      label: t('todo.completed'),
-    },
-  ];
+  const totalQuests = waitingQuests.length + inProgressQuests.length + doneQuests.length;
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title={t('todo.title')}
-        subtitle={shortName}
-        actions={
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <RefreshCw className="h-3 w-3" />
-              {t('todo.lastUpdate')}: {lastUpdate.toLocaleTimeString(locale === 'ja' ? 'ja-JP' : 'en-US', { hour: '2-digit', minute: '2-digit' })}
-            </div>
-            <TimeBandTabs value={timeBand} onChange={handleTimeBandChange} />
-          </div>
-        }
+        title="Today Quests"
+        subtitle={`${currentStore.name} - ${new Date().toLocaleDateString('ja-JP', { month: 'long', day: 'numeric' })}`}
       />
 
-      {/* Role Filter */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-sm text-muted-foreground">{t('todo.roleFilter')}:</span>
-        <div className="flex gap-1 flex-wrap">
-          <Badge
-            variant={selectedRole === undefined ? 'default' : 'outline'}
-            className="cursor-pointer"
-            onClick={() => setSelectedRole(undefined)}
-          >
-            {t('common.all')}
-          </Badge>
-          {state.roles.map((role) => (
-            <Badge
-              key={role.id}
-              variant={selectedRole === role.id ? 'default' : 'outline'}
-              className="cursor-pointer"
-              onClick={() => setSelectedRole(role.id)}
-            >
-              {role.name}
-            </Badge>
-          ))}
-        </div>
+      {/* Progress Summary */}
+      <ProgressSummary
+        waiting={waitingQuests.length}
+        inProgress={inProgressQuests.length}
+        done={doneQuests.length}
+        total={totalQuests}
+      />
+
+      {/* 3-Column Kanban */}
+      <div className="flex gap-4 overflow-x-auto pb-4">
+        {/* Waiting Column */}
+        <QuestColumn
+          title="待機中"
+          icon={<Clock className="h-5 w-5 text-muted-foreground" />}
+          count={waitingQuests.length}
+          accentColor="border-muted-foreground"
+        >
+          {waitingQuests.length === 0 ? (
+            <EmptyState type="no_data" title="待機中のクエストなし" />
+          ) : (
+            waitingQuests.map((quest) => (
+              <QuestCard
+                key={quest.id}
+                quest={quest}
+                status="waiting"
+                roleNames={getRoleNames(quest.distributedToRoles)}
+                onStart={() => handleStart(quest)}
+                disabled={hasTaskInProgress}
+              />
+            ))
+          )}
+        </QuestColumn>
+
+        {/* In Progress Column */}
+        <QuestColumn
+          title="進行中"
+          icon={<Play className="h-5 w-5 text-primary" />}
+          count={inProgressQuests.length}
+          accentColor="border-primary"
+        >
+          {inProgressQuests.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground">
+              <Play className="h-8 w-8 mb-2 opacity-30" />
+              <p>クエストを開始してください</p>
+              <p className="text-sm">1つずつ集中して取り組もう</p>
+            </div>
+          ) : (
+            inProgressQuests.map((quest) => (
+              <QuestCard
+                key={quest.id}
+                quest={quest}
+                status="in_progress"
+                roleNames={getRoleNames(quest.distributedToRoles)}
+                onComplete={() => handleCompleteClick(quest)}
+              />
+            ))
+          )}
+        </QuestColumn>
+
+        {/* Done Column */}
+        <QuestColumn
+          title="完了"
+          icon={<CheckCircle className="h-5 w-5 text-emerald-600" />}
+          count={doneQuests.length}
+          accentColor="border-emerald-600"
+        >
+          {doneQuests.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground">
+              <Trophy className="h-8 w-8 mb-2 opacity-30" />
+              <p>完了したクエストがここに表示されます</p>
+            </div>
+          ) : (
+            doneQuests.map((quest) => (
+              <QuestCard
+                key={quest.id}
+                quest={quest}
+                status="done"
+                roleNames={getRoleNames(quest.distributedToRoles)}
+              />
+            ))
+          )}
+        </QuestColumn>
       </div>
-
-      <StatsGrid stats={stats} />
-
-      {/* Pending Tasks */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Clock className="h-5 w-5 text-yellow-600" />
-            {t('todo.pendingTasks')}
-            {pendingTodos.length > 0 && (
-              <Badge variant="secondary">{pendingTodos.length}</Badge>
-            )}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {pendingTodos.length === 0 ? (
-            <EmptyState title={t('todo.noTasks')} />
-          ) : (
-            <div className="space-y-4">
-              {pendingTodos.map((todo) => (
-                <TodoCard
-                  key={todo.id}
-                  todo={todo}
-                  roleNames={getRoleNames(todo.distributedToRoles)}
-                  status="pending"
-                  onStart={() => handleStart(todo)}
-                />
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* In Progress Tasks */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Play className="h-5 w-5 text-blue-600" />
-            {t('todo.inProgressTasks')}
-            {(inProgressTodos.length + pausedTodos.length) > 0 && (
-              <Badge variant="secondary">{inProgressTodos.length + pausedTodos.length}</Badge>
-            )}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {inProgressTodos.length === 0 && pausedTodos.length === 0 ? (
-            <EmptyState title={t('todo.noTasks')} />
-          ) : (
-            <div className="space-y-4">
-              {inProgressTodos.map((todo) => (
-                <TodoCard
-                  key={todo.id}
-                  todo={todo}
-                  roleNames={getRoleNames(todo.distributedToRoles)}
-                  status="active"
-                  onPause={() => handlePause(todo)}
-                  onComplete={() => handleCompleteClick(todo)}
-                />
-              ))}
-              {pausedTodos.map((todo) => (
-                <TodoCard
-                  key={todo.id}
-                  todo={todo}
-                  roleNames={getRoleNames(todo.distributedToRoles)}
-                  status="paused"
-                  onResume={() => handleResume(todo)}
-                />
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Completed Tasks */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <CheckCircle className="h-5 w-5 text-green-600" />
-            {t('todo.completedTasks')}
-            {filteredCompletedTodos.length > 0 && (
-              <Badge variant="secondary">{filteredCompletedTodos.length}</Badge>
-            )}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {filteredCompletedTodos.length === 0 ? (
-            <EmptyState title={t('todo.noTasks')} />
-          ) : (
-            <div className="space-y-4">
-              {filteredCompletedTodos.slice(0, 5).map((todo) => (
-                <TodoCard
-                  key={todo.id}
-                  todo={todo}
-                  roleNames={getRoleNames(todo.distributedToRoles)}
-                  status="completed"
-                />
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
 
       {/* Completion Modal */}
       <CompletionModal
-        todo={completingTodo}
-        open={!!completingTodo}
-        onOpenChange={(open) => !open && setCompletingTodo(null)}
+        quest={completingQuest}
+        open={!!completingQuest}
+        onOpenChange={(open) => !open && setCompletingQuest(null)}
         onSubmit={handleCompleteSubmit}
+        elapsedMinutes={getElapsedMinutes()}
       />
     </div>
   );

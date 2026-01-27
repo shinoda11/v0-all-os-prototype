@@ -35,105 +35,79 @@ interface NavSection {
   items: NavItem[];
 }
 
-// Management section - 計画・マスター・分析
-const managementSection: NavSection = {
-  title: 'Management',
-  description: '計画・マスター・分析',
-  items: [
-    {
-      label: '売上管理',
-      icon: <TrendingUp className="h-4 w-4" />,
-      children: [
-        {
-          label: '売上予測入力',
-          path: '/food-service/stores/sales-forecast',
-          icon: <BarChart3 className="h-4 w-4" />,
-        },
-      ],
-    },
-    {
-      label: '分析・レポート',
-      icon: <BarChart3 className="h-4 w-4" />,
-      children: [
-        {
-          label: '日別売上分析',
-          path: '/food-service/stores/analytics/daily-sales',
-          icon: <TrendingUp className="h-4 w-4" />,
-        },
-      ],
-    },
-    {
-      label: 'メニュー',
-      icon: <UtensilsCrossed className="h-4 w-4" />,
-      children: [
-        {
-          label: 'メニュー管理',
-          path: '/menu',
-          icon: <UtensilsCrossed className="h-4 w-4" />,
-        },
-      ],
-    },
-    {
-      label: '仕込み',
-      icon: <ChefHat className="h-4 w-4" />,
-      children: [
-        {
-          label: '仕込み管理',
-          path: '/prep',
-          icon: <ChefHat className="h-4 w-4" />,
-        },
-      ],
-    },
-  ],
-};
+/**
+ * Navigation Structure (KOS / Ops OS / Incidents)
+ * 
+ * KOS (Manager): Cockpit, Weekly Review, Team Performance, Awards
+ * Ops OS (Floor): Today Quests, Time Clock, My Score
+ * Incidents: Incident Center (rare events)
+ */
 
-// OS section - 運用・意思決定
-const osSection: NavSection = {
-  title: 'All OS',
-  description: '運用・意思決定',
+// KOS section - 店長・経営向け
+const kosSection: NavSection = {
+  title: 'KOS',
+  description: 'Manager',
   items: [
     {
-      label: '運用コックピット',
+      label: 'コックピット',
       path: '/os/cockpit',
       icon: <Gauge className="h-5 w-5" />,
     },
     {
-      label: '案件センター',
-      path: '/os/incidents',
-      icon: <FileWarning className="h-5 w-5" />,
-    },
-    {
-      label: '例外センター',
-      path: '/os/exceptions',
-      icon: <AlertTriangle className="h-5 w-5" />,
-    },
-    {
-      label: '週次労務レビュー',
+      label: 'Weekly Review',
       path: '/os/labor-weekly',
-      icon: <Clock className="h-5 w-5" />,
+      icon: <BarChart3 className="h-5 w-5" />,
+    },
+    {
+      label: 'Team Performance',
+      path: '/os/team-performance',
+      icon: <TrendingUp className="h-5 w-5" />,
+    },
+    {
+      label: 'Awards',
+      path: '/os/awards',
+      icon: <CheckSquare className="h-5 w-5" />,
     },
   ],
 };
 
-// Floor section - 現場実行
-const floorSection: NavSection = {
-  title: 'Floor',
-  description: '現場実行',
+// Ops OS section - 現場向け
+const opsOsSection: NavSection = {
+  title: 'Ops OS',
+  description: 'Floor',
   items: [
     {
-      label: '現場ToDo',
+      label: 'Today Quests',
       path: '/floor/todo',
       icon: <CheckSquare className="h-5 w-5" />,
     },
     {
-      label: '勤怠',
+      label: 'Time Clock',
       path: '/floor/timeclock',
       icon: <Clock className="h-5 w-5" />,
+    },
+    {
+      label: 'My Score',
+      path: '/floor/my-score',
+      icon: <TrendingUp className="h-5 w-5" />,
     },
   ],
 };
 
-const navSections: NavSection[] = [osSection, floorSection, managementSection];
+// Incidents section - レアイベント
+const incidentsSection: NavSection = {
+  title: 'Incidents',
+  description: 'Rare Events',
+  items: [
+    {
+      label: 'Incident Center',
+      path: '/os/incidents',
+      icon: <FileWarning className="h-5 w-5" />,
+    },
+  ],
+};
+
+const navSections: NavSection[] = [kosSection, opsOsSection, incidentsSection];
 
 const navItems = navSections.flatMap((section) => section.items);
 
