@@ -27,6 +27,8 @@ import {
   TodoStats,
 } from './types';
 
+import { INCENTIVE_POLICY, getDailyTargetSales } from '@/data/mock';
+
 // ------------------------------------------------------------
 // Event Filtering Helpers
 // ------------------------------------------------------------
@@ -2837,6 +2839,334 @@ export const deriveTeamPerformanceMetrics = (
       hasQuestData,
       hasQualityData,
     },
+  };
+};
+
+// ------------------------------------------------------------
+// Earnings & Incentive Derivation
+// ------------------------------------------------------------
+
+export interface TodayEarnings {
+  staffId: string;
+  staffName: string;
+  businessDate: string;
+  // Hours
+  hoursWorked: number | null; // null = not tracked
+  breakMinutes: number;
+  netHoursWorked: number | null;
+  // Base Pay
+  hourlyWage: number;
+  basePay: number | null;
+  // Quest XP
+  questsCompleted: number;
+  questXP: number;
+  qualityNgCount: number;
+  // Points
+  pointsFromHours: number | null;
+  pointsFromQuests: number;
+  totalPoints: number | null;
+  // Status
+  status: 'working' | 'checked-out' | 'not-tracked';
+}
+
+export interface IncentivePool {
+  storeId: string;
+  businessDate: string;
+  // Sales
+  targetSales: number;
+  actualSales: number;
+  runRateSales: number; // Projected end-of-day sales
+  useSalesValue: 'actual' | 'runRate';
+  salesForCalculation: number;
+  // Over-achievement
+  overAchievement: number;
+  overAchievementRate: number | null; // percentage over target
+  // Pool
+  poolShare: number;
+  pool: number;
+  // Status
+  status: 'projected' | 'finalized' | 'not-tracked';
+}
+
+export interface StaffIncentiveShare {
+  staffId: string;
+  staffName: string;
+  points: number;
+  sharePercentage: number;
+  estimatedShare: number;
+  isEstimate: boolean; // true = projected, not finalized
+}
+
+export interface IncentiveDistribution {
+  storeId: string;
+  businessDate: string;
+  pool: IncentivePool;
+  totalPoints: number;
+  staffShares: StaffIncentiveShare[];
+  status: 'projected' | 'finalized' | 'not-tracked';
+  lastUpdate: string;
+}
+
+export const deriveTodayEarnings = (
+  events: DomainEvent[],
+  staff: Staff[],
+  staffId: string,
+  businessDate: string
+): TodayEarnings => {
+  const staffMember = staff.find(s => s.id === staffId);
+  
+  if (!staffMember) {
+    return {
+      staffId,
+      staffName: 'Unknown',
+      businessDate,
+      hoursWorked: null,
+      breakMinutes: 0,
+      netHoursWorked: null,
+      hourlyWage: 0,
+      basePay: null,
+      questsCompleted: 0,
+      questXP: 0,
+      qualityNgCount: 0,
+      pointsFromHours: null,
+      pointsFromQuests: 0,
+      totalPoints: null,
+      status: 'not-tracked',
+    };
+  }
+  
+  const now = new Date();
+  const dateStr = businessDate;
+  
+  // Filter labor events for this staff on this date
+  const laborEvents = (filterByType(events, 'labor') as LaborEvent[])
+    .filter(e => e.staffId === staffId && e.timestamp.startsWith(dateStr))
+    .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+  
+  // Calculate hours worked
+  let totalMinutesWorked = 0;
+  let breakMinutes = 0;
+  let checkInTime: Date | null = null;
+  let breakStartTime: Date | null = null;
+  let hasLaborData = false;
+  let isCheckedOut = false;
+  
+  for (const event of laborEvents) {
+    hasLaborData = true;
+    const eventTime = new Date(event.timestamp);
+    
+    switch (event.action) {
+      case 'check-in':
+        checkInTime = eventTime;
+        break;
+      case 'check-out':
+        if (checkInTime) {
+          totalMinutesWorked += (eventTime.getTime() - checkInTime.getTime()) / 60000;
+          checkInTime = null;
+          isCheckedOut = true;
+        }
+        break;
+      case 'break-start':
+        breakStartTime = eventTime;
+        break;
+      case 'break-end':
+        if (breakStartTime) {
+          breakMinutes += (eventTime.getTime() - breakStartTime.getTime()) / 60000;
+          breakStartTime = null;
+        }
+        break;
+    }
+  }
+  
+  // If still checked in, count time until now
+  if (checkInTime && !isCheckedOut) {
+    totalMinutesWorked += (now.getTime() - checkInTime.getTime()) / 60000;
+  }
+  
+  // If still on break, count break time until now
+  if (breakStartTime) {
+    breakMinutes += (now.getTime() - breakStartTime.getTime()) / 60000;
+  }
+  
+  // Net hours = total - breaks
+  const netMinutesWorked = Math.max(0, totalMinutesWorked - breakMinutes);
+  const hoursWorked = hasLaborData ? Math.round(totalMinutesWorked / 6) / 10 : null;
+  const netHoursWorked = hasLaborData ? Math.round(netMinutesWorked / 6) / 10 : null;
+  
+  // Calculate base pay
+  const hourlyWage = staffMember.wage;
+  const basePay = netHoursWorked !== null ? Math.round(netHoursWorked * hourlyWage) : null;
+  
+  // Filter decision events (quests) for this staff on this date
+  const decisionEvents = (filterByType(events, 'decision') as DecisionEvent[])
+    .filter(e => 
+      e.timestamp.startsWith(dateStr) && 
+      (e.assigneeId === staffId || e.distributedToRoles.includes(staffMember.roleId))
+    );
+  
+  // Get completed quests
+  const questStatuses = new Map<string, DecisionEvent>();
+  for (const event of decisionEvents.sort((a, b) => 
+    new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+  )) {
+    questStatuses.set(event.proposalId, event);
+  }
+  
+  const completedQuests = Array.from(questStatuses.values()).filter(q => q.action === 'completed');
+  const questsCompleted = completedQuests.length;
+  
+  // Calculate quest XP (based on estimated minutes - simplified)
+  const questXP = completedQuests.reduce((sum, q) => sum + (q.estimatedMinutes ?? 10), 0);
+  
+  // Quality NG count
+  const qualityNgCount = completedQuests.filter(q => q.qualityStatus === 'ng').length;
+  
+  // Calculate points
+  const { points } = INCENTIVE_POLICY;
+  const pointsFromHours = netHoursWorked !== null ? Math.round(netHoursWorked * points.perHour) : null;
+  const pointsFromQuests = questXP * points.perQuestXP;
+  
+  // Apply quality penalty if there are NG quests
+  let totalPoints: number | null = null;
+  if (pointsFromHours !== null) {
+    totalPoints = pointsFromHours + pointsFromQuests;
+    if (qualityNgCount > 0) {
+      totalPoints = Math.round(totalPoints * INCENTIVE_POLICY.qualityPenalty.ngMultiplier);
+    }
+  }
+  
+  return {
+    staffId,
+    staffName: staffMember.name,
+    businessDate,
+    hoursWorked,
+    breakMinutes: Math.round(breakMinutes),
+    netHoursWorked,
+    hourlyWage,
+    basePay,
+    questsCompleted,
+    questXP,
+    qualityNgCount,
+    pointsFromHours,
+    pointsFromQuests,
+    totalPoints,
+    status: !hasLaborData ? 'not-tracked' : isCheckedOut ? 'checked-out' : 'working',
+  };
+};
+
+export const deriveIncentivePool = (
+  events: DomainEvent[],
+  storeId: string,
+  businessDate: string
+): IncentivePool => {
+  const targetSales = getDailyTargetSales(storeId, businessDate);
+  
+  // Get actual sales for the day
+  const salesEvents = (filterByType(events, 'sales') as SalesEvent[])
+    .filter(e => e.storeId === storeId && e.timestamp.startsWith(businessDate));
+  
+  const actualSales = salesEvents.reduce((sum, e) => sum + e.totalAmount, 0);
+  
+  // Calculate run rate (projected end-of-day sales)
+  const now = new Date();
+  const currentHour = now.getHours();
+  const businessEndHour = 22; // Assume business ends at 10 PM
+  const businessStartHour = 11; // Assume business starts at 11 AM
+  
+  let runRateSales = actualSales;
+  let useSalesValue: 'actual' | 'runRate' = 'actual';
+  
+  // If business day not yet finished, project run rate
+  if (currentHour < businessEndHour && currentHour >= businessStartHour) {
+    const hoursElapsed = currentHour - businessStartHour;
+    const totalBusinessHours = businessEndHour - businessStartHour;
+    const progressRatio = hoursElapsed / totalBusinessHours;
+    
+    if (progressRatio > 0) {
+      runRateSales = Math.round(actualSales / progressRatio);
+      useSalesValue = 'runRate';
+    }
+  }
+  
+  const salesForCalculation = useSalesValue === 'runRate' ? runRateSales : actualSales;
+  
+  // Calculate over-achievement
+  const overAchievement = Math.max(0, salesForCalculation - targetSales);
+  const overAchievementRate = targetSales > 0 
+    ? Math.round((overAchievement / targetSales) * 1000) / 10 
+    : null;
+  
+  // Calculate pool
+  const { poolShare } = INCENTIVE_POLICY;
+  const pool = Math.round(overAchievement * poolShare);
+  
+  // Determine status
+  const isFinalized = currentHour >= businessEndHour || 
+    (new Date(businessDate).toDateString() !== now.toDateString());
+  
+  return {
+    storeId,
+    businessDate,
+    targetSales,
+    actualSales,
+    runRateSales,
+    useSalesValue,
+    salesForCalculation,
+    overAchievement,
+    overAchievementRate,
+    poolShare,
+    pool,
+    status: salesEvents.length === 0 ? 'not-tracked' : isFinalized ? 'finalized' : 'projected',
+  };
+};
+
+export const deriveIncentiveDistribution = (
+  events: DomainEvent[],
+  staff: Staff[],
+  storeId: string,
+  businessDate: string
+): IncentiveDistribution => {
+  const pool = deriveIncentivePool(events, storeId, businessDate);
+  
+  // Get all staff for this store
+  const storeStaff = staff.filter(s => s.storeId === storeId);
+  
+  // Calculate earnings for each staff member
+  const staffEarnings = storeStaff.map(s => deriveTodayEarnings(events, staff, s.id, businessDate));
+  
+  // Calculate total points
+  const totalPoints = staffEarnings.reduce((sum, e) => sum + (e.totalPoints ?? 0), 0);
+  
+  // Calculate each staff's share
+  const staffShares: StaffIncentiveShare[] = staffEarnings
+    .filter(e => e.totalPoints !== null && e.totalPoints > 0)
+    .map(e => {
+      const sharePercentage = totalPoints > 0 
+        ? Math.round((e.totalPoints! / totalPoints) * 1000) / 10 
+        : 0;
+      const estimatedShare = totalPoints > 0 
+        ? Math.round(pool.pool * (e.totalPoints! / totalPoints)) 
+        : 0;
+      
+      return {
+        staffId: e.staffId,
+        staffName: e.staffName,
+        points: e.totalPoints!,
+        sharePercentage,
+        estimatedShare,
+        isEstimate: pool.status === 'projected',
+      };
+    })
+    .sort((a, b) => b.points - a.points);
+  
+  return {
+    storeId,
+    businessDate,
+    pool,
+    totalPoints,
+    staffShares,
+    status: pool.status,
+    lastUpdate: new Date().toISOString(),
   };
 };
 

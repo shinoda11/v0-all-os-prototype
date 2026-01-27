@@ -46,7 +46,7 @@ export const ja = {
   'error.forbidden.currentRole': '現在のロール',
 
   // Cockpit
-  'cockpit.title': '運用コックピット',
+  'cockpit.title': 'Cockpit',
   'cockpit.sales': '売上',
   'cockpit.forecast': '予測',
   'cockpit.landing': '着地見込',
@@ -830,7 +830,7 @@ export const ja = {
   'nav.opsOsDesc': 'Floor',
   'nav.incidents': 'Incidents',
   'nav.incidentsDesc': 'Rare Events',
-  'nav.cockpit': 'コックピット',
+  'nav.cockpit': 'Cockpit',
   'nav.liveStaff': 'Live Staff',
   'nav.opsMonitor': 'Ops Monitor',
   'nav.weeklyReview': 'Weekly Review',

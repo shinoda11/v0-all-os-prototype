@@ -28,6 +28,9 @@ import {
   deriveCompletedTodos,
   deriveTeamPerformanceMetrics,
   deriveAwards,
+  deriveTodayEarnings,
+  deriveIncentivePool,
+  deriveIncentiveDistribution,
   // Types from derive
   type DailyScore,
   type TeamDailyScore,
@@ -42,6 +45,10 @@ import {
   type AwardNominee,
   type AwardEvidence,
   type AwardCategory,
+  type TodayEarnings,
+  type IncentivePool,
+  type IncentiveDistribution,
+  type StaffIncentiveShare,
 } from './derive';
 import type { EnhancedCockpitMetrics } from './types';
 
@@ -773,6 +780,81 @@ export const selectAwards = (
   );
 };
 
+// ------------------------------------------------------------
+// Earnings & Incentive Selectors
+// ------------------------------------------------------------
+
+export const selectTodayEarnings = (
+  state: AppState,
+  staffId: string,
+  businessDate?: string
+): TodayEarnings => {
+  const date = businessDate ?? new Date().toISOString().split('T')[0];
+  return deriveTodayEarnings(state.events, state.staff, staffId, date);
+};
+
+export const selectIncentivePool = (
+  state: AppState,
+  businessDate?: string
+): IncentivePool => {
+  const storeId = state.selectedStoreId;
+  const date = businessDate ?? new Date().toISOString().split('T')[0];
+  
+  if (!storeId) {
+    return {
+      storeId: '',
+      businessDate: date,
+      targetSales: 0,
+      actualSales: 0,
+      runRateSales: 0,
+      useSalesValue: 'actual',
+      salesForCalculation: 0,
+      overAchievement: 0,
+      overAchievementRate: null,
+      poolShare: 0,
+      pool: 0,
+      status: 'not-tracked',
+    };
+  }
+  
+  return deriveIncentivePool(state.events, storeId, date);
+};
+
+export const selectIncentiveDistribution = (
+  state: AppState,
+  businessDate?: string
+): IncentiveDistribution => {
+  const storeId = state.selectedStoreId;
+  const date = businessDate ?? new Date().toISOString().split('T')[0];
+  
+  if (!storeId) {
+    return {
+      storeId: '',
+      businessDate: date,
+      pool: {
+        storeId: '',
+        businessDate: date,
+        targetSales: 0,
+        actualSales: 0,
+        runRateSales: 0,
+        useSalesValue: 'actual',
+        salesForCalculation: 0,
+        overAchievement: 0,
+        overAchievementRate: null,
+        poolShare: 0,
+        pool: 0,
+        status: 'not-tracked',
+      },
+      totalPoints: 0,
+      staffShares: [],
+      status: 'not-tracked',
+      lastUpdate: new Date().toISOString(),
+    };
+  }
+  
+  return deriveIncentiveDistribution(state.events, state.staff, storeId, date);
+};
+
 // Re-export types from derive for easier access
 export type { 
   DailyScore, 
@@ -793,4 +875,8 @@ export type {
   AwardNominee,
   AwardEvidence,
   AwardCategory,
+  TodayEarnings,
+  IncentivePool,
+  IncentiveDistribution,
+  StaffIncentiveShare,
 } from './derive';

@@ -18,6 +18,62 @@ import mockSushiData from './mock_sushi_events.json';
 import { normalizeEvents, normalizeStaff } from './normalizer';
 
 // ------------------------------------------------------------
+// Incentive Policy Configuration
+// (Will be replaced by All Management API later)
+// ------------------------------------------------------------
+
+export interface IncentivePolicy {
+  poolShare: number; // Percentage of over-achievement allocated to pool (e.g., 0.75 = 75%)
+  points: {
+    perHour: number;    // Points earned per hour worked
+    perQuestXP: number; // Points earned per quest XP
+  };
+  qualityPenalty: {
+    ngMultiplier: number; // Multiplier applied when quality is NG (e.g., 0.7 = 70%)
+  };
+}
+
+export const INCENTIVE_POLICY: IncentivePolicy = {
+  poolShare: 0.75,
+  points: {
+    perHour: 10,
+    perQuestXP: 1,
+  },
+  qualityPenalty: {
+    ngMultiplier: 0.7,
+  },
+};
+
+// ------------------------------------------------------------
+// Daily Target Sales Configuration
+// (Will be replaced by All Management API later)
+// ------------------------------------------------------------
+
+export interface DailyTargetSales {
+  storeId: string;
+  businessDate: string;
+  targetSales: number;
+}
+
+// Generate daily target sales for demo (based on day of week)
+export const getDailyTargetSales = (storeId: string, businessDate: string): number => {
+  const date = new Date(businessDate);
+  const dayOfWeek = date.getDay();
+  const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+  
+  // Different targets by store and day type
+  const baseTargets: Record<string, { weekday: number; weekend: number }> = {
+    '1': { weekday: 280000, weekend: 420000 }, // 二子玉川店
+    '2': { weekday: 250000, weekend: 380000 }, // 自由が丘店
+    '3': { weekday: 320000, weekend: 480000 }, // 豊洲店
+    '4': { weekday: 230000, weekend: 350000 }, // 駒沢店
+  };
+  
+  const storeTarget = baseTargets[storeId] ?? { weekday: 250000, weekend: 380000 };
+  return isWeekend ? storeTarget.weekend : storeTarget.weekday;
+};
+
+// ------------------------------------------------------------
 // Labor Guardrails Configuration
 // (Will be replaced by All Management API later)
 // ------------------------------------------------------------
