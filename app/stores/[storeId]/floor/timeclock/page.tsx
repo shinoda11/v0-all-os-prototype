@@ -9,7 +9,8 @@ import { useStore } from '@/state/store';
 import { useAuth } from '@/state/auth';
 import { useI18n } from '@/i18n/I18nProvider';
 import { formatHours } from '@/i18n/format';
-import { selectCurrentStore, selectLaborMetrics, selectStaffStates } from '@/core/selectors';
+import { selectCurrentStore, selectLaborMetrics, selectStaffStates, selectTodayEarnings, selectIncentiveDistribution } from '@/core/selectors';
+import { formatCurrency } from '@/lib/format';
 import type { StaffStatus } from '@/core/derive';
 import {
   LogIn,
@@ -18,6 +19,9 @@ import {
   Play,
   Clock,
   Users,
+  Banknote,
+  Gift,
+  AlertTriangle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -173,6 +177,78 @@ function SummaryCard({ icon, label, value, className }: SummaryCardProps) {
   );
 }
 
+interface EarningsCardProps {
+  hoursWorked: number | null;
+  basePay: number | null;
+  projectedBonus: number;
+  hasQualityPenalty: boolean;
+  t: (key: string) => string;
+}
+
+function EarningsCard({ hoursWorked, basePay, projectedBonus, hasQualityPenalty, t }: EarningsCardProps) {
+  const projectedTotal = (basePay ?? 0) + projectedBonus;
+  const notWorked = hoursWorked === null || hoursWorked === 0;
+  
+  return (
+    <Card className="border-emerald-200 bg-emerald-50/50">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm flex items-center gap-2">
+          <Banknote className="h-4 w-4 text-emerald-700" />
+          {t('earnings.title')}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {notWorked ? (
+          <div className="text-sm text-muted-foreground py-4 text-center">
+            {t('earnings.notWorked')}
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <div className="text-xs text-muted-foreground">{t('earnings.hoursWorked')}</div>
+                <div className="text-lg font-bold tabular-nums">{hoursWorked?.toFixed(1)}h</div>
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground">{t('earnings.basePay')}</div>
+                <div className="text-lg font-bold tabular-nums">{formatCurrency(basePay)}</div>
+              </div>
+            </div>
+            <div className="border-t border-emerald-200 pt-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Gift className="h-4 w-4 text-amber-600" />
+                  <span className="text-sm">{t('earnings.projectedBonus')}</span>
+                </div>
+                <span className="font-bold tabular-nums text-amber-700">
+                  {formatCurrency(projectedBonus)}
+                </span>
+              </div>
+            </div>
+            <div className="border-t border-emerald-200 pt-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-bold">{t('earnings.projectedTotal')}</span>
+                <span className="text-xl font-bold tabular-nums text-emerald-700">
+                  {formatCurrency(projectedTotal)}
+                </span>
+              </div>
+            </div>
+            {hasQualityPenalty && (
+              <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 rounded px-2 py-1">
+                <AlertTriangle className="h-3 w-3" />
+                {t('earnings.qualityPenalty')}
+              </div>
+            )}
+            <div className="text-xs text-muted-foreground text-center">
+              {t('earnings.estimated')}
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function TimeclockPage() {
   const { state, actions } = useStore();
   const { currentUser } = useAuth();
@@ -188,6 +264,11 @@ export default function TimeclockPage() {
   const myStaff = state.staff.find((s) => 
     s.storeId === state.selectedStoreId && s.id === `staff-${currentUser.id}`
   ) ?? state.staff.find((s) => s.storeId === state.selectedStoreId);
+  
+  // Get earnings data
+  const todayEarnings = myStaff ? selectTodayEarnings(state, myStaff.id, today) : null;
+  const incentiveDistribution = selectIncentiveDistribution(state, today);
+  const myShare = incentiveDistribution.staffShares.find(s => s.staffId === myStaff?.id);
   
   if (!currentStore || !myStaff) {
     return null;
@@ -245,6 +326,15 @@ export default function TimeclockPage() {
           <CurrentTimeDisplay />
         </CardContent>
       </Card>
+      
+      {/* Earnings Card */}
+      <EarningsCard
+        hoursWorked={todayEarnings?.netHoursWorked ?? null}
+        basePay={todayEarnings?.basePay ?? null}
+        projectedBonus={myShare?.estimatedShare ?? 0}
+        hasQualityPenalty={(todayEarnings?.qualityNgCount ?? 0) > 0}
+        t={t}
+      />
       
       {/* Current Status - Self-service for current user only */}
       <StatusCard

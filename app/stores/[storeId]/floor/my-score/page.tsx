@@ -8,7 +8,9 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { useStore } from '@/state/store';
 import { useI18n } from '@/i18n/I18nProvider';
-import { selectDailyScore } from '@/core/selectors';
+import { selectDailyScore, selectTodayEarnings, selectIncentiveDistribution } from '@/core/selectors';
+import { formatCurrency } from '@/lib/format';
+import { useAuth } from '@/state/auth';
 import type { ScoreDeduction, DeductionCategory } from '@/core/selectors';
 import { cn } from '@/lib/utils';
 import {
@@ -23,6 +25,9 @@ import {
   AlertCircle,
   ExternalLink,
   Info,
+  Banknote,
+  Gift,
+  Target,
 } from 'lucide-react';
 
 /**
@@ -31,9 +36,7 @@ import {
  * Design Guidelines compliant: 2.1 spacing, 2.4 touch targets, 2.5 typography
  */
 
-// Mock staff selection (in real app, would come from auth)
-const MOCK_STAFF_ID = 'staff-1';
-const MOCK_STAFF_NAME = '山田 太郎';
+
 
 // Grade colors
 const GRADE_STYLES = {
@@ -207,11 +210,25 @@ export default function MyScorePage() {
   const params = useParams();
   const storeId = params.storeId as string;
   const { state } = useStore();
+  const { currentUser } = useAuth();
   const { t, locale } = useI18n();
   const [selectedDate] = useState(new Date().toISOString().split('T')[0]);
   
-  const dailyScore = selectDailyScore(state, MOCK_STAFF_ID, selectedDate);
+  // Get current staff member
+  const myStaff = state.staff.find((s) => 
+    s.storeId === state.selectedStoreId && s.id === `staff-${currentUser.id}`
+  ) ?? state.staff.find((s) => s.storeId === state.selectedStoreId);
+  
+  const staffId = myStaff?.id ?? 'staff-1';
+  const staffName = myStaff?.name ?? currentUser.name;
+  
+  const dailyScore = selectDailyScore(state, staffId, selectedDate);
   const gradeStyle = GRADE_STYLES[dailyScore.grade];
+  
+  // Get earnings data
+  const todayEarnings = selectTodayEarnings(state, staffId, selectedDate);
+  const incentiveDistribution = selectIncentiveDistribution(state, selectedDate);
+  const myShare = incentiveDistribution.staffShares.find(s => s.staffId === staffId);
   
   // i18n category labels
   const categoryLabels = {
@@ -228,7 +245,7 @@ export default function MyScorePage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-xl font-bold">{t('myscore.title')}</h1>
-            <p className="text-sm text-muted-foreground">{MOCK_STAFF_NAME}</p>
+            <p className="text-sm text-muted-foreground">{staffName}</p>
           </div>
           <div className="text-sm text-muted-foreground">
             {new Date(selectedDate).toLocaleDateString(locale === 'ja' ? 'ja-JP' : 'en-US', { 
@@ -280,6 +297,99 @@ export default function MyScorePage() {
                 ))}
               </div>
             </div>
+          </CardContent>
+        </Card>
+        
+        {/* Earnings Card */}
+        <Card className="border-emerald-200 bg-emerald-50/50">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Banknote className="h-4 w-4 text-emerald-700" />
+              {t('earnings.title')}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {todayEarnings.status === 'not-tracked' || !todayEarnings.netHoursWorked ? (
+              <div className="text-sm text-muted-foreground py-4 text-center">
+                {t('earnings.notWorked')}
+              </div>
+            ) : (
+              <>
+                {/* Base Pay Row */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm">{t('earnings.hoursWorked')}</span>
+                  </div>
+                  <span className="font-bold tabular-nums">{todayEarnings.netHoursWorked?.toFixed(1)}h</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground ml-6">{t('earnings.basePay')}</span>
+                  <span className="font-bold tabular-nums">{formatCurrency(todayEarnings.basePay)}</span>
+                </div>
+                
+                {/* Points Breakdown */}
+                <div className="border-t border-emerald-200 pt-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Target className="h-4 w-4 text-blue-600" />
+                      <span className="text-sm">{t('earnings.pointsFromHours')}</span>
+                    </div>
+                    <span className="font-bold tabular-nums">{todayEarnings.pointsFromHours ?? 0} pt</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-emerald-600" />
+                      <span className="text-sm">{t('earnings.pointsFromQuests')}</span>
+                    </div>
+                    <span className="font-bold tabular-nums">{todayEarnings.pointsFromQuests} pt</span>
+                  </div>
+                  <div className="flex items-center justify-between pt-1">
+                    <span className="text-sm font-bold">{t('earnings.totalPoints')}</span>
+                    <span className="font-bold tabular-nums text-blue-700">{todayEarnings.totalPoints ?? 0} pt</span>
+                  </div>
+                  {myShare && (
+                    <div className="text-xs text-muted-foreground text-right">
+                      {t('earnings.sharePercent')}: {myShare.sharePercentage}%
+                    </div>
+                  )}
+                </div>
+                
+                {/* Projected Bonus */}
+                <div className="border-t border-emerald-200 pt-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Gift className="h-4 w-4 text-amber-600" />
+                      <span className="text-sm">{t('earnings.projectedBonus')}</span>
+                    </div>
+                    <span className="font-bold tabular-nums text-amber-700">
+                      {formatCurrency(myShare?.estimatedShare ?? 0)}
+                    </span>
+                  </div>
+                </div>
+                
+                {/* Projected Total */}
+                <div className="border-t border-emerald-200 pt-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-bold">{t('earnings.projectedTotal')}</span>
+                    <span className="text-xl font-bold tabular-nums text-emerald-700">
+                      {formatCurrency((todayEarnings.basePay ?? 0) + (myShare?.estimatedShare ?? 0))}
+                    </span>
+                  </div>
+                </div>
+                
+                {todayEarnings.qualityNgCount > 0 && (
+                  <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 rounded px-2 py-1">
+                    <AlertCircle className="h-3 w-3" />
+                    {t('earnings.qualityPenalty')}
+                  </div>
+                )}
+                
+                <div className="text-xs text-muted-foreground text-center">
+                  {t('earnings.estimated')}
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
         

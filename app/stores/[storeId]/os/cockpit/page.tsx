@@ -27,6 +27,7 @@ import {
   selectSupplyDemandMetrics,
   selectTodoStats,
   selectTeamDailyScore,
+  selectIncentivePool,
 } from '@/core/selectors';
 import { deriveLaborGuardrailSummary } from '@/core/derive';
 import { TodayBriefingModal, type OperationMode } from '@/components/cockpit/TodayBriefingModal';
@@ -48,6 +49,8 @@ import {
   Target,
   CheckSquare,
   Trophy,
+  Gift,
+  ExternalLink,
   ExternalLink,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -529,6 +532,7 @@ export default function CockpitPage() {
   const exceptions = selectExceptions(state);
   const shiftSummary = selectShiftSummary(state);
   const supplyDemandMetrics = selectSupplyDemandMetrics(state, undefined, timeBand);
+  const incentivePool = selectIncentivePool(state);
   const todoStats = selectTodoStats(state);
 
   // Calculate enhanced metrics - use bus update time for freshness
@@ -834,6 +838,38 @@ export default function CockpitPage() {
               {topException.title}
             </div>
           )}
+        </MetricCard>
+
+        {/* Incentive Pool Card */}
+        <MetricCard
+          title={t('incentive.title')}
+          value={formatCurrency(incentivePool.pool, locale)}
+          subValue={`${t('incentive.overachievement')} ${formatCurrency(incentivePool.overAchievement, locale)}`}
+          icon={<Gift className="h-4 w-4" />}
+          status={incentivePool.pool > 0 ? 'success' : 'default'}
+          lastUpdate={lastUpdateTime}
+        >
+          <div className="space-y-1 text-xs">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">{t('incentive.targetSales')}</span>
+              <span className="font-medium">{formatCurrency(incentivePool.targetSales, locale)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">{t('incentive.projectedSales')}</span>
+              <span className="font-medium">{formatCurrency(incentivePool.salesForCalculation, locale)}</span>
+            </div>
+            <div className="flex justify-between pt-1 border-t border-muted">
+              <span className="text-muted-foreground">{t('incentive.poolShare')}</span>
+              <span className="font-medium">{(incentivePool.poolShare * 100).toFixed(0)}%</span>
+            </div>
+            <Link
+              href={`/stores/${currentStore?.id}/os/incentives`}
+              className="flex items-center justify-end gap-1 pt-1 text-primary hover:underline"
+            >
+              {t('incentive.viewDetails')}
+              <ExternalLink className="h-3 w-3" />
+            </Link>
+          </div>
         </MetricCard>
       </div>
 
