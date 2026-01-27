@@ -4,6 +4,31 @@
 // ============================================================
 
 // ------------------------------------------------------------
+// User Role Types (RBAC)
+// ------------------------------------------------------------
+
+export type UserRole = 'staff' | 'manager' | 'sv';
+
+export interface CurrentUser {
+  id: string;
+  name: string;
+  role: UserRole;
+  storeId: string;
+}
+
+// Role hierarchy for permission checks
+export const ROLE_HIERARCHY: Record<UserRole, number> = {
+  staff: 1,
+  manager: 2,
+  sv: 3,
+};
+
+// Check if user has at least the required role level
+export const hasRoleLevel = (userRole: UserRole, requiredRole: UserRole): boolean => {
+  return ROLE_HIERARCHY[userRole] >= ROLE_HIERARCHY[requiredRole];
+};
+
+// ------------------------------------------------------------
 // Master Data Types
 // ------------------------------------------------------------
 
@@ -113,12 +138,24 @@ export interface DecisionEvent extends BaseEvent {
   priority: 'low' | 'medium' | 'high' | 'critical';
   estimatedMinutes?: number;
   linkedExceptionId?: string;
+  // Assignee tracking
+  assigneeId?: string; // Staff ID of assigned person
+  assigneeName?: string; // Staff name for display
+  // Source tracking for incentive abuse prevention
+  source?: 'system' | 'manager' | 'ad-hoc'; // system=auto-generated, manager=assigned, ad-hoc=self-created
+  managerApprovedForPoints?: boolean; // true if manager approved ad-hoc quest for points
   // Completion result fields
   actualQuantity?: number;
   actualMinutes?: number;
   delayReason?: string;
   hasIssue?: boolean;
   issueNote?: string;
+  // Quality flag (OK/NG) for completion quality tracking
+  qualityStatus?: 'ok' | 'ng';
+  qualityNote?: string;
+  // Pause tracking
+  pausedAt?: string;
+  pauseReason?: string;
 }
 
 export interface ForecastEvent extends BaseEvent {
@@ -176,6 +213,9 @@ export interface Proposal {
   expectedEffects: ExpectedEffect[];
   todoCount: number; // Number of todos that will be generated on approval
   status: 'pending' | 'approved' | 'rejected';
+  // Source tracking for incentive abuse prevention
+  source?: 'system' | 'manager' | 'ad-hoc'; // system=auto-generated, manager=assigned, ad-hoc=self-created
+  managerApprovedForPoints?: boolean; // true if manager approved ad-hoc for points
 }
 
 // ------------------------------------------------------------
@@ -305,13 +345,26 @@ export interface SupplyDemandKPI {
 
 // Dynamic Shift Summary (replaces MOCK_SHIFT_SUMMARY)
 export interface ShiftSummary {
-  plannedHours: number;
+  plannedHours: number | null; // null when shift plan is not available
   actualHours: number;
+  activeStaffCount: number; // Count of currently active staff
   skillMix: { star3: number; star2: number; star1: number };
   roleMix: { kitchen: number; floor: number; delivery: number };
   onBreakCount: number;
   lastUpdate: string;
   isCalculating: boolean; // True when data is incomplete
+}
+
+// Todo Stats for Quest Progress
+export interface TodoStats {
+  pendingCount: number;
+  inProgressCount: number;
+  completedCount: number;
+  // Aliases for easier access
+  pending: number;
+  inProgress: number;
+  completed: number;
+  total: number;
 }
 
 // Enhanced Supply/Demand Metrics
@@ -346,6 +399,13 @@ export interface WeeklyLaborDailyRow {
   staffCount: number;
   starMix: { star3: number; star2: number; star1: number };
   sales: number | null; // null if sales_event not available
+  // HR-focused fields for weekly review
+  dayScore: number | null; // Daily team score (0-100)
+  overtimeFlag: boolean; // True if overtime occurred
+  overtimeMinutes: number; // Minutes of overtime
+  questDelayCount: number; // Number of delayed quests
+  questCompletedCount: number; // Number of completed quests
+  questTotalCount: number; // Total quests for the day
 }
 
 export interface WeeklyLaborMetrics {
@@ -357,8 +417,30 @@ export interface WeeklyLaborMetrics {
     totalSales: number | null;
     staffCountTotal: number;
     starMixTotal: { star3: number; star2: number; star1: number };
+    // HR-focused summary fields
+    avgDayScore: number | null; // Average daily score
+    overtimeDays: number; // Number of days with overtime
+    totalOvertimeMinutes: number; // Total overtime across week
+    totalQuestDelays: number; // Total delayed quests
+    questCompletionRate: number; // Overall quest completion rate
   };
   dailyRows: WeeklyLaborDailyRow[];
+  // Winning patterns analysis
+  winningMix: {
+    dayLabel: string;
+    starMix: { star3: number; star2: number; star1: number };
+    score: number;
+  } | null;
+  weakTimeBands: Array<{
+    dayLabel: string;
+    issue: 'low_score' | 'overtime' | 'quest_delay';
+    value: number;
+  }>;
+  chronicDelayQuests: Array<{
+    questTitle: string;
+    delayCount: number;
+    avgDelayMinutes: number;
+  }>;
   weekStart: string;
   weekEnd: string;
   lastUpdate: string;

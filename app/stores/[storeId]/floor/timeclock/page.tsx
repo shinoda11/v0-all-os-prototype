@@ -5,18 +5,12 @@ import { PageHeader } from '@/components/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { useStore } from '@/state/store';
+import { useAuth } from '@/state/auth';
 import { useI18n } from '@/i18n/I18nProvider';
 import { formatHours } from '@/i18n/format';
-import { selectCurrentStore, selectLaborMetrics, selectStaffStates } from '@/core/selectors';
-import type { Staff, Role } from '@/core/types';
+import { selectCurrentStore, selectLaborMetrics, selectStaffStates, selectTodayEarnings, selectIncentiveDistribution } from '@/core/selectors';
+import { formatCurrency } from '@/lib/format';
 import type { StaffStatus } from '@/core/derive';
 import {
   LogIn,
@@ -25,7 +19,9 @@ import {
   Play,
   Clock,
   Users,
-  User,
+  Banknote,
+  Gift,
+  AlertTriangle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -181,8 +177,88 @@ function SummaryCard({ icon, label, value, className }: SummaryCardProps) {
   );
 }
 
+interface EarningsCardProps {
+  hoursWorked: number | null;
+  basePay: number | null;
+  projectedBonus: number;
+  hasQualityPenalty: boolean;
+  adHocQuestCount: number;
+  t: (key: string) => string;
+}
+
+function EarningsCard({ hoursWorked, basePay, projectedBonus, hasQualityPenalty, adHocQuestCount, t }: EarningsCardProps) {
+  const projectedTotal = (basePay ?? 0) + projectedBonus;
+  const notWorked = hoursWorked === null || hoursWorked === 0;
+  
+  return (
+    <Card className="border-emerald-200 bg-emerald-50/50">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm flex items-center gap-2">
+          <Banknote className="h-4 w-4 text-emerald-700" />
+          {t('earnings.title')}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {notWorked ? (
+          <div className="text-sm text-muted-foreground py-4 text-center">
+            {t('earnings.notWorked')}
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <div className="text-xs text-muted-foreground">{t('earnings.hoursWorked')}</div>
+                <div className="text-lg font-bold tabular-nums">{hoursWorked?.toFixed(1)}h</div>
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground">{t('earnings.basePay')}</div>
+                <div className="text-lg font-bold tabular-nums">{formatCurrency(basePay)}</div>
+              </div>
+            </div>
+            <div className="border-t border-emerald-200 pt-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Gift className="h-4 w-4 text-amber-600" />
+                  <span className="text-sm">{t('earnings.projectedBonus')}</span>
+                </div>
+                <span className="font-bold tabular-nums text-amber-700">
+                  {formatCurrency(projectedBonus)}
+                </span>
+              </div>
+            </div>
+            <div className="border-t border-emerald-200 pt-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-bold">{t('earnings.projectedTotal')}</span>
+                <span className="text-xl font-bold tabular-nums text-emerald-700">
+                  {formatCurrency(projectedTotal)}
+                </span>
+              </div>
+            </div>
+            {hasQualityPenalty && (
+              <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 rounded px-2 py-1">
+                <AlertTriangle className="h-3 w-3" />
+                {t('earnings.qualityPenalty')}
+              </div>
+            )}
+            {adHocQuestCount > 0 && (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted rounded px-2 py-1">
+                <AlertTriangle className="h-3 w-3" />
+                {t('earnings.adHocNote').replace('{count}', String(adHocQuestCount))}
+              </div>
+            )}
+            <div className="text-xs text-muted-foreground text-center">
+              {t('earnings.estimated')}
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function TimeclockPage() {
   const { state, actions } = useStore();
+  const { currentUser } = useAuth();
   const currentStore = selectCurrentStore(state);
   const { t, locale } = useI18n();
   const today = new Date().toISOString().split('T')[0];
@@ -190,24 +266,23 @@ export default function TimeclockPage() {
   const laborMetrics = selectLaborMetrics(state, today);
   const staffStates = selectStaffStates(state, today);
   
-  const [selectedStaffId, setSelectedStaffId] = useState<string | null>(null);
+  // Self-service: only the current user can clock in/out
+  // Map auth user to staff record by matching staffId pattern
+  const myStaff = state.staff.find((s) => 
+    s.storeId === state.selectedStoreId && s.id === `staff-${currentUser.id}`
+  ) ?? state.staff.find((s) => s.storeId === state.selectedStoreId);
   
-  const storeStaff = state.staff.filter((s) => s.storeId === state.selectedStoreId);
+  // Get earnings data
+  const todayEarnings = myStaff ? selectTodayEarnings(state, myStaff.id, today) : null;
+  const incentiveDistribution = selectIncentiveDistribution(state, today);
+  const myShare = incentiveDistribution.staffShares.find(s => s.staffId === myStaff?.id);
   
-  // Auto-select first staff if none selected
-  useEffect(() => {
-    if (!selectedStaffId && storeStaff.length > 0) {
-      setSelectedStaffId(storeStaff[0].id);
-    }
-  }, [selectedStaffId, storeStaff]);
-  
-  if (!currentStore) {
+  if (!currentStore || !myStaff) {
     return null;
   }
   
   const shortName = currentStore.name.replace('Aburi TORA 熟成鮨と炙り鮨 ', '');
-  const selectedStaff = storeStaff.find(s => s.id === selectedStaffId);
-  const staffState = selectedStaffId ? staffStates.get(selectedStaffId) : null;
+  const staffState = staffStates.get(myStaff.id);
   const currentStatus: StaffStatus = staffState?.status ?? 'out';
   
   // Determine available actions based on current status
@@ -227,20 +302,20 @@ export default function TimeclockPage() {
   const availableActions = getAvailableActions(currentStatus);
   
   const handleAction = (action: ClockAction) => {
-    if (!selectedStaffId) return;
+    if (!myStaff) return;
     
     switch (action) {
       case 'check-in':
-        actions.checkIn(selectedStaffId);
+        actions.checkIn(myStaff.id);
         break;
       case 'check-out':
-        actions.checkOut(selectedStaffId);
+        actions.checkOut(myStaff.id);
         break;
       case 'break-start':
-        actions.startBreak(selectedStaffId);
+        actions.startBreak(myStaff.id);
         break;
       case 'break-end':
-        actions.endBreak(selectedStaffId);
+        actions.endBreak(myStaff.id);
         break;
     }
   };
@@ -259,65 +334,37 @@ export default function TimeclockPage() {
         </CardContent>
       </Card>
       
-      {/* Staff Selector */}
-      <Card>
-        <CardHeader className="p-4 pb-2">
-          <CardTitle className="text-sm flex items-center gap-2">
-            <User className="h-4 w-4" />
-            {t('timeclock.selectStaff')}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-4 pt-0">
-          <Select value={selectedStaffId ?? ''} onValueChange={setSelectedStaffId}>
-            <SelectTrigger className="h-12 text-lg">
-              <SelectValue placeholder={t('timeclock.selectStaff')} />
-            </SelectTrigger>
-            <SelectContent>
-              {storeStaff.map((staff) => {
-                const state = staffStates.get(staff.id);
-                const status = state?.status ?? 'out';
-                const statusConfig = STATUS_CONFIG[status];
-                return (
-                  <SelectItem key={staff.id} value={staff.id} className="py-3">
-                    <div className="flex items-center gap-2">
-                      <span>{staff.name}</span>
-                      <Badge variant="outline" className={cn('text-xs', statusConfig.className)}>
-                        {locale === 'ja' ? statusConfig.label : statusConfig.labelEn}
-                      </Badge>
-                    </div>
-                  </SelectItem>
-                );
-              })}
-            </SelectContent>
-          </Select>
-        </CardContent>
-      </Card>
+      {/* Earnings Card */}
+      <EarningsCard
+        hoursWorked={todayEarnings?.netHoursWorked ?? null}
+        basePay={todayEarnings?.basePay ?? null}
+        projectedBonus={myShare?.estimatedShare ?? 0}
+        hasQualityPenalty={(todayEarnings?.qualityNgCount ?? 0) > 0}
+        adHocQuestCount={todayEarnings?.adHocQuestCount ?? 0}
+        t={t}
+      />
       
-      {/* Current Status */}
-      {selectedStaff && (
-        <StatusCard
-          status={currentStatus}
-          staffName={selectedStaff.name}
-          lastAction={staffState?.lastAction}
-        />
-      )}
+      {/* Current Status - Self-service for current user only */}
+      <StatusCard
+        status={currentStatus}
+        staffName={myStaff.name}
+        lastAction={staffState?.lastAction}
+      />
       
       {/* Action Buttons */}
-      {selectedStaff && (
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex gap-3">
-              {availableActions.map((action) => (
-                <ClockButton
-                  key={action}
-                  action={action}
-                  onClick={() => handleAction(action)}
-                />
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex gap-3">
+            {availableActions.map((action) => (
+              <ClockButton
+                key={action}
+                action={action}
+                onClick={() => handleAction(action)}
+              />
+            ))}
+          </div>
+        </CardContent>
+      </Card>
       
       {/* Summary for Manager View */}
       <div className="grid gap-4 sm:grid-cols-3">

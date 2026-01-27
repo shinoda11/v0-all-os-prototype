@@ -226,27 +226,30 @@ export const createDecision = (
   storeId: string,
   proposal: Proposal,
   action: DecisionEvent['action']
-): DecisionEvent => {
+  ): DecisionEvent => {
   const timestamp = now();
   const hour = new Date(timestamp).getHours();
   return {
-    id: generateId(),
-    type: 'decision',
-    storeId,
-    timestamp,
-    timeBand: proposal.timeBand ?? getTimeBandFromHour(hour),
-    proposalId: proposal.id,
-    action,
-    title: proposal.title,
-    description: proposal.description,
-    distributedToRoles: proposal.distributedToRoles,
-    targetMenuIds: proposal.targetMenuIds,
-    targetPrepItemIds: proposal.targetPrepItemIds,
-    quantity: proposal.quantity,
-    deadline: proposal.deadline,
-    priority: proposal.priority,
+  id: generateId(),
+  type: 'decision',
+  storeId,
+  timestamp,
+  timeBand: proposal.timeBand ?? getTimeBandFromHour(hour),
+  proposalId: proposal.id,
+  action,
+  title: proposal.title,
+  description: proposal.description,
+  distributedToRoles: proposal.distributedToRoles,
+  targetMenuIds: proposal.targetMenuIds,
+  targetPrepItemIds: proposal.targetPrepItemIds,
+  quantity: proposal.quantity,
+  deadline: proposal.deadline,
+  priority: proposal.priority,
+  // Source tracking for incentive abuse prevention
+  source: proposal.source ?? 'system', // Default to system for auto-generated
+  managerApprovedForPoints: proposal.managerApprovedForPoints,
   };
-};
+  };
 
 export const approveProposal = (storeId: string, proposal: Proposal): DecisionEvent =>
   createDecision(storeId, proposal, 'approved');

@@ -1,14 +1,22 @@
 'use client';
 
+import { usePathname, useRouter } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { TimeBandTabs } from '@/components/TimeBandTabs';
 import { useAskPanel } from '@/components/AppShell';
 import { useStore } from '@/state/store';
+import { useAuth } from '@/state/auth';
 import { selectCurrentStore } from '@/core/selectors';
 import { useI18n, useLocaleDateFormat } from '@/i18n/I18nProvider';
 import type { TimeBand } from '@/core/types';
-import { RefreshCw, Globe, MessageCircle } from 'lucide-react';
+import { RefreshCw, Globe, MessageCircle, Users, Briefcase, ChevronDown } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 interface OSHeaderProps {
   title: string;
@@ -28,6 +36,24 @@ export function OSHeader({
   const { locale, setLocale, t } = useI18n();
   const { formatDate, formatTime } = useLocaleDateFormat();
   const askPanel = useAskPanel();
+  const { canSwitchView, currentUser } = useAuth();
+  const pathname = usePathname();
+  const router = useRouter();
+  
+  // Determine current view from pathname
+  const isManagerView = pathname.includes('/os/');
+  const currentView = isManagerView ? 'manager' : 'staff';
+  
+  // Handle view switch
+  const handleViewSwitch = (view: 'manager' | 'staff') => {
+    if (!currentStore) return;
+    const storeId = currentStore.id;
+    if (view === 'manager') {
+      router.push(`/stores/${storeId}/os/cockpit`);
+    } else {
+      router.push(`/stores/${storeId}/floor/todo`);
+    }
+  };
 
   // Get current business date (today for now)
   const today = new Date();
@@ -74,6 +100,39 @@ export function OSHeader({
             <RefreshCw className="h-4 w-4" />
             <span>{t('os.header.lastUpdated')}: {lastUpdatedStr}</span>
           </div>
+          
+          {/* View Switcher - Only for Manager+ */}
+          {canSwitchView && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="default" className="px-3 gap-2">
+                  {currentView === 'manager' ? (
+                    <Briefcase className="h-4 w-4" />
+                  ) : (
+                    <Users className="h-4 w-4" />
+                  )}
+                  <span>{t(currentView === 'manager' ? 'view.manager' : 'view.staff')}</span>
+                  <ChevronDown className="h-3 w-3 ml-1" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem 
+                  onClick={() => handleViewSwitch('manager')}
+                  className={currentView === 'manager' ? 'bg-accent' : ''}
+                >
+                  <Briefcase className="h-4 w-4 mr-2" />
+                  {t('view.manager')}
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => handleViewSwitch('staff')}
+                  className={currentView === 'staff' ? 'bg-accent' : ''}
+                >
+                  <Users className="h-4 w-4 mr-2" />
+                  {t('view.staff')}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
           
           {/* Language Toggle */}
           <Button

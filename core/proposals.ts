@@ -149,6 +149,7 @@ export const generateProposalsFromExceptions = (
           expectedEffects: menuRestriction.expectedEffects,
           todoCount: menuRestriction.todoCount,
           status: 'pending',
+          source: 'system', // Auto-generated from exception
         });
 
         const prepReorder = PROPOSAL_TEMPLATES['delivery-delay-prep-reorder'];
@@ -173,6 +174,7 @@ export const generateProposalsFromExceptions = (
           expectedEffects: prepReorder.expectedEffects,
           todoCount: prepReorder.todoCount,
           status: 'pending',
+          source: 'system', // Auto-generated from exception
         });
         break;
       }
@@ -200,6 +202,7 @@ export const generateProposalsFromExceptions = (
           expectedEffects: helpRequest.expectedEffects,
           todoCount: helpRequest.todoCount,
           status: 'pending',
+          source: 'system',
         });
 
         const scopeReduction = PROPOSAL_TEMPLATES['staff-shortage-scope-reduction'];
@@ -224,6 +227,7 @@ export const generateProposalsFromExceptions = (
           expectedEffects: scopeReduction.expectedEffects,
           todoCount: scopeReduction.todoCount,
           status: 'pending',
+          source: 'system',
         });
         break;
       }
@@ -252,6 +256,7 @@ export const generateProposalsFromExceptions = (
           expectedEffects: highMargin.expectedEffects,
           todoCount: highMargin.todoCount,
           status: 'pending',
+          source: 'system',
         });
 
         const extraPrep = PROPOSAL_TEMPLATES['demand-surge-extra-prep'];
@@ -276,6 +281,7 @@ export const generateProposalsFromExceptions = (
           expectedEffects: extraPrep.expectedEffects,
           todoCount: extraPrep.todoCount,
           status: 'pending',
+          source: 'system',
         });
         break;
       }
@@ -303,6 +309,7 @@ export const generateProposalsFromExceptions = (
           expectedEffects: prepReorder.expectedEffects,
           todoCount: prepReorder.todoCount,
           status: 'pending',
+          source: 'system',
         });
         break;
       }

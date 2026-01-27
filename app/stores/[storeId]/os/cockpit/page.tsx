@@ -1,14 +1,13 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import Link from 'next/link';
+import { useParams } from 'next/navigation';
 import { PageHeader } from '@/components/PageHeader';
 import { OSHeader } from '@/components/OSHeader';
 import { TimeBandTabs } from '@/components/TimeBandTabs';
 import { MetricCard } from '@/components/MetricCard';
-import { LaneTimeline } from '@/components/Timeline';
-import { DecisionQueue } from '@/components/DecisionQueue';
 import { FreshnessBadge } from '@/components/FreshnessBadge';
-import { Drawer } from '@/components/Drawer';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,11 +23,11 @@ import {
   selectExceptions,
   selectPrepMetrics,
   selectLaborMetrics,
-  selectLaneEvents,
   selectShiftSummary,
   selectSupplyDemandMetrics,
   selectTodoStats,
   selectTeamDailyScore,
+  selectIncentivePool,
 } from '@/core/selectors';
 import { deriveLaborGuardrailSummary } from '@/core/derive';
 import { TodayBriefingModal, type OperationMode } from '@/components/cockpit/TodayBriefingModal';
@@ -50,6 +49,9 @@ import {
   Target,
   CheckSquare,
   Trophy,
+  Gift,
+  ExternalLink,
+  ExternalLink,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -143,6 +145,9 @@ function ReplayControls() {
 // Shift Summary + Quest Progress Component
 function DynamicShiftSummary() {
   const { state } = useStore();
+  const { t } = useI18n();
+  const params = useParams();
+  const storeId = params.storeId as string;
   const summary = selectShiftSummary(state);
   const todoStats = selectTodoStats(state);
   
@@ -152,6 +157,16 @@ function DynamicShiftSummary() {
   const questInProgress = todoStats.inProgress;
   const questCompletionRate = questTotal > 0 ? Math.round((questDone / questTotal) * 100) : 0;
   
+  // Format hours display - show "—" when plannedHours is null (not tracked)
+  const formatHoursDisplay = () => {
+    const actualDisplay = `${summary.actualHours.toFixed(1)}h`;
+    const plannedDisplay = summary.plannedHours !== null ? `${summary.plannedHours}h` : '—';
+    return `${actualDisplay} / ${plannedDisplay}`;
+  };
+  
+  // Check if hours are over planned (only when planned is available)
+  const isOverPlanned = summary.plannedHours !== null && summary.actualHours > summary.plannedHours;
+  
   return (
     <Card>
       <CardHeader className="pb-2">
@@ -160,7 +175,15 @@ function DynamicShiftSummary() {
             <Clock className="h-4 w-4" />
             Staff & Quest Status
           </CardTitle>
-          <FreshnessBadge lastUpdate={summary.lastUpdate} />
+          <div className="flex items-center gap-2">
+            <FreshnessBadge lastUpdate={summary.lastUpdate} />
+            <Link href={`/stores/${storeId}/os/live-staff`}>
+              <Button variant="ghost" size="sm" className="h-6 px-2 text-xs gap-1">
+                詳細
+                <ExternalLink className="h-3 w-3" />
+              </Button>
+            </Link>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -183,8 +206,8 @@ function DynamicShiftSummary() {
           </div>
           <div className="flex justify-between items-center text-sm">
             <span className="text-muted-foreground">Hours</span>
-            <span className={cn('font-bold', summary.actualHours > summary.plannedHours && 'text-red-700')}>
-              {summary.actualHours.toFixed(1)}h / {summary.plannedHours}h
+            <span className={cn('font-bold', isOverPlanned && 'text-red-700')}>
+              {formatHoursDisplay()}
             </span>
           </div>
         </div>
@@ -199,10 +222,11 @@ function DynamicShiftSummary() {
             </span>
             <span className={cn(
               'font-bold',
+              questTotal === 0 ? 'text-muted-foreground' :
               questCompletionRate >= 80 ? 'text-emerald-700' : 
               questCompletionRate >= 50 ? 'text-amber-700' : 'text-red-700'
             )}>
-              {questCompletionRate}%
+              {questTotal === 0 ? '—' : `${questCompletionRate}%`}
             </span>
           </div>
           <div className="flex justify-between items-center text-sm">
@@ -218,12 +242,19 @@ function DynamicShiftSummary() {
             <div 
               className={cn(
                 'h-full transition-all',
+                questTotal === 0 ? 'bg-muted' :
                 questCompletionRate >= 80 ? 'bg-emerald-500' : 
                 questCompletionRate >= 50 ? 'bg-amber-500' : 'bg-red-500'
               )}
-              style={{ width: `${questCompletionRate}%` }}
+              style={{ width: questTotal === 0 ? '0%' : `${questCompletionRate}%` }}
             />
           </div>
+          {/* Bottleneck message when no quests */}
+          {questTotal === 0 && (
+            <div className="text-xs text-muted-foreground italic">
+              {t('cockpit.quest.noQuestsBottleneck')}
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>
@@ -329,97 +360,6 @@ function TeamScoreCard() {
         )}
       </CardContent>
     </Card>
-  );
-}
-
-interface ProposalEditorProps {
-  proposal: Proposal;
-  roles: Role[];
-  onChange: (proposal: Proposal) => void;
-  onSave: () => void;
-  onCancel: () => void;
-}
-
-function ProposalEditor({ proposal, roles, onChange, onSave, onCancel }: ProposalEditorProps) {
-  return (
-    <div className="space-y-6">
-      <div>
-        <Label>タイトル</Label>
-        <Input
-          value={proposal.title}
-          onChange={(e) => onChange({ ...proposal, title: e.target.value })}
-        />
-      </div>
-      <div>
-        <Label>説明</Label>
-        <textarea
-          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-          rows={3}
-          value={proposal.description}
-          onChange={(e) => onChange({ ...proposal, description: e.target.value })}
-        />
-      </div>
-      <div>
-        <Label>数量</Label>
-        <Input
-          type="number"
-          value={proposal.quantity}
-          onChange={(e) => onChange({ ...proposal, quantity: Number.parseInt(e.target.value) || 0 })}
-        />
-      </div>
-      <div>
-        <Label>配布先ロール</Label>
-        <div className="flex flex-wrap gap-2 mt-2">
-          {roles.map((role) => (
-            <Badge
-              key={role.id}
-              variant={proposal.distributedToRoles.includes(role.id) ? 'default' : 'outline'}
-              className={cn(
-                'cursor-pointer',
-                !proposal.distributedToRoles.includes(role.id) && 'hover:bg-muted'
-              )}
-              onClick={() => {
-                const newRoles = proposal.distributedToRoles.includes(role.id)
-                  ? proposal.distributedToRoles.filter((r) => r !== role.id)
-                  : [...proposal.distributedToRoles, role.id];
-                onChange({ ...proposal, distributedToRoles: newRoles });
-              }}
-            >
-              {role.name}
-            </Badge>
-          ))}
-        </div>
-      </div>
-      <div>
-        <Label>優先度</Label>
-        <div className="flex gap-2 mt-2">
-          {(['low', 'medium', 'high', 'critical'] as const).map((priority) => (
-            <Badge
-              key={priority}
-              variant={proposal.priority === priority ? 'default' : 'outline'}
-              className="cursor-pointer"
-              onClick={() => onChange({ ...proposal, priority })}
-            >
-              {priority === 'critical' ? '緊急' : priority === 'high' ? '高' : priority === 'medium' ? '中' : '低'}
-            </Badge>
-          ))}
-        </div>
-      </div>
-      <div>
-        <Label>期限</Label>
-        <Input
-          type="datetime-local"
-          value={proposal.deadline?.slice(0, 16) || ''}
-          onChange={(e) => onChange({ ...proposal, deadline: new Date(e.target.value).toISOString() })}
-        />
-      </div>
-      <div className="flex gap-2 pt-4">
-        <Button onClick={onSave}>保存</Button>
-        <Button variant="outline" onClick={onCancel} className="bg-transparent">
-          キャンセル
-        </Button>
-      </div>
-    </div>
   );
 }
 
@@ -575,8 +515,6 @@ export default function CockpitPage() {
   const currentStore = selectCurrentStore(state);
   const { t, locale } = useI18n();
   const [timeBand, setTimeBand] = useState<TimeBand>('all');
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [editingProposal, setEditingProposal] = useState<Proposal | null>(null);
   const [briefingOpen, setBriefingOpen] = useState(false);
   const [operationMode, setOperationMode] = useState<OperationMode>('sales');
 
@@ -586,19 +524,15 @@ export default function CockpitPage() {
   ]);
 
   // All hooks must be called before any early returns
-  const eventsLength = state.events.length;
   const selectedStoreId = state.selectedStoreId;
-  const lastRefreshKey = useRef('');
-  const actionsRef = useRef(actions);
-  actionsRef.current = actions;
-
+  
   const metrics = selectCockpitMetrics(state, undefined, timeBand);
   const laborMetrics = selectLaborMetrics(state);
   const prepMetrics = selectPrepMetrics(state);
   const exceptions = selectExceptions(state);
-  const laneEvents = selectLaneEvents(state, 5, timeBand);
   const shiftSummary = selectShiftSummary(state);
   const supplyDemandMetrics = selectSupplyDemandMetrics(state, undefined, timeBand);
+  const incentivePool = selectIncentivePool(state);
   const todoStats = selectTodoStats(state);
 
   // Calculate enhanced metrics - use bus update time for freshness
@@ -674,36 +608,6 @@ export default function CockpitPage() {
     (p.type === 'extra-prep' || p.type === 'prep-reorder')
   );
 
-  // Refresh proposals when events change
-  useEffect(() => {
-    const key = `${selectedStoreId}-${eventsLength}`;
-    if (selectedStoreId && lastRefreshKey.current !== key) {
-      lastRefreshKey.current = key;
-      actionsRef.current.refreshProposals();
-    }
-  }, [eventsLength, selectedStoreId]);
-
-  const handleApprove = (proposal: Proposal) => {
-    actions.approveProposal(proposal);
-  };
-
-  const handleReject = (proposal: Proposal) => {
-    actions.rejectProposal(proposal);
-  };
-
-  const handleEdit = (proposal: Proposal) => {
-    setEditingProposal({ ...proposal });
-    setDrawerOpen(true);
-  };
-
-  const handleSaveEdit = () => {
-    if (editingProposal) {
-      actions.updateProposal(editingProposal);
-      setDrawerOpen(false);
-      setEditingProposal(null);
-    }
-  };
-  
   // Briefing modal handlers
   const handleDistributeTodos = (todos: Proposal[], mode: OperationMode) => {
     setOperationMode(mode);
@@ -935,41 +839,45 @@ export default function CockpitPage() {
             </div>
           )}
         </MetricCard>
+
+        {/* Incentive Pool Card */}
+        <MetricCard
+          title={t('incentive.title')}
+          value={formatCurrency(incentivePool.pool, locale)}
+          subValue={`${t('incentive.overachievement')} ${formatCurrency(incentivePool.overAchievement, locale)}`}
+          icon={<Gift className="h-4 w-4" />}
+          status={incentivePool.pool > 0 ? 'success' : 'default'}
+          lastUpdate={lastUpdateTime}
+        >
+          <div className="space-y-1 text-xs">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">{t('incentive.targetSales')}</span>
+              <span className="font-medium">{formatCurrency(incentivePool.targetSales, locale)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">{t('incentive.projectedSales')}</span>
+              <span className="font-medium">{formatCurrency(incentivePool.salesForCalculation, locale)}</span>
+            </div>
+            <div className="flex justify-between pt-1 border-t border-muted">
+              <span className="text-muted-foreground">{t('incentive.poolShare')}</span>
+              <span className="font-medium">{(incentivePool.poolShare * 100).toFixed(0)}%</span>
+            </div>
+            <Link
+              href={`/stores/${currentStore?.id}/os/incentives`}
+              className="flex items-center justify-end gap-1 pt-1 text-primary hover:underline"
+            >
+              {t('incentive.viewDetails')}
+              <ExternalLink className="h-3 w-3" />
+            </Link>
+          </div>
+        </MetricCard>
       </div>
 
-      {/* Staff Status + Team Score + Lane Timeline */}
-      <div className="grid gap-4 lg:grid-cols-5">
+      {/* Staff Status + Team Score */}
+      <div className="grid gap-4 lg:grid-cols-2">
         <DynamicShiftSummary />
         <TeamScoreCard />
-        <div className="lg:col-span-3">
-          <LaneTimeline laneEvents={laneEvents} maxPerLane={5} />
-        </div>
       </div>
-
-      {/* Decision Queue */}
-      <DecisionQueue
-        proposals={state.proposals}
-        roles={state.roles}
-        onApprove={handleApprove}
-        onReject={handleReject}
-        onEdit={handleEdit}
-      />
-
-      <Drawer
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-        title="提案を編集"
-      >
-        {editingProposal && (
-          <ProposalEditor
-            proposal={editingProposal}
-            roles={state.roles}
-            onChange={setEditingProposal}
-            onSave={handleSaveEdit}
-            onCancel={() => setDrawerOpen(false)}
-          />
-        )}
-      </Drawer>
     </div>
   );
 }

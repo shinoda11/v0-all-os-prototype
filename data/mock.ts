@@ -18,6 +18,62 @@ import mockSushiData from './mock_sushi_events.json';
 import { normalizeEvents, normalizeStaff } from './normalizer';
 
 // ------------------------------------------------------------
+// Incentive Policy Configuration
+// (Will be replaced by All Management API later)
+// ------------------------------------------------------------
+
+export interface IncentivePolicy {
+  poolShare: number; // Percentage of over-achievement allocated to pool (e.g., 0.75 = 75%)
+  points: {
+    perHour: number;    // Points earned per hour worked
+    perQuestXP: number; // Points earned per quest XP
+  };
+  qualityPenalty: {
+    ngMultiplier: number; // Multiplier applied when quality is NG (e.g., 0.7 = 70%)
+  };
+}
+
+export const INCENTIVE_POLICY: IncentivePolicy = {
+  poolShare: 0.75,
+  points: {
+    perHour: 10,
+    perQuestXP: 1,
+  },
+  qualityPenalty: {
+    ngMultiplier: 0.7,
+  },
+};
+
+// ------------------------------------------------------------
+// Daily Target Sales Configuration
+// (Will be replaced by All Management API later)
+// ------------------------------------------------------------
+
+export interface DailyTargetSales {
+  storeId: string;
+  businessDate: string;
+  targetSales: number;
+}
+
+// Generate daily target sales for demo (based on day of week)
+export const getDailyTargetSales = (storeId: string, businessDate: string): number => {
+  const date = new Date(businessDate);
+  const dayOfWeek = date.getDay();
+  const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+  
+  // Different targets by store and day type
+  const baseTargets: Record<string, { weekday: number; weekend: number }> = {
+    '1': { weekday: 280000, weekend: 420000 }, // 二子玉川店
+    '2': { weekday: 250000, weekend: 380000 }, // 自由が丘店
+    '3': { weekday: 320000, weekend: 480000 }, // 豊洲店
+    '4': { weekday: 230000, weekend: 350000 }, // 駒沢店
+  };
+  
+  const storeTarget = baseTargets[storeId] ?? { weekday: 250000, weekend: 380000 };
+  return isWeekend ? storeTarget.weekend : storeTarget.weekday;
+};
+
+// ------------------------------------------------------------
 // Labor Guardrails Configuration
 // (Will be replaced by All Management API later)
 // ------------------------------------------------------------
@@ -327,6 +383,166 @@ const generateSampleIncidents = (storeId: string): Incident[] => {
 // ------------------------------------------------------------
 
 const normalizedJsonEvents = normalizeEvents(mockSushiData.events as Array<Record<string, unknown>>);
+
+// ------------------------------------------------------------
+// Generate Quest/Decision Events for Daily Score Testing
+// ------------------------------------------------------------
+
+const generateQuestEvents = (storeId: string): DomainEvent[] => {
+  const events: DomainEvent[] = [];
+  const today = new Date().toISOString().split('T')[0];
+  const baseTime = new Date(`${today}T09:00:00`);
+  
+  // Sample quests for the day
+  const quests = [
+    { id: 'quest-1', title: 'ランチ仕込み', estimatedMin: 30, actualMin: 28, status: 'completed' },
+    { id: 'quest-2', title: 'シャリ補充', estimatedMin: 15, actualMin: 18, status: 'completed' },
+    { id: 'quest-3', title: '在庫確認', estimatedMin: 20, actualMin: 25, status: 'completed' },
+    { id: 'quest-4', title: 'テーブル清掃', estimatedMin: 10, actualMin: 10, status: 'completed' },
+    { id: 'quest-5', title: 'ディナー準備', estimatedMin: 45, actualMin: null, status: 'started' },
+    { id: 'quest-6', title: 'デリバリー梱包', estimatedMin: 15, actualMin: null, status: 'pending' },
+  ];
+  
+  let timeOffset = 0;
+  
+  for (const quest of quests) {
+    const questTime = new Date(baseTime.getTime() + timeOffset * 60 * 1000);
+    
+    // Create approval event
+    events.push({
+      id: `${quest.id}-approved-${storeId}`,
+      type: 'decision',
+      storeId,
+      timestamp: questTime.toISOString(),
+      action: 'approved',
+      proposalId: quest.id,
+      title: quest.title,
+      description: `本日のタスク: ${quest.title}`,
+      reason: 'マネージャー承認',
+      expectedEffect: 'labor-savings',
+      distributedToRoles: ['kitchen', 'floor'],
+      estimatedMinutes: quest.estimatedMin,
+    });
+    
+    timeOffset += 5;
+    
+    if (quest.status === 'started' || quest.status === 'completed') {
+      // Create started event
+      const startTime = new Date(questTime.getTime() + 10 * 60 * 1000);
+      events.push({
+        id: `${quest.id}-started-${storeId}`,
+        type: 'decision',
+        storeId,
+        timestamp: startTime.toISOString(),
+        action: 'started',
+        proposalId: quest.id,
+        title: quest.title,
+        description: `タスク開始: ${quest.title}`,
+        reason: 'スタッフ着手',
+        expectedEffect: 'labor-savings',
+        distributedToRoles: ['kitchen', 'floor'],
+        estimatedMinutes: quest.estimatedMin,
+      });
+      timeOffset += quest.estimatedMin;
+    }
+    
+    if (quest.status === 'completed' && quest.actualMin !== null) {
+      // Create completed event
+      const completeTime = new Date(questTime.getTime() + (10 + quest.actualMin) * 60 * 1000);
+      events.push({
+        id: `${quest.id}-completed-${storeId}`,
+        type: 'decision',
+        storeId,
+        timestamp: completeTime.toISOString(),
+        action: 'completed',
+        proposalId: quest.id,
+        title: quest.title,
+        description: `タスク完了: ${quest.title}`,
+        reason: 'スタッフ完了報告',
+        expectedEffect: 'labor-savings',
+        distributedToRoles: ['kitchen', 'floor'],
+        estimatedMinutes: quest.estimatedMin,
+        actualMinutes: quest.actualMin,
+      });
+      timeOffset += 5;
+    }
+  }
+  
+  return events;
+};
+
+// ------------------------------------------------------------
+// Generate Labor Events for Daily Score Testing
+// ------------------------------------------------------------
+
+const generateLaborEvents = (storeId: string, staff: Staff[]): DomainEvent[] => {
+  const events: DomainEvent[] = [];
+  const today = new Date().toISOString().split('T')[0];
+  const now = new Date();
+  
+  // Get staff for this store
+  const storeStaff = staff.filter(s => s.storeId === storeId);
+  
+  // Generate labor events for each staff member
+  for (const member of storeStaff) {
+    // Check-in at 9:00 AM
+    const checkInTime = new Date(`${today}T09:00:00`);
+    
+    // Only generate events if check-in time is in the past
+    if (checkInTime <= now) {
+      events.push({
+        id: `labor-checkin-${member.id}-${today}`,
+        type: 'labor',
+        storeId,
+        timestamp: checkInTime.toISOString(),
+        staffId: member.id,
+        action: 'check-in',
+      });
+      
+      // Break at 12:30 (if past that time)
+      const breakStartTime = new Date(`${today}T12:30:00`);
+      if (breakStartTime <= now) {
+        events.push({
+          id: `labor-breakstart-${member.id}-${today}`,
+          type: 'labor',
+          storeId,
+          timestamp: breakStartTime.toISOString(),
+          staffId: member.id,
+          action: 'break-start',
+        });
+        
+        // Break end at 13:00 (if past that time)
+        const breakEndTime = new Date(`${today}T13:00:00`);
+        if (breakEndTime <= now) {
+          events.push({
+            id: `labor-breakend-${member.id}-${today}`,
+            type: 'labor',
+            storeId,
+            timestamp: breakEndTime.toISOString(),
+            staffId: member.id,
+            action: 'break-end',
+          });
+        }
+      }
+      
+      // Check-out at 17:30 for some staff (simulating completed shifts)
+      // Only for first 2 staff members to show variety
+      const checkOutTime = new Date(`${today}T17:30:00`);
+      if (checkOutTime <= now && storeStaff.indexOf(member) < 2) {
+        events.push({
+          id: `labor-checkout-${member.id}-${today}`,
+          type: 'labor',
+          storeId,
+          timestamp: checkOutTime.toISOString(),
+          staffId: member.id,
+          action: 'check-out',
+        });
+      }
+    }
+  }
+  
+  return events;
+};
 
 // ------------------------------------------------------------
 // Generate Initial Forecast Events

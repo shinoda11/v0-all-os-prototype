@@ -24,7 +24,10 @@ import {
   ExceptionsKPI,
   EnhancedCockpitMetrics,
   ExpectedEffect,
+  TodoStats,
 } from './types';
+
+import { INCENTIVE_POLICY, getDailyTargetSales } from '@/data/mock';
 
 // ------------------------------------------------------------
 // Event Filtering Helpers
@@ -733,11 +736,8 @@ export const deriveCalendarData = (
 // Todo Statistics Derivation
 // ------------------------------------------------------------
 
-export interface TodoStats {
-  pendingCount: number;
-  inProgressCount: number;
-  completedCount: number;
-}
+// TodoStats is imported from ./types and re-exported for backward compatibility
+export type { TodoStats } from './types';
 
 export const deriveTodoStats = (
   events: DomainEvent[],
@@ -747,10 +747,20 @@ export const deriveTodoStats = (
   const activeTodos = deriveActiveTodos(events, storeId, roleId);
   const completedTodos = deriveCompletedTodos(events, storeId);
   
+  const pendingCount = activeTodos.filter((t) => t.action === 'approved').length;
+  const inProgressCount = activeTodos.filter((t) => t.action === 'started').length;
+  const completedCount = completedTodos.length;
+  const total = pendingCount + inProgressCount + completedCount;
+  
   return {
-    pendingCount: activeTodos.filter((t) => t.action === 'approved').length,
-    inProgressCount: activeTodos.filter((t) => t.action === 'started').length,
-    completedCount: completedTodos.length,
+    pendingCount,
+    inProgressCount,
+    completedCount,
+    // Aliases for easier access
+    pending: pendingCount,
+    inProgress: inProgressCount,
+    completed: completedCount,
+    total,
   };
 };
 
@@ -883,6 +893,7 @@ import type { ShiftSummary, SupplyDemandMetrics, RiskItem, Staff, Role, TodoEven
 // ------------------------------------------------------------
 // Daily Score Derivation
 // Score 0-100 based on: Task completion, Time variance, Break compliance, Zero overtime
+// All calculations are based on actual events (quest + attendance)
 // ------------------------------------------------------------
 
 export interface DailyScoreBreakdown {
@@ -892,6 +903,25 @@ export interface DailyScoreBreakdown {
   zeroOvertime: number;        // 0-20 points (20% weight)
 }
 
+// Deduction reason with link to source event
+export type DeductionCategory = 'task' | 'time' | 'break' | 'overtime';
+
+export interface ScoreDeduction {
+  id: string;
+  category: DeductionCategory;
+  points: number;              // Points deducted (positive number)
+  reason: string;              // Human-readable reason
+  eventId: string;             // Source event ID for navigation
+  eventType: 'quest' | 'attendance'; // Type of source event
+  timestamp: string;           // When the deduction occurred
+  details?: {
+    expected?: number | string;
+    actual?: number | string;
+    questTitle?: string;
+    staffName?: string;
+  };
+}
+
 export interface DailyScore {
   total: number;               // 0-100
   breakdown: DailyScoreBreakdown;
@@ -899,6 +929,19 @@ export interface DailyScore {
   feedback: string;
   bottlenecks: string[];
   improvements: string[];
+  // New: Event-based deduction tracking
+  deductions: ScoreDeduction[];
+  // Summary stats for transparency
+  stats: {
+    totalQuests: number;
+    completedQuests: number;
+    onTimeQuests: number;
+    breaksTaken: number;
+    breaksExpected: number;
+    plannedHours: number;
+    actualHours: number;
+    overtimeMinutes: number;
+  };
 }
 
 export interface StaffDailyScore extends DailyScore {
@@ -935,68 +978,232 @@ export const deriveDailyScore = (
   date: string,
   staffId?: string
 ): DailyScore => {
-  const laborEvents = filterByType(events, 'labor') as LaborEvent[];
-  const todoEvents = events.filter(e => 
-    e.type === 'todo' && 
-    e.storeId === storeId && 
-    e.timestamp.startsWith(date)
-  ) as TodoEvent[];
+  const deductions: ScoreDeduction[] = [];
   
-  // Filter by staff if specified
+  // Get labor events for attendance tracking
+  const laborEvents = filterByType(events, 'labor') as LaborEvent[];
   const filteredLabor = laborEvents.filter(e => 
     e.storeId === storeId && 
     e.timestamp.startsWith(date) &&
     (!staffId || e.staffId === staffId)
   );
   
-  const filteredTodo = todoEvents.filter(e => 
-    !staffId || e.assignedStaffId === staffId
+  // Get quest events (decision events with started/completed actions)
+  const decisionEvents = filterByType(events, 'decision') as DecisionEvent[];
+  const questEvents = decisionEvents.filter(e =>
+    e.storeId === storeId &&
+    e.timestamp.startsWith(date)
   );
   
+  // Build quest state map (latest status per proposal)
+  const questStates = new Map<string, DecisionEvent>();
+  for (const event of questEvents.sort((a, b) => 
+    new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+  )) {
+    questStates.set(event.proposalId, event);
+  }
+  
+  // Filter quests for this staff if specified
+  const relevantQuests = Array.from(questStates.values()).filter(q => {
+    if (!staffId) return true;
+    // Check if quest was assigned to this staff's role
+    const staffMember = staff.find(s => s.id === staffId);
+    if (!staffMember) return false;
+    return q.distributedToRoles.includes(staffMember.roleId);
+  });
+  
+  // ============================================================
   // 1. Task Completion (40 points max)
-  const totalTasks = filteredTodo.length || 5; // Default mock
-  const completedTasks = filteredTodo.filter(e => e.status === 'done').length || 3;
-  const taskCompletionRate = totalTasks > 0 ? completedTasks / totalTasks : 0;
-  const taskCompletion = Math.round(taskCompletionRate * 40);
+  // Based on: quest_start → quest_complete ratio and difficulty
+  // ============================================================
+  const totalQuests = relevantQuests.length;
+  const completedQuests = relevantQuests.filter(q => q.action === 'completed').length;
+  const startedButNotCompleted = relevantQuests.filter(q => 
+    q.action === 'started' || q.action === 'paused'
+  );
   
-  // 2. Time Variance (25 points max) - How close to estimated time
-  // Mock: assume 80% on-time for demo
-  const onTimeRate = 0.8;
-  const timeVariance = Math.round(onTimeRate * 25);
+  // Calculate task completion score
+  let taskCompletion = 40; // Start with full points
   
+  if (totalQuests > 0) {
+    const completionRate = completedQuests / totalQuests;
+    taskCompletion = Math.round(completionRate * 40);
+    
+    // Add deductions for incomplete quests
+    for (const quest of startedButNotCompleted) {
+      const pointsDeducted = Math.round(40 / totalQuests);
+      deductions.push({
+        id: `task-incomplete-${quest.proposalId}`,
+        category: 'task',
+        points: pointsDeducted,
+        reason: `未完了: ${quest.title}`,
+        eventId: quest.id,
+        eventType: 'quest',
+        timestamp: quest.timestamp,
+        details: {
+          questTitle: quest.title,
+        },
+      });
+    }
+    
+    // Add deductions for quests not even started
+    const notStarted = relevantQuests.filter(q => 
+      q.action === 'approved' || q.action === 'pending'
+    );
+    for (const quest of notStarted) {
+      const pointsDeducted = Math.round(40 / totalQuests);
+      deductions.push({
+        id: `task-notstarted-${quest.proposalId}`,
+        category: 'task',
+        points: pointsDeducted,
+        reason: `未着手: ${quest.title}`,
+        eventId: quest.id,
+        eventType: 'quest',
+        timestamp: quest.timestamp,
+        details: {
+          questTitle: quest.title,
+        },
+      });
+    }
+  }
+  
+  // ============================================================
+  // 2. Time Variance (25 points max)
+  // Based on: actual vs estimated time for completed quests
+  // ============================================================
+  let timeVariance = 25; // Start with full points
+  let onTimeQuests = 0;
+  
+  const completedQuestEvents = relevantQuests.filter(q => q.action === 'completed');
+  
+  if (completedQuestEvents.length > 0) {
+    for (const quest of completedQuestEvents) {
+      const estimatedMinutes = quest.estimatedMinutes ?? 30;
+      const actualMinutes = quest.actualMinutes ?? estimatedMinutes;
+      
+      // Quest is "on-time" if actual <= estimated * 1.2 (20% buffer)
+      if (actualMinutes <= estimatedMinutes * 1.2) {
+        onTimeQuests++;
+      } else {
+        // Deduct points for overtime
+        const overagePercent = (actualMinutes - estimatedMinutes) / estimatedMinutes;
+        const pointsDeducted = Math.min(5, Math.round(overagePercent * 10));
+        timeVariance -= pointsDeducted;
+        
+        deductions.push({
+          id: `time-overage-${quest.proposalId}`,
+          category: 'time',
+          points: pointsDeducted,
+          reason: `時間超過: ${quest.title}`,
+          eventId: quest.id,
+          eventType: 'quest',
+          timestamp: quest.timestamp,
+          details: {
+            expected: `${estimatedMinutes}分`,
+            actual: `${actualMinutes}分`,
+            questTitle: quest.title,
+          },
+        });
+      }
+    }
+    timeVariance = Math.max(0, timeVariance);
+  }
+  
+  // ============================================================
   // 3. Break Compliance (15 points max)
-  // Check if breaks were taken properly
-  const breakStarts = filteredLabor.filter(e => e.action === 'break-start').length;
-  const breakEnds = filteredLabor.filter(e => e.action === 'break-end').length;
-  const breaksTaken = Math.min(breakStarts, breakEnds);
-  const expectedBreaks = 1; // 1 break per shift expected
-  const breakComplianceRate = breaksTaken >= expectedBreaks ? 1 : breaksTaken / expectedBreaks;
-  const breakCompliance = Math.round(breakComplianceRate * 15);
+  // Based on: break-start/break-end events matching expected pattern
+  // ============================================================
+  const breakStarts = filteredLabor.filter(e => e.action === 'break-start');
+  const breakEnds = filteredLabor.filter(e => e.action === 'break-end');
+  const breaksTaken = Math.min(breakStarts.length, breakEnds.length);
   
-  // 4. Zero Overtime (20 points max)
-  // Mock: check if total hours <= planned hours
+  // Calculate expected breaks based on work hours
   const checkIns = filteredLabor.filter(e => e.action === 'check-in');
   const checkOuts = filteredLabor.filter(e => e.action === 'check-out');
-  const plannedHours = 8;
+  
   let actualHours = 0;
+  const sessions: Array<{ checkIn: LaborEvent; checkOut?: LaborEvent; hours: number }> = [];
   
   for (const checkIn of checkIns) {
     const checkOut = checkOuts.find(co => 
       co.staffId === checkIn.staffId && 
       new Date(co.timestamp) > new Date(checkIn.timestamp)
     );
+    
+    let hours = 0;
     if (checkOut) {
-      const duration = (new Date(checkOut.timestamp).getTime() - new Date(checkIn.timestamp).getTime()) / (1000 * 60 * 60);
-      actualHours += duration;
+      hours = (new Date(checkOut.timestamp).getTime() - new Date(checkIn.timestamp).getTime()) / (1000 * 60 * 60);
+    } else {
+      // Still working - calculate from check-in to now
+      const now = new Date();
+      if (new Date(checkIn.timestamp) <= now) {
+        hours = (now.getTime() - new Date(checkIn.timestamp).getTime()) / (1000 * 60 * 60);
+      }
+    }
+    
+    actualHours += hours;
+    sessions.push({ checkIn, checkOut, hours });
+  }
+  
+  // Expected breaks: 1 per 6 hours of work
+  const expectedBreaks = Math.max(1, Math.floor(actualHours / 6));
+  const breakComplianceRate = breaksTaken >= expectedBreaks ? 1 : breaksTaken / expectedBreaks;
+  let breakCompliance = Math.round(breakComplianceRate * 15);
+  
+  if (breaksTaken < expectedBreaks && actualHours > 0) {
+    const missedBreaks = expectedBreaks - breaksTaken;
+    const pointsPerMissedBreak = Math.round(15 / expectedBreaks);
+    
+    deductions.push({
+      id: `break-missed-${date}`,
+      category: 'break',
+      points: missedBreaks * pointsPerMissedBreak,
+      reason: `休憩未取得: ${missedBreaks}回`,
+      eventId: checkIns[0]?.id ?? `labor-${date}`,
+      eventType: 'attendance',
+      timestamp: checkIns[0]?.timestamp ?? date,
+      details: {
+        expected: `${expectedBreaks}回`,
+        actual: `${breaksTaken}回`,
+      },
+    });
+  }
+  
+  // ============================================================
+  // 4. Zero Overtime (20 points max)
+  // Based on: check-in/check-out vs planned hours
+  // ============================================================
+  const plannedHours = 8; // Default planned hours per day
+  const overtimeMinutes = Math.max(0, Math.round((actualHours - plannedHours) * 60));
+  
+  let zeroOvertime = 20;
+  if (overtimeMinutes > 0) {
+    // Deduct 2 points per 30 minutes of overtime
+    const pointsDeducted = Math.min(20, Math.round(overtimeMinutes / 30) * 2);
+    zeroOvertime = Math.max(0, 20 - pointsDeducted);
+    
+    // Find the checkout event that caused overtime
+    const lastSession = sessions[sessions.length - 1];
+    if (lastSession && lastSession.hours > plannedHours) {
+      deductions.push({
+        id: `overtime-${date}`,
+        category: 'overtime',
+        points: pointsDeducted,
+        reason: `残業: ${overtimeMinutes}分`,
+        eventId: lastSession.checkOut?.id ?? lastSession.checkIn.id,
+        eventType: 'attendance',
+        timestamp: lastSession.checkOut?.timestamp ?? lastSession.checkIn.timestamp,
+        details: {
+          expected: `${plannedHours}時間`,
+          actual: `${actualHours.toFixed(1)}時間`,
+        },
+      });
     }
   }
   
-  // If no data, use mock values
-  if (actualHours === 0) actualHours = 7.5;
-  
-  const overtimeHours = Math.max(0, actualHours - plannedHours);
-  const zeroOvertime = overtimeHours === 0 ? 20 : Math.max(0, 20 - Math.round(overtimeHours * 10));
-  
+  // ============================================================
+  // Calculate final score and summary
+  // ============================================================
   const breakdown: DailyScoreBreakdown = {
     taskCompletion,
     timeVariance,
@@ -1006,7 +1213,10 @@ export const deriveDailyScore = (
   
   const total = taskCompletion + timeVariance + breakCompliance + zeroOvertime;
   
-  // Determine bottlenecks
+  // Sort deductions by points (highest first)
+  deductions.sort((a, b) => b.points - a.points);
+  
+  // Determine bottlenecks based on actual deductions
   const bottlenecks: string[] = [];
   if (taskCompletion < 32) bottlenecks.push('タスク完了率が低い');
   if (timeVariance < 20) bottlenecks.push('作業時間の遅延が多い');
@@ -1027,6 +1237,17 @@ export const deriveDailyScore = (
     feedback: getFeedback(total, breakdown),
     bottlenecks,
     improvements,
+    deductions,
+    stats: {
+      totalQuests,
+      completedQuests,
+      onTimeQuests,
+      breaksTaken,
+      breaksExpected: expectedBreaks,
+      plannedHours,
+      actualHours: Math.round(actualHours * 10) / 10,
+      overtimeMinutes,
+    },
   };
 };
 
@@ -1100,6 +1321,28 @@ export const deriveTeamDailyScore = (
   const improvementSet = new Set(allImprovements);
   const teamImprovements = [...improvementSet].slice(0, 3);
   
+  // Aggregate team deductions (top deductions across all staff)
+  const allDeductions = staffScores.flatMap(s => 
+    s.deductions.map(d => ({
+      ...d,
+      details: { ...d.details, staffName: s.staffName },
+    }))
+  );
+  allDeductions.sort((a, b) => b.points - a.points);
+  const teamDeductions = allDeductions.slice(0, 5); // Top 5 team deductions
+  
+  // Aggregate team stats
+  const teamStats = {
+    totalQuests: staffScores.reduce((sum, s) => sum + s.stats.totalQuests, 0),
+    completedQuests: staffScores.reduce((sum, s) => sum + s.stats.completedQuests, 0),
+    onTimeQuests: staffScores.reduce((sum, s) => sum + s.stats.onTimeQuests, 0),
+    breaksTaken: staffScores.reduce((sum, s) => sum + s.stats.breaksTaken, 0),
+    breaksExpected: staffScores.reduce((sum, s) => sum + s.stats.breaksExpected, 0),
+    plannedHours: staffScores.reduce((sum, s) => sum + s.stats.plannedHours, 0),
+    actualHours: Math.round(staffScores.reduce((sum, s) => sum + s.stats.actualHours, 0) * 10) / 10,
+    overtimeMinutes: staffScores.reduce((sum, s) => sum + s.stats.overtimeMinutes, 0),
+  };
+  
   return {
     total: avgTotal,
     breakdown: avgBreakdown,
@@ -1107,6 +1350,8 @@ export const deriveTeamDailyScore = (
     feedback: getFeedback(avgTotal, avgBreakdown),
     bottlenecks: teamBottlenecks,
     improvements: teamImprovements,
+    deductions: teamDeductions,
+    stats: teamStats,
     staffScores,
     topPerformers,
     needsSupport,
@@ -1242,8 +1487,18 @@ export const deriveShiftSummary = (
     }
   }
 
-  // Planned hours: 8h/person as default (would come from shift plan)
-  const plannedHours = storeStaff.length * 8;
+  // Count active staff (not on break)
+  let activeStaffCount = 0;
+  for (const [, session] of sessions) {
+    if (session.isActive && !session.isOnBreak) {
+      activeStaffCount++;
+    }
+  }
+  
+  // Planned hours: null when no shift data available, otherwise estimate from staff count
+  // In a real system, this would come from the shift plan
+  const hasShiftData = storeStaff.length > 0;
+  const plannedHours = hasShiftData ? storeStaff.length * 8 : null;
   
   // Check if we have enough data
   const isCalculating = sessions.size === 0;
@@ -1251,6 +1506,7 @@ export const deriveShiftSummary = (
   return {
     plannedHours,
     actualHours: Math.max(0, Math.round(actualHours * 10) / 10),
+    activeStaffCount,
     skillMix,
     roleMix,
     onBreakCount,
@@ -1416,9 +1672,10 @@ export const deriveWeeklyLaborMetrics = (
   }
   const weekEnd = dates[6];
   
-  // Filter labor and sales events for this store
+  // Filter labor, sales, and decision events for this store
   const laborEvents = filterByType(events, 'labor') as LaborEvent[];
   const salesEvents = filterByType(events, 'sales') as SalesEvent[];
+  const decisionEvents = filterByType(events, 'decision') as DecisionEvent[];
   
   const dailyRows: WeeklyLaborDailyRow[] = [];
   let totalHours = 0;
@@ -1427,6 +1684,17 @@ export const deriveWeeklyLaborMetrics = (
   let hasSalesData = false;
   const staffIdsAllWeek = new Set<string>();
   const starMixTotal = { star3: 0, star2: 0, star1: 0 };
+  
+  // HR-focused tracking
+  let totalOvertimeMinutes = 0;
+  let overtimeDays = 0;
+  let totalQuestDelays = 0;
+  let totalQuestsCompleted = 0;
+  let totalQuestsCount = 0;
+  const dayScores: number[] = [];
+  
+  // Track quest delays by title for chronic delay detection
+  const questDelayTracker = new Map<string, { count: number; totalDelayMinutes: number }>();
   
   for (const date of dates) {
     const dayOfWeek = new Date(date).getDay();
@@ -1445,7 +1713,7 @@ export const deriveWeeklyLaborMetrics = (
     // Calculate daily sales
     let daySales: number | null = null;
     if (daySalesEvents.length > 0) {
-      daySales = daySalesEvents.reduce((sum, e) => sum + e.amount, 0);
+      daySales = daySalesEvents.reduce((sum, e) => sum + e.total, 0);
       totalSales = (totalSales ?? 0) + daySales;
       hasSalesData = true;
     }
@@ -1554,6 +1822,73 @@ export const deriveWeeklyLaborMetrics = (
     starMixTotal.star2 += dayStarMix.star2;
     starMixTotal.star1 += dayStarMix.star1;
     
+    // Calculate overtime (assume 8h standard shift per staff)
+    const standardHours = dayStaffIds.size * 8;
+    const dayOvertimeMinutes = Math.max(0, Math.round((dayHours - standardHours) * 60));
+    const hasOvertime = dayOvertimeMinutes > 0;
+    if (hasOvertime) {
+      overtimeDays++;
+      totalOvertimeMinutes += dayOvertimeMinutes;
+    }
+    
+    // Get quest/decision events for this day
+    const dayDecisionEvents = decisionEvents.filter(
+      e => e.storeId === storeId && e.timestamp.startsWith(date)
+    );
+    
+    // Track quests by proposalId to get latest status
+    const questStatus = new Map<string, DecisionEvent>();
+    for (const evt of dayDecisionEvents) {
+      const existing = questStatus.get(evt.proposalId);
+      if (!existing || new Date(evt.timestamp) > new Date(existing.timestamp)) {
+        questStatus.set(evt.proposalId, evt);
+      }
+    }
+    
+    let dayQuestDelayCount = 0;
+    let dayQuestCompletedCount = 0;
+    let dayQuestTotalCount = 0;
+    
+    for (const [, quest] of questStatus) {
+      if (quest.action === 'completed' || quest.action === 'started' || quest.action === 'paused') {
+        dayQuestTotalCount++;
+        
+        if (quest.action === 'completed') {
+          dayQuestCompletedCount++;
+          
+          // Check if delayed (actual > estimated)
+          if (quest.actualMinutes && quest.estimatedMinutes && quest.actualMinutes > quest.estimatedMinutes) {
+            dayQuestDelayCount++;
+            const delayMinutes = quest.actualMinutes - quest.estimatedMinutes;
+            
+            // Track for chronic delay detection
+            const tracker = questDelayTracker.get(quest.title) || { count: 0, totalDelayMinutes: 0 };
+            tracker.count++;
+            tracker.totalDelayMinutes += delayMinutes;
+            questDelayTracker.set(quest.title, tracker);
+          }
+        }
+      }
+    }
+    
+    totalQuestDelays += dayQuestDelayCount;
+    totalQuestsCompleted += dayQuestCompletedCount;
+    totalQuestsCount += dayQuestTotalCount;
+    
+    // Calculate day score (simplified: based on task completion and overtime)
+    let dayScore: number | null = null;
+    if (dayQuestTotalCount > 0 || dayStaffIds.size > 0) {
+      const taskCompletionScore = dayQuestTotalCount > 0 
+        ? (dayQuestCompletedCount / dayQuestTotalCount) * 40 
+        : 40;
+      const onTimeScore = dayQuestCompletedCount > 0 
+        ? ((dayQuestCompletedCount - dayQuestDelayCount) / dayQuestCompletedCount) * 30 
+        : 30;
+      const overtimeScore = hasOvertime ? Math.max(0, 30 - dayOvertimeMinutes / 2) : 30;
+      dayScore = Math.round(taskCompletionScore + onTimeScore + overtimeScore);
+      dayScores.push(dayScore);
+    }
+    
     dailyRows.push({
       date,
       dayLabel,
@@ -1564,6 +1899,12 @@ export const deriveWeeklyLaborMetrics = (
       staffCount: dayStaffIds.size,
       starMix: dayStarMix,
       sales: daySales,
+      dayScore,
+      overtimeFlag: hasOvertime,
+      overtimeMinutes: dayOvertimeMinutes,
+      questDelayCount: dayQuestDelayCount,
+      questCompletedCount: dayQuestCompletedCount,
+      questTotalCount: dayQuestTotalCount,
     });
   }
   
@@ -1575,6 +1916,60 @@ export const deriveWeeklyLaborMetrics = (
     ? Math.round((totalSales / totalLaborCost) * 100) / 100
     : null;
   
+  // HR-focused summary calculations
+  const avgDayScore = dayScores.length > 0 
+    ? Math.round(dayScores.reduce((a, b) => a + b, 0) / dayScores.length)
+    : null;
+  const questCompletionRate = totalQuestsCount > 0
+    ? Math.round((totalQuestsCompleted / totalQuestsCount) * 100) / 100
+    : 1;
+  
+  // Find winning mix (highest scoring day)
+  const scoredRows = dailyRows.filter(r => r.dayScore !== null);
+  const winningDay = scoredRows.length > 0
+    ? scoredRows.reduce((best, row) => 
+        (row.dayScore ?? 0) > (best.dayScore ?? 0) ? row : best
+      )
+    : null;
+  const winningMix = winningDay ? {
+    dayLabel: winningDay.dayLabel,
+    starMix: winningDay.starMix,
+    score: winningDay.dayScore ?? 0,
+  } : null;
+  
+  // Find weak time bands
+  const weakTimeBands: WeeklyLaborMetrics['weakTimeBands'] = [];
+  for (const row of dailyRows) {
+    if (row.dayScore !== null && row.dayScore < 70) {
+      weakTimeBands.push({ dayLabel: row.dayLabel, issue: 'low_score', value: row.dayScore });
+    }
+    if (row.overtimeFlag && row.overtimeMinutes > 30) {
+      weakTimeBands.push({ dayLabel: row.dayLabel, issue: 'overtime', value: row.overtimeMinutes });
+    }
+    if (row.questDelayCount >= 2) {
+      weakTimeBands.push({ dayLabel: row.dayLabel, issue: 'quest_delay', value: row.questDelayCount });
+    }
+  }
+  // Sort by severity (low score first, then overtime, then delays)
+  weakTimeBands.sort((a, b) => {
+    if (a.issue === 'low_score' && b.issue !== 'low_score') return -1;
+    if (a.issue !== 'low_score' && b.issue === 'low_score') return 1;
+    return b.value - a.value;
+  });
+  
+  // Find chronic delay quests (delayed 2+ times)
+  const chronicDelayQuests: WeeklyLaborMetrics['chronicDelayQuests'] = [];
+  for (const [title, tracker] of questDelayTracker) {
+    if (tracker.count >= 2) {
+      chronicDelayQuests.push({
+        questTitle: title,
+        delayCount: tracker.count,
+        avgDelayMinutes: Math.round(tracker.totalDelayMinutes / tracker.count),
+      });
+    }
+  }
+  chronicDelayQuests.sort((a, b) => b.delayCount - a.delayCount);
+  
   return {
     weekSummary: {
       totalHours: Math.round(totalHours * 10) / 10,
@@ -1584,8 +1979,16 @@ export const deriveWeeklyLaborMetrics = (
       totalSales: hasSalesData ? totalSales : null,
       staffCountTotal: staffIdsAllWeek.size,
       starMixTotal,
+      avgDayScore,
+      overtimeDays,
+      totalOvertimeMinutes,
+      totalQuestDelays,
+      questCompletionRate,
     },
     dailyRows,
+    winningMix,
+    weakTimeBands: weakTimeBands.slice(0, 5),
+    chronicDelayQuests: chronicDelayQuests.slice(0, 5),
     weekStart: weekStartDate,
     weekEnd,
     lastUpdate: now.toISOString(),
@@ -1981,4 +2384,1402 @@ export const deriveDemandDropExceptions = (
 
     return exception;
   });
+};
+
+// ------------------------------------------------------------
+// Team Performance Metrics Derivation
+// ------------------------------------------------------------
+
+export type Period = 'today' | '7d' | '4w';
+
+export interface TeamSnapshot {
+  teamScoreAvg: number | null;
+  questCompletion: { completed: number; total: number; rate: number | null };
+  delayRate: number | null; // percentage of completed quests that were delayed
+  breakCompliance: number | null; // percentage of staff who took required breaks
+  overtimeRate: number | null; // percentage of staff with overtime
+  qualityNgRate: number | null; // percentage of quests with NG quality
+}
+
+export interface SkillMixCoverage {
+  starMix: { star1: number; star2: number; star3: number };
+  roleMix: Map<string, number>; // role code -> count
+  peakCoverage: 'good' | 'warning' | 'critical' | null; // null if not trackable
+  peakCoverageReason: string;
+}
+
+export interface IndividualPerformance {
+  staffId: string;
+  name: string;
+  starLevel: 1 | 2 | 3;
+  roleCode: string;
+  roleName: string;
+  hoursWorked: number | null;
+  questsDone: number;
+  questsTotal: number;
+  avgDurationVsEstimate: number | null; // percentage (100 = on time, >100 = over)
+  delayRate: number | null;
+  breakCompliance: boolean | null;
+  qualityOkCount: number;
+  qualityNgCount: number;
+  score: number;
+}
+
+export interface CoachingAction {
+  id: string;
+  action: string;
+  reason: string;
+  targetStaffId?: string;
+  targetStaffName?: string;
+  targetQuestId?: string;
+  priority: 'high' | 'medium' | 'low';
+}
+
+export interface PromotionCandidate {
+  staffId: string;
+  staffName: string;
+  currentStar: 1 | 2 | 3;
+  criteria: string[];
+  score: number;
+}
+
+export interface TeamPerformanceMetrics {
+  teamSnapshot: TeamSnapshot;
+  skillMixCoverage: SkillMixCoverage;
+  individuals: IndividualPerformance[];
+  coachingActions: CoachingAction[];
+  promotionCandidates: PromotionCandidate[];
+  period: Period;
+  timeBand: TimeBand;
+  lastUpdate: string;
+  dataAvailability: {
+    hasLaborData: boolean;
+    hasQuestData: boolean;
+    hasQualityData: boolean;
+  };
+}
+
+export const deriveTeamPerformanceMetrics = (
+  events: DomainEvent[],
+  staff: Staff[],
+  roles: Role[],
+  storeId: string,
+  period: Period,
+  timeBand: TimeBand
+): TeamPerformanceMetrics => {
+  const now = new Date();
+  const today = now.toISOString().split('T')[0];
+  
+  // Calculate date range based on period
+  const getDateRange = (): { start: Date; end: Date } => {
+    const end = new Date(today);
+    const start = new Date(today);
+    switch (period) {
+      case '7d':
+        start.setDate(start.getDate() - 6);
+        break;
+      case '4w':
+        start.setDate(start.getDate() - 27);
+        break;
+      default: // today
+        break;
+    }
+    return { start, end };
+  };
+  
+  const { start, end } = getDateRange();
+  const startStr = start.toISOString().split('T')[0];
+  const endStr = end.toISOString().split('T')[0];
+  
+  // Filter staff for this store
+  const storeStaff = staff.filter(s => s.storeId === storeId);
+  const roleMap = new Map(roles.map(r => [r.id, r]));
+  
+  // Filter events for date range
+  const isInRange = (timestamp: string) => {
+    const date = timestamp.split('T')[0];
+    return date >= startStr && date <= endStr;
+  };
+  
+  // Get labor events
+  const laborEvents = (filterByType(events, 'labor') as LaborEvent[])
+    .filter(e => e.storeId === storeId && isInRange(e.timestamp));
+  
+  // Get decision events (quests)
+  const decisionEvents = (filterByType(events, 'decision') as DecisionEvent[])
+    .filter(e => e.storeId === storeId && isInRange(e.timestamp));
+  
+  // Get latest status for each quest
+  const questStatuses = new Map<string, DecisionEvent>();
+  for (const event of decisionEvents.sort((a, b) => 
+    new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+  )) {
+    questStatuses.set(event.proposalId, event);
+  }
+  
+  const completedQuests = Array.from(questStatuses.values()).filter(q => q.action === 'completed');
+  const allQuests = Array.from(questStatuses.values()).filter(
+    q => q.action !== 'rejected'
+  );
+  
+  // Data availability flags
+  const hasLaborData = laborEvents.length > 0;
+  const hasQuestData = allQuests.length > 0;
+  const hasQualityData = completedQuests.some(q => q.qualityStatus !== undefined);
+  
+  // Calculate individual performance
+  const individuals: IndividualPerformance[] = storeStaff.map(s => {
+    const role = roleMap.get(s.roleId);
+    
+    // Calculate hours worked
+    const staffLaborEvents = laborEvents.filter(e => e.staffId === s.id);
+    let hoursWorked: number | null = null;
+    let tookBreak = false;
+    
+    if (staffLaborEvents.length > 0) {
+      let totalMinutes = 0;
+      let checkInTime: Date | null = null;
+      let breakStartTime: Date | null = null;
+      
+      for (const event of staffLaborEvents.sort((a, b) => 
+        new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+      )) {
+        switch (event.action) {
+          case 'check-in':
+            checkInTime = new Date(event.timestamp);
+            break;
+          case 'check-out':
+            if (checkInTime) {
+              totalMinutes += (new Date(event.timestamp).getTime() - checkInTime.getTime()) / 60000;
+              checkInTime = null;
+            }
+            break;
+          case 'break-start':
+            tookBreak = true;
+            breakStartTime = new Date(event.timestamp);
+            break;
+          case 'break-end':
+            breakStartTime = null;
+            break;
+        }
+      }
+      
+      // If still checked in, count time until now
+      if (checkInTime) {
+        totalMinutes += (now.getTime() - checkInTime.getTime()) / 60000;
+      }
+      
+      hoursWorked = Math.round(totalMinutes / 6) / 10; // Round to 1 decimal
+    }
+    
+    // Calculate quest performance
+    const staffQuests = completedQuests.filter(
+      q => q.assigneeId === s.id || q.distributedToRoles.includes(s.roleId)
+    );
+    const staffAllQuests = allQuests.filter(
+      q => q.assigneeId === s.id || q.distributedToRoles.includes(s.roleId)
+    );
+    
+    const questsDone = staffQuests.length;
+    const questsTotal = staffAllQuests.length;
+    
+    // Calculate avg duration vs estimate
+    let avgDurationVsEstimate: number | null = null;
+    const questsWithTiming = staffQuests.filter(
+      q => q.actualMinutes !== undefined && q.estimatedMinutes !== undefined && q.estimatedMinutes > 0
+    );
+    if (questsWithTiming.length > 0) {
+      const totalRatio = questsWithTiming.reduce(
+        (sum, q) => sum + ((q.actualMinutes ?? 0) / (q.estimatedMinutes ?? 1)) * 100,
+        0
+      );
+      avgDurationVsEstimate = Math.round(totalRatio / questsWithTiming.length);
+    }
+    
+    // Calculate delay rate
+    const delayedQuests = staffQuests.filter(
+      q => q.actualMinutes !== undefined && q.estimatedMinutes !== undefined && 
+           q.actualMinutes > q.estimatedMinutes
+    );
+    const delayRate = questsDone > 0 ? Math.round((delayedQuests.length / questsDone) * 100) : null;
+    
+    // Quality counts
+    const qualityOkCount = staffQuests.filter(q => q.qualityStatus === 'ok').length;
+    const qualityNgCount = staffQuests.filter(q => q.qualityStatus === 'ng').length;
+    
+    // Calculate score (weighted)
+    let score = 50; // Base score
+    if (questsDone > 0) {
+      score += Math.min(20, questsDone * 2); // Up to 20 points for quests done
+    }
+    if (avgDurationVsEstimate !== null) {
+      score += avgDurationVsEstimate <= 100 ? 15 : Math.max(0, 15 - (avgDurationVsEstimate - 100) / 5);
+    }
+    if (delayRate !== null) {
+      score += Math.max(0, 10 - delayRate / 10);
+    }
+    if (hasQualityData && (qualityOkCount + qualityNgCount) > 0) {
+      const qualityRate = qualityOkCount / (qualityOkCount + qualityNgCount);
+      score += qualityRate * 5;
+    }
+    score = Math.round(Math.min(100, Math.max(0, score)));
+    
+    // Break compliance
+    const breakCompliance = hoursWorked !== null && hoursWorked >= 4 
+      ? tookBreak 
+      : null; // Not applicable if worked less than 4 hours
+    
+    return {
+      staffId: s.id,
+      name: s.name,
+      starLevel: s.starLevel,
+      roleCode: role?.code ?? 'unknown',
+      roleName: role?.name ?? 'Unknown',
+      hoursWorked,
+      questsDone,
+      questsTotal,
+      avgDurationVsEstimate,
+      delayRate,
+      breakCompliance,
+      qualityOkCount,
+      qualityNgCount,
+      score,
+    };
+  });
+  
+  // Sort by score descending
+  individuals.sort((a, b) => b.score - a.score);
+  
+  // Calculate team snapshot
+  const activeIndividuals = individuals.filter(i => i.hoursWorked !== null && i.hoursWorked > 0);
+  
+  const teamScoreAvg = activeIndividuals.length > 0
+    ? Math.round(activeIndividuals.reduce((sum, i) => sum + i.score, 0) / activeIndividuals.length)
+    : null;
+  
+  const questCompletion = {
+    completed: completedQuests.length,
+    total: allQuests.length,
+    rate: allQuests.length > 0 
+      ? Math.round((completedQuests.length / allQuests.length) * 100) 
+      : null,
+  };
+  
+  const delayedQuestsCount = completedQuests.filter(
+    q => q.actualMinutes !== undefined && q.estimatedMinutes !== undefined && 
+         q.actualMinutes > q.estimatedMinutes
+  ).length;
+  const delayRate = completedQuests.length > 0
+    ? Math.round((delayedQuestsCount / completedQuests.length) * 100)
+    : null;
+  
+  const staffNeedingBreaks = activeIndividuals.filter(i => i.hoursWorked !== null && i.hoursWorked >= 4);
+  const staffWithBreaks = staffNeedingBreaks.filter(i => i.breakCompliance === true);
+  const breakCompliance = staffNeedingBreaks.length > 0
+    ? Math.round((staffWithBreaks.length / staffNeedingBreaks.length) * 100)
+    : null;
+  
+  // Overtime rate (simplified: anyone working > 8 hours)
+  const staffWithOvertime = activeIndividuals.filter(i => i.hoursWorked !== null && i.hoursWorked > 8);
+  const overtimeRate = activeIndividuals.length > 0
+    ? Math.round((staffWithOvertime.length / activeIndividuals.length) * 100)
+    : null;
+  
+  // Quality NG rate
+  const qualityTrackedQuests = completedQuests.filter(q => q.qualityStatus !== undefined);
+  const ngQuests = qualityTrackedQuests.filter(q => q.qualityStatus === 'ng');
+  const qualityNgRate = qualityTrackedQuests.length > 0
+    ? Math.round((ngQuests.length / qualityTrackedQuests.length) * 100)
+    : null;
+  
+  const teamSnapshot: TeamSnapshot = {
+    teamScoreAvg,
+    questCompletion,
+    delayRate,
+    breakCompliance,
+    overtimeRate,
+    qualityNgRate,
+  };
+  
+  // Calculate skill mix coverage
+  const starMix = { star1: 0, star2: 0, star3: 0 };
+  const roleMix = new Map<string, number>();
+  
+  for (const ind of activeIndividuals) {
+    if (ind.starLevel === 1) starMix.star1++;
+    else if (ind.starLevel === 2) starMix.star2++;
+    else starMix.star3++;
+    
+    const count = roleMix.get(ind.roleCode) ?? 0;
+    roleMix.set(ind.roleCode, count + 1);
+  }
+  
+  // Peak coverage: need at least 1 star2+ during peak (simplified logic)
+  let peakCoverage: 'good' | 'warning' | 'critical' | null = null;
+  let peakCoverageReason = '';
+  
+  if (activeIndividuals.length > 0) {
+    const highSkillCount = starMix.star2 + starMix.star3;
+    if (highSkillCount >= 2) {
+      peakCoverage = 'good';
+      peakCoverageReason = `${highSkillCount} high-skill staff available`;
+    } else if (highSkillCount === 1) {
+      peakCoverage = 'warning';
+      peakCoverageReason = 'Only 1 high-skill staff - consider backup';
+    } else {
+      peakCoverage = 'critical';
+      peakCoverageReason = 'No high-skill staff on shift';
+    }
+  } else {
+    peakCoverageReason = 'No staff data available';
+  }
+  
+  const skillMixCoverage: SkillMixCoverage = {
+    starMix,
+    roleMix,
+    peakCoverage,
+    peakCoverageReason,
+  };
+  
+  // Generate coaching actions (max 5)
+  const coachingActions: CoachingAction[] = [];
+  
+  // Action 1: Staff with high delay rate
+  const highDelayStaff = individuals.filter(i => i.delayRate !== null && i.delayRate > 30);
+  for (const ind of highDelayStaff.slice(0, 2)) {
+    coachingActions.push({
+      id: `delay-${ind.staffId}`,
+      action: `Review task estimation with ${ind.name}`,
+      reason: `${ind.delayRate}% delay rate on completed quests`,
+      targetStaffId: ind.staffId,
+      targetStaffName: ind.name,
+      priority: ind.delayRate! > 50 ? 'high' : 'medium',
+    });
+  }
+  
+  // Action 2: Staff not taking breaks
+  const noBreakStaff = individuals.filter(i => i.breakCompliance === false);
+  for (const ind of noBreakStaff.slice(0, 1)) {
+    coachingActions.push({
+      id: `break-${ind.staffId}`,
+      action: `Remind ${ind.name} about break requirements`,
+      reason: `Worked ${ind.hoursWorked}+ hours without recorded break`,
+      targetStaffId: ind.staffId,
+      targetStaffName: ind.name,
+      priority: 'high',
+    });
+  }
+  
+  // Action 3: Quality issues
+  const qualityIssueStaff = individuals.filter(i => i.qualityNgCount > 0);
+  for (const ind of qualityIssueStaff.slice(0, 1)) {
+    coachingActions.push({
+      id: `quality-${ind.staffId}`,
+      action: `Quality review with ${ind.name}`,
+      reason: `${ind.qualityNgCount} quality issue(s) recorded`,
+      targetStaffId: ind.staffId,
+      targetStaffName: ind.name,
+      priority: ind.qualityNgCount > 2 ? 'high' : 'medium',
+    });
+  }
+  
+  // Action 4: Low score staff
+  const lowScoreStaff = individuals.filter(i => i.score < 60 && i.hoursWorked !== null && i.hoursWorked > 0);
+  for (const ind of lowScoreStaff.slice(0, 1)) {
+    coachingActions.push({
+      id: `score-${ind.staffId}`,
+      action: `Performance discussion with ${ind.name}`,
+      reason: `Below target score (${ind.score}/100)`,
+      targetStaffId: ind.staffId,
+      targetStaffName: ind.name,
+      priority: 'medium',
+    });
+  }
+  
+  // Generate promotion candidates (max 5)
+  const promotionCandidates: PromotionCandidate[] = [];
+  
+  // Criteria: high score, low delay rate, good quality
+  for (const ind of individuals) {
+    if (ind.starLevel >= 3) continue; // Already max level
+    if (ind.hoursWorked === null || ind.hoursWorked < 2) continue; // Not enough data
+    
+    const criteria: string[] = [];
+    
+    if (ind.score >= 80) criteria.push(`High score: ${ind.score}/100`);
+    if (ind.delayRate !== null && ind.delayRate <= 10) criteria.push(`Low delay rate: ${ind.delayRate}%`);
+    if (ind.questsDone >= 5) criteria.push(`Active contributor: ${ind.questsDone} quests`);
+    if (ind.qualityOkCount > 0 && ind.qualityNgCount === 0) criteria.push('Perfect quality record');
+    
+    if (criteria.length >= 2) {
+      promotionCandidates.push({
+        staffId: ind.staffId,
+        staffName: ind.name,
+        currentStar: ind.starLevel,
+        criteria,
+        score: ind.score,
+      });
+    }
+  }
+  
+  // Sort by score and limit to 5
+  promotionCandidates.sort((a, b) => b.score - a.score);
+  
+  return {
+    teamSnapshot,
+    skillMixCoverage,
+    individuals,
+    coachingActions: coachingActions.slice(0, 5),
+    promotionCandidates: promotionCandidates.slice(0, 5),
+    period,
+    timeBand,
+    lastUpdate: now.toISOString(),
+    dataAvailability: {
+      hasLaborData,
+      hasQuestData,
+      hasQualityData,
+    },
+  };
+};
+
+// ------------------------------------------------------------
+// Earnings & Incentive Derivation
+// ------------------------------------------------------------
+
+export interface TodayEarnings {
+  staffId: string;
+  staffName: string;
+  businessDate: string;
+  // Hours
+  hoursWorked: number | null; // null = not tracked
+  breakMinutes: number;
+  netHoursWorked: number | null;
+  // Base Pay
+  hourlyWage: number;
+  basePay: number | null;
+  // Quest XP
+  questsCompleted: number;
+  questXP: number; // Only from eligible quests (excludes unapproved ad-hoc)
+  adHocQuestCount: number; // Count of unapproved ad-hoc quests (0 points)
+  qualityNgCount: number;
+  // Points
+  pointsFromHours: number | null;
+  pointsFromQuests: number;
+  totalPoints: number | null;
+  // Status
+  status: 'working' | 'checked-out' | 'not-tracked';
+}
+
+export interface IncentivePool {
+  storeId: string;
+  businessDate: string;
+  // Sales
+  targetSales: number;
+  actualSales: number;
+  runRateSales: number; // Projected end-of-day sales
+  useSalesValue: 'actual' | 'runRate';
+  salesForCalculation: number;
+  // Over-achievement
+  overAchievement: number;
+  overAchievementRate: number | null; // percentage over target
+  // Pool
+  poolShare: number;
+  pool: number;
+  // Status
+  status: 'projected' | 'finalized' | 'not-tracked';
+}
+
+export interface StaffIncentiveShare {
+  staffId: string;
+  staffName: string;
+  points: number;
+  sharePercentage: number;
+  estimatedShare: number;
+  isEstimate: boolean; // true = projected, not finalized
+}
+
+export interface IncentiveDistribution {
+  storeId: string;
+  businessDate: string;
+  pool: IncentivePool;
+  totalPoints: number;
+  staffShares: StaffIncentiveShare[];
+  status: 'projected' | 'finalized' | 'not-tracked';
+  lastUpdate: string;
+}
+
+export const deriveTodayEarnings = (
+  events: DomainEvent[],
+  staff: Staff[],
+  staffId: string,
+  businessDate: string
+): TodayEarnings => {
+  const staffMember = staff.find(s => s.id === staffId);
+  
+  if (!staffMember) {
+    return {
+      staffId,
+      staffName: 'Unknown',
+      businessDate,
+      hoursWorked: null,
+      breakMinutes: 0,
+      netHoursWorked: null,
+      hourlyWage: 0,
+      basePay: null,
+      questsCompleted: 0,
+      questXP: 0,
+      adHocQuestCount: 0,
+      qualityNgCount: 0,
+      pointsFromHours: null,
+      pointsFromQuests: 0,
+      totalPoints: null,
+      status: 'not-tracked',
+    };
+  }
+  
+  const now = new Date();
+  const dateStr = businessDate;
+  
+  // Filter labor events for this staff on this date
+  const laborEvents = (filterByType(events, 'labor') as LaborEvent[])
+    .filter(e => e.staffId === staffId && e.timestamp.startsWith(dateStr))
+    .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+  
+  // Calculate hours worked
+  let totalMinutesWorked = 0;
+  let breakMinutes = 0;
+  let checkInTime: Date | null = null;
+  let breakStartTime: Date | null = null;
+  let hasLaborData = false;
+  let isCheckedOut = false;
+  
+  for (const event of laborEvents) {
+    hasLaborData = true;
+    const eventTime = new Date(event.timestamp);
+    
+    switch (event.action) {
+      case 'check-in':
+        checkInTime = eventTime;
+        break;
+      case 'check-out':
+        if (checkInTime) {
+          totalMinutesWorked += (eventTime.getTime() - checkInTime.getTime()) / 60000;
+          checkInTime = null;
+          isCheckedOut = true;
+        }
+        break;
+      case 'break-start':
+        breakStartTime = eventTime;
+        break;
+      case 'break-end':
+        if (breakStartTime) {
+          breakMinutes += (eventTime.getTime() - breakStartTime.getTime()) / 60000;
+          breakStartTime = null;
+        }
+        break;
+    }
+  }
+  
+  // If still checked in, count time until now
+  if (checkInTime && !isCheckedOut) {
+    totalMinutesWorked += (now.getTime() - checkInTime.getTime()) / 60000;
+  }
+  
+  // If still on break, count break time until now
+  if (breakStartTime) {
+    breakMinutes += (now.getTime() - breakStartTime.getTime()) / 60000;
+  }
+  
+  // Net hours = total - breaks
+  const netMinutesWorked = Math.max(0, totalMinutesWorked - breakMinutes);
+  const hoursWorked = hasLaborData ? Math.round(totalMinutesWorked / 6) / 10 : null;
+  const netHoursWorked = hasLaborData ? Math.round(netMinutesWorked / 6) / 10 : null;
+  
+  // Calculate base pay
+  const hourlyWage = staffMember.wage;
+  const basePay = netHoursWorked !== null ? Math.round(netHoursWorked * hourlyWage) : null;
+  
+  // Filter decision events (quests) for this staff on this date
+  const decisionEvents = (filterByType(events, 'decision') as DecisionEvent[])
+    .filter(e => 
+      e.timestamp.startsWith(dateStr) && 
+      (e.assigneeId === staffId || e.distributedToRoles.includes(staffMember.roleId))
+    );
+  
+  // Get completed quests
+  const questStatuses = new Map<string, DecisionEvent>();
+  for (const event of decisionEvents.sort((a, b) => 
+    new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+  )) {
+    questStatuses.set(event.proposalId, event);
+  }
+  
+  const completedQuests = Array.from(questStatuses.values()).filter(q => q.action === 'completed');
+  const questsCompleted = completedQuests.length;
+  
+  // Calculate quest XP (based on estimated minutes - simplified)
+  // ANTI-ABUSE: Ad-hoc quests earn 0 points unless manager-approved
+  const isQuestEligibleForPoints = (q: DecisionEvent): boolean => {
+    // System-generated or manager-assigned quests are always eligible
+    if (!q.source || q.source === 'system' || q.source === 'manager') return true;
+    // Ad-hoc quests only eligible if manager approved for points
+    if (q.source === 'ad-hoc' && q.managerApprovedForPoints) return true;
+    return false;
+  };
+  
+  const eligibleQuests = completedQuests.filter(isQuestEligibleForPoints);
+  const adHocQuests = completedQuests.filter(q => q.source === 'ad-hoc' && !q.managerApprovedForPoints);
+  
+  const questXP = eligibleQuests.reduce((sum, q) => sum + (q.estimatedMinutes ?? 10), 0);
+  const adHocQuestCount = adHocQuests.length;
+  
+  // Quality NG count (applies to all quests, not just eligible ones)
+  const qualityNgCount = completedQuests.filter(q => q.qualityStatus === 'ng').length;
+  
+  // Calculate points
+  const { points } = INCENTIVE_POLICY;
+  const pointsFromHours = netHoursWorked !== null ? Math.round(netHoursWorked * points.perHour) : null;
+  const pointsFromQuests = questXP * points.perQuestXP;
+  
+  // Apply quality penalty if there are NG quests
+  let totalPoints: number | null = null;
+  if (pointsFromHours !== null) {
+    totalPoints = pointsFromHours + pointsFromQuests;
+    if (qualityNgCount > 0) {
+      totalPoints = Math.round(totalPoints * INCENTIVE_POLICY.qualityPenalty.ngMultiplier);
+    }
+  }
+  
+  return {
+    staffId,
+    staffName: staffMember.name,
+    businessDate,
+    hoursWorked,
+    breakMinutes: Math.round(breakMinutes),
+    netHoursWorked,
+    hourlyWage,
+    basePay,
+    questsCompleted,
+    questXP,
+    adHocQuestCount,
+    qualityNgCount,
+    pointsFromHours,
+    pointsFromQuests,
+    totalPoints,
+    status: !hasLaborData ? 'not-tracked' : isCheckedOut ? 'checked-out' : 'working',
+  };
+};
+
+export const deriveIncentivePool = (
+  events: DomainEvent[],
+  storeId: string,
+  businessDate: string
+): IncentivePool => {
+  const targetSales = getDailyTargetSales(storeId, businessDate);
+  
+  // Get actual sales for the day
+  const salesEvents = (filterByType(events, 'sales') as SalesEvent[])
+    .filter(e => e.storeId === storeId && e.timestamp.startsWith(businessDate));
+  
+  const actualSales = salesEvents.reduce((sum, e) => sum + e.totalAmount, 0);
+  
+  // Calculate run rate (projected end-of-day sales)
+  const now = new Date();
+  const currentHour = now.getHours();
+  const businessEndHour = 22; // Assume business ends at 10 PM
+  const businessStartHour = 11; // Assume business starts at 11 AM
+  
+  let runRateSales = actualSales;
+  let useSalesValue: 'actual' | 'runRate' = 'actual';
+  
+  // If business day not yet finished, project run rate
+  if (currentHour < businessEndHour && currentHour >= businessStartHour) {
+    const hoursElapsed = currentHour - businessStartHour;
+    const totalBusinessHours = businessEndHour - businessStartHour;
+    const progressRatio = hoursElapsed / totalBusinessHours;
+    
+    if (progressRatio > 0) {
+      runRateSales = Math.round(actualSales / progressRatio);
+      useSalesValue = 'runRate';
+    }
+  }
+  
+  const salesForCalculation = useSalesValue === 'runRate' ? runRateSales : actualSales;
+  
+  // Calculate over-achievement
+  const overAchievement = Math.max(0, salesForCalculation - targetSales);
+  const overAchievementRate = targetSales > 0 
+    ? Math.round((overAchievement / targetSales) * 1000) / 10 
+    : null;
+  
+  // Calculate pool
+  const { poolShare } = INCENTIVE_POLICY;
+  const pool = Math.round(overAchievement * poolShare);
+  
+  // Determine status
+  const isFinalized = currentHour >= businessEndHour || 
+    (new Date(businessDate).toDateString() !== now.toDateString());
+  
+  return {
+    storeId,
+    businessDate,
+    targetSales,
+    actualSales,
+    runRateSales,
+    useSalesValue,
+    salesForCalculation,
+    overAchievement,
+    overAchievementRate,
+    poolShare,
+    pool,
+    status: salesEvents.length === 0 ? 'not-tracked' : isFinalized ? 'finalized' : 'projected',
+  };
+};
+
+export const deriveIncentiveDistribution = (
+  events: DomainEvent[],
+  staff: Staff[],
+  storeId: string,
+  businessDate: string
+): IncentiveDistribution => {
+  const pool = deriveIncentivePool(events, storeId, businessDate);
+  
+  // Get all staff for this store
+  const storeStaff = staff.filter(s => s.storeId === storeId);
+  
+  // Calculate earnings for each staff member
+  const staffEarnings = storeStaff.map(s => deriveTodayEarnings(events, staff, s.id, businessDate));
+  
+  // Calculate total points
+  const totalPoints = staffEarnings.reduce((sum, e) => sum + (e.totalPoints ?? 0), 0);
+  
+  // Calculate each staff's share
+  const staffShares: StaffIncentiveShare[] = staffEarnings
+    .filter(e => e.totalPoints !== null && e.totalPoints > 0)
+    .map(e => {
+      const sharePercentage = totalPoints > 0 
+        ? Math.round((e.totalPoints! / totalPoints) * 1000) / 10 
+        : 0;
+      const estimatedShare = totalPoints > 0 
+        ? Math.round(pool.pool * (e.totalPoints! / totalPoints)) 
+        : 0;
+      
+      return {
+        staffId: e.staffId,
+        staffName: e.staffName,
+        points: e.totalPoints!,
+        sharePercentage,
+        estimatedShare,
+        isEstimate: pool.status === 'projected',
+      };
+    })
+    .sort((a, b) => b.points - a.points);
+  
+  return {
+    storeId,
+    businessDate,
+    pool,
+    totalPoints,
+    staffShares,
+    status: pool.status,
+    lastUpdate: new Date().toISOString(),
+  };
+};
+
+// ------------------------------------------------------------
+// Awards Derivation
+// ------------------------------------------------------------
+
+export type AwardCategory = 'perfect-run' | 'speed-master' | 'quality-guardian' | 'team-saver' | 'most-improved';
+
+export interface AwardEvidence {
+  laborTimeline: Array<{ time: string; action: string; duration?: number }>;
+  questHistory: Array<{ title: string; startedAt: string; completedAt?: string; durationMinutes?: number; estimatedMinutes?: number; qualityStatus?: 'ok' | 'ng' }>;
+  scoreBreakdown: { base: number; questBonus: number; speedBonus: number; qualityBonus: number; total: number };
+  reasonText: { en: string; ja: string };
+}
+
+export interface Award {
+  category: AwardCategory;
+  categoryLabel: { en: string; ja: string };
+  winner: { staffId: string; name: string; starLevel: 1 | 2 | 3; roleCode: string } | null;
+  evidenceBullets: string[]; // 3 short evidence points
+  reproducibleRule: { en: string; ja: string }; // How to win this award next time
+  evidence: AwardEvidence | null;
+  status: 'awarded' | 'no-winner' | 'not-tracked';
+  notTrackedReason?: string;
+}
+
+export interface AwardNominee {
+  staffId: string;
+  name: string;
+  starLevel: 1 | 2 | 3;
+  roleCode: string;
+  roleName: string;
+  score: number;
+  questsDone: number;
+  delayRate: number | null;
+  qualityNgCount: number;
+  hoursWorked: number | null;
+  avgDurationVsEstimate: number | null;
+  scoreTrend: number | null; // positive = improving
+}
+
+export interface AwardsSnapshot {
+  winnersCount: number;
+  eligibleStaffCount: number;
+  lastUpdated: string;
+  period: Period;
+  timeBand: TimeBand;
+}
+
+export interface AwardsMetrics {
+  snapshot: AwardsSnapshot;
+  awards: Award[];
+  nominees: AwardNominee[];
+  dataAvailability: {
+    hasLaborData: boolean;
+    hasQuestData: boolean;
+    hasQualityData: boolean;
+    hasScoreTrendData: boolean;
+  };
+}
+
+const AWARD_LABELS: Record<AwardCategory, { en: string; ja: string }> = {
+  'perfect-run': { en: 'Perfect Run', ja: 'パーフェクトラン' },
+  'speed-master': { en: 'Speed Master', ja: 'スピードマスター' },
+  'quality-guardian': { en: 'Quality Guardian', ja: '品質ガーディアン' },
+  'team-saver': { en: 'Team Saver', ja: 'チームセーバー' },
+  'most-improved': { en: 'Most Improved', ja: '最も成長した人' },
+};
+
+const AWARD_RULES: Record<AwardCategory, { en: string; ja: string }> = {
+  'perfect-run': { 
+    en: 'Achieve score >= 85, zero delays, take required breaks, zero quality issues', 
+    ja: 'スコア85以上、遅延ゼロ、休憩取得、品質NGゼロを達成' 
+  },
+  'speed-master': { 
+    en: 'Complete quests faster than estimated while maintaining zero quality issues', 
+    ja: '品質NGゼロを維持しながら、見積より早くクエストを完了' 
+  },
+  'quality-guardian': { 
+    en: 'Maintain zero quality issues while completing difficult quests', 
+    ja: '難易度の高いクエストをこなしながら品質NGゼロを維持' 
+  },
+  'team-saver': { 
+    en: 'Help resolve delayed quests or take over reassigned tasks', 
+    ja: '遅延クエストの解決や再アサインタスクの引き受け' 
+  },
+  'most-improved': { 
+    en: 'Show the greatest improvement in score over the past 7 days', 
+    ja: '過去7日間で最も大きなスコア改善を達成' 
+  },
+};
+
+export const deriveAwards = (
+  events: DomainEvent[],
+  staff: Staff[],
+  roles: Role[],
+  storeId: string,
+  period: Period,
+  timeBand: TimeBand
+): AwardsMetrics => {
+  const now = new Date();
+  const today = now.toISOString().split('T')[0];
+  
+  // Calculate date range based on period
+  const getDateRange = (): { start: Date; end: Date } => {
+    const end = new Date(today);
+    const start = new Date(today);
+    switch (period) {
+      case '7d':
+        start.setDate(start.getDate() - 6);
+        break;
+      case '4w':
+        start.setDate(start.getDate() - 27);
+        break;
+      default: // today
+        break;
+    }
+    return { start, end };
+  };
+  
+  const { start, end } = getDateRange();
+  const startStr = start.toISOString().split('T')[0];
+  const endStr = end.toISOString().split('T')[0];
+  
+  // Filter staff for this store
+  const storeStaff = staff.filter(s => s.storeId === storeId);
+  const roleMap = new Map(roles.map(r => [r.id, r]));
+  
+  // Filter events for date range
+  const isInRange = (timestamp: string) => {
+    const date = timestamp.split('T')[0];
+    return date >= startStr && date <= endStr;
+  };
+  
+  // Get labor events
+  const laborEvents = (filterByType(events, 'labor') as LaborEvent[])
+    .filter(e => e.storeId === storeId && isInRange(e.timestamp));
+  
+  // Get decision events (quests)
+  const decisionEvents = (filterByType(events, 'decision') as DecisionEvent[])
+    .filter(e => e.storeId === storeId && isInRange(e.timestamp));
+  
+  // Get latest status for each quest
+  const questStatuses = new Map<string, DecisionEvent>();
+  for (const event of decisionEvents.sort((a, b) => 
+    new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+  )) {
+    questStatuses.set(event.proposalId, event);
+  }
+  
+  const completedQuests = Array.from(questStatuses.values()).filter(q => q.action === 'completed');
+  const allQuests = Array.from(questStatuses.values()).filter(q => q.action !== 'rejected');
+  
+  // Data availability flags
+  const hasLaborData = laborEvents.length > 0;
+  const hasQuestData = allQuests.length > 0;
+  const hasQualityData = completedQuests.some(q => q.qualityStatus !== undefined);
+  const hasScoreTrendData = period !== 'today'; // Can only calculate trend over time
+  
+  // Build nominee data for each staff
+  const nominees: AwardNominee[] = storeStaff.map(s => {
+    const role = roleMap.get(s.roleId);
+    
+    // Calculate hours worked
+    const staffLaborEvents = laborEvents.filter(e => e.staffId === s.id);
+    let hoursWorked: number | null = null;
+    let tookBreak = false;
+    
+    if (staffLaborEvents.length > 0) {
+      let totalMinutes = 0;
+      let checkInTime: Date | null = null;
+      
+      for (const event of staffLaborEvents.sort((a, b) => 
+        new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+      )) {
+        switch (event.action) {
+          case 'check-in':
+            checkInTime = new Date(event.timestamp);
+            break;
+          case 'check-out':
+            if (checkInTime) {
+              totalMinutes += (new Date(event.timestamp).getTime() - checkInTime.getTime()) / 60000;
+              checkInTime = null;
+            }
+            break;
+          case 'break-start':
+            tookBreak = true;
+            break;
+        }
+      }
+      
+      if (checkInTime) {
+        totalMinutes += (now.getTime() - checkInTime.getTime()) / 60000;
+      }
+      
+      hoursWorked = Math.round(totalMinutes / 6) / 10;
+    }
+    
+    // Calculate quest performance
+    const staffQuests = completedQuests.filter(
+      q => q.assigneeId === s.id || q.distributedToRoles.includes(s.roleId)
+    );
+    
+    const questsDone = staffQuests.length;
+    
+    // Calculate avg duration vs estimate
+    let avgDurationVsEstimate: number | null = null;
+    const questsWithTiming = staffQuests.filter(
+      q => q.actualMinutes !== undefined && q.estimatedMinutes !== undefined && q.estimatedMinutes > 0
+    );
+    if (questsWithTiming.length > 0) {
+      const totalRatio = questsWithTiming.reduce(
+        (sum, q) => sum + ((q.actualMinutes ?? 0) / (q.estimatedMinutes ?? 1)) * 100,
+        0
+      );
+      avgDurationVsEstimate = Math.round(totalRatio / questsWithTiming.length);
+    }
+    
+    // Calculate delay rate
+    const delayedQuests = staffQuests.filter(
+      q => q.actualMinutes !== undefined && q.estimatedMinutes !== undefined && 
+           q.actualMinutes > q.estimatedMinutes
+    );
+    const delayRate = questsDone > 0 ? Math.round((delayedQuests.length / questsDone) * 100) : null;
+    
+    // Quality counts
+    const qualityNgCount = staffQuests.filter(q => q.qualityStatus === 'ng').length;
+    
+    // Break compliance check
+    const breakNeeded = hoursWorked !== null && hoursWorked >= 4;
+    const breakCompliant = !breakNeeded || tookBreak;
+    
+    // Calculate score
+    let score = 50;
+    if (questsDone > 0) {
+      score += Math.min(20, questsDone * 2);
+    }
+    if (avgDurationVsEstimate !== null) {
+      score += avgDurationVsEstimate <= 100 ? 15 : Math.max(0, 15 - (avgDurationVsEstimate - 100) / 5);
+    }
+    if (delayRate !== null) {
+      score += Math.max(0, 10 - delayRate / 10);
+    }
+    if (hasQualityData && staffQuests.length > 0) {
+      const okCount = staffQuests.filter(q => q.qualityStatus === 'ok').length;
+      const qualityRate = staffQuests.length > 0 ? okCount / staffQuests.length : 0;
+      score += qualityRate * 5;
+    }
+    score = Math.round(Math.min(100, Math.max(0, score)));
+    
+    // Score trend (simplified: random for demo, should be calculated from historical data)
+    const scoreTrend = hasScoreTrendData ? Math.round((Math.random() - 0.3) * 20) : null;
+    
+    return {
+      staffId: s.id,
+      name: s.name,
+      starLevel: s.starLevel,
+      roleCode: role?.code ?? 'unknown',
+      roleName: role?.name ?? 'Unknown',
+      score,
+      questsDone,
+      delayRate,
+      qualityNgCount,
+      hoursWorked,
+      avgDurationVsEstimate,
+      scoreTrend,
+    };
+  });
+  
+  // Sort nominees by score
+  nominees.sort((a, b) => b.score - a.score);
+  
+  // Filter to only staff who worked
+  const activeNominees = nominees.filter(n => n.hoursWorked !== null && n.hoursWorked > 0);
+  
+  // Helper to build evidence for a staff member
+  const buildEvidence = (staffId: string): AwardEvidence | null => {
+    const staffLaborEvents = laborEvents.filter(e => e.staffId === staffId);
+    const staffQuests = completedQuests.filter(
+      q => q.assigneeId === staffId
+    );
+    const nominee = nominees.find(n => n.staffId === staffId);
+    
+    if (!nominee) return null;
+    
+    const laborTimeline = staffLaborEvents.map(e => ({
+      time: new Date(e.timestamp).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }),
+      action: e.action,
+    }));
+    
+    const questHistory = staffQuests.map(q => ({
+      title: q.title,
+      startedAt: new Date(q.timestamp).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }),
+      completedAt: q.action === 'completed' ? new Date(q.timestamp).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }) : undefined,
+      durationMinutes: q.actualMinutes,
+      estimatedMinutes: q.estimatedMinutes,
+      qualityStatus: q.qualityStatus,
+    }));
+    
+    const scoreBreakdown = {
+      base: 50,
+      questBonus: Math.min(20, nominee.questsDone * 2),
+      speedBonus: nominee.avgDurationVsEstimate !== null && nominee.avgDurationVsEstimate <= 100 ? 15 : 0,
+      qualityBonus: nominee.qualityNgCount === 0 ? 5 : 0,
+      total: nominee.score,
+    };
+    
+    return {
+      laborTimeline,
+      questHistory,
+      scoreBreakdown,
+      reasonText: { en: '', ja: '' }, // Will be filled per award
+    };
+  };
+  
+  // Generate awards
+  const awards: Award[] = [];
+  
+  // 1. Perfect Run: score>=85, delay=0, breakCompliance ok, qualityNG=0
+  const perfectRunCandidates = activeNominees.filter(
+    n => n.score >= 85 && 
+         (n.delayRate === null || n.delayRate === 0) && 
+         n.qualityNgCount === 0 &&
+         n.questsDone > 0
+  );
+  
+  if (!hasQuestData && !hasLaborData) {
+    awards.push({
+      category: 'perfect-run',
+      categoryLabel: AWARD_LABELS['perfect-run'],
+      winner: null,
+      evidenceBullets: [],
+      reproducibleRule: AWARD_RULES['perfect-run'],
+      evidence: null,
+      status: 'not-tracked',
+      notTrackedReason: 'No labor or quest data available',
+    });
+  } else if (perfectRunCandidates.length > 0) {
+    const winner = perfectRunCandidates[0];
+    const evidence = buildEvidence(winner.staffId);
+    if (evidence) {
+      evidence.reasonText = {
+        en: `${winner.name} achieved a score of ${winner.score} with zero delays and zero quality issues while completing ${winner.questsDone} quests.`,
+        ja: `${winner.name}さんは${winner.questsDone}件のクエストを完了し、遅延ゼロ・品質NGゼロでスコア${winner.score}を達成しました。`,
+      };
+    }
+    awards.push({
+      category: 'perfect-run',
+      categoryLabel: AWARD_LABELS['perfect-run'],
+      winner: { staffId: winner.staffId, name: winner.name, starLevel: winner.starLevel, roleCode: winner.roleCode },
+      evidenceBullets: [
+        `Score: ${winner.score}/100`,
+        `Quests completed: ${winner.questsDone}`,
+        `Zero delays, zero quality issues`,
+      ],
+      reproducibleRule: AWARD_RULES['perfect-run'],
+      evidence,
+      status: 'awarded',
+    });
+  } else {
+    awards.push({
+      category: 'perfect-run',
+      categoryLabel: AWARD_LABELS['perfect-run'],
+      winner: null,
+      evidenceBullets: [],
+      reproducibleRule: AWARD_RULES['perfect-run'],
+      evidence: null,
+      status: 'no-winner',
+    });
+  }
+  
+  // 2. Speed Master: avgDurationVsEstimate is best (lowest), qualityNG=0
+  const speedMasterCandidates = activeNominees.filter(
+    n => n.avgDurationVsEstimate !== null && 
+         n.avgDurationVsEstimate < 100 && 
+         n.qualityNgCount === 0 &&
+         n.questsDone >= 2
+  ).sort((a, b) => (a.avgDurationVsEstimate ?? 999) - (b.avgDurationVsEstimate ?? 999));
+  
+  if (!hasQuestData) {
+    awards.push({
+      category: 'speed-master',
+      categoryLabel: AWARD_LABELS['speed-master'],
+      winner: null,
+      evidenceBullets: [],
+      reproducibleRule: AWARD_RULES['speed-master'],
+      evidence: null,
+      status: 'not-tracked',
+      notTrackedReason: 'No quest data available',
+    });
+  } else if (speedMasterCandidates.length > 0) {
+    const winner = speedMasterCandidates[0];
+    const evidence = buildEvidence(winner.staffId);
+    if (evidence) {
+      evidence.reasonText = {
+        en: `${winner.name} completed quests at ${winner.avgDurationVsEstimate}% of estimated time while maintaining zero quality issues.`,
+        ja: `${winner.name}さんは見積時間の${winner.avgDurationVsEstimate}%でクエストを完了し、品質NGゼロを維持しました。`,
+      };
+    }
+    awards.push({
+      category: 'speed-master',
+      categoryLabel: AWARD_LABELS['speed-master'],
+      winner: { staffId: winner.staffId, name: winner.name, starLevel: winner.starLevel, roleCode: winner.roleCode },
+      evidenceBullets: [
+        `Avg duration: ${winner.avgDurationVsEstimate}% of estimate`,
+        `Quests completed: ${winner.questsDone}`,
+        `Zero quality issues`,
+      ],
+      reproducibleRule: AWARD_RULES['speed-master'],
+      evidence,
+      status: 'awarded',
+    });
+  } else {
+    awards.push({
+      category: 'speed-master',
+      categoryLabel: AWARD_LABELS['speed-master'],
+      winner: null,
+      evidenceBullets: [],
+      reproducibleRule: AWARD_RULES['speed-master'],
+      evidence: null,
+      status: 'no-winner',
+    });
+  }
+  
+  // 3. Quality Guardian: qualityNG=0, hardQuestDone (quests with high priority) is highest
+  const qualityGuardianCandidates = activeNominees.filter(
+    n => n.qualityNgCount === 0 && n.questsDone >= 2
+  ).sort((a, b) => b.questsDone - a.questsDone);
+  
+  if (!hasQualityData) {
+    awards.push({
+      category: 'quality-guardian',
+      categoryLabel: AWARD_LABELS['quality-guardian'],
+      winner: null,
+      evidenceBullets: [],
+      reproducibleRule: AWARD_RULES['quality-guardian'],
+      evidence: null,
+      status: 'not-tracked',
+      notTrackedReason: 'Quality tracking not enabled',
+    });
+  } else if (qualityGuardianCandidates.length > 0) {
+    const winner = qualityGuardianCandidates[0];
+    const evidence = buildEvidence(winner.staffId);
+    if (evidence) {
+      evidence.reasonText = {
+        en: `${winner.name} completed ${winner.questsDone} quests with zero quality issues, demonstrating exceptional attention to detail.`,
+        ja: `${winner.name}さんは${winner.questsDone}件のクエストを品質NGゼロで完了し、卓越した注意力を発揮しました。`,
+      };
+    }
+    awards.push({
+      category: 'quality-guardian',
+      categoryLabel: AWARD_LABELS['quality-guardian'],
+      winner: { staffId: winner.staffId, name: winner.name, starLevel: winner.starLevel, roleCode: winner.roleCode },
+      evidenceBullets: [
+        `Quests completed: ${winner.questsDone}`,
+        `Quality issues: 0`,
+        `Score: ${winner.score}/100`,
+      ],
+      reproducibleRule: AWARD_RULES['quality-guardian'],
+      evidence,
+      status: 'awarded',
+    });
+  } else {
+    awards.push({
+      category: 'quality-guardian',
+      categoryLabel: AWARD_LABELS['quality-guardian'],
+      winner: null,
+      evidenceBullets: [],
+      reproducibleRule: AWARD_RULES['quality-guardian'],
+      evidence: null,
+      status: 'no-winner',
+    });
+  }
+  
+  // 4. Team Saver: delayedQuestResolvedCount (approximated by quests done when delay rate exists)
+  // Simplified: staff who completed the most quests when overall team had delays
+  const teamSaverCandidates = activeNominees.filter(
+    n => n.questsDone >= 3 && n.score >= 60
+  ).sort((a, b) => b.questsDone - a.questsDone);
+  
+  if (!hasQuestData) {
+    awards.push({
+      category: 'team-saver',
+      categoryLabel: AWARD_LABELS['team-saver'],
+      winner: null,
+      evidenceBullets: [],
+      reproducibleRule: AWARD_RULES['team-saver'],
+      evidence: null,
+      status: 'not-tracked',
+      notTrackedReason: 'No quest data available',
+    });
+  } else if (teamSaverCandidates.length > 0) {
+    const winner = teamSaverCandidates[0];
+    const evidence = buildEvidence(winner.staffId);
+    if (evidence) {
+      evidence.reasonText = {
+        en: `${winner.name} completed ${winner.questsDone} quests, helping keep operations on track and supporting the team.`,
+        ja: `${winner.name}さんは${winner.questsDone}件のクエストを完了し、オペレーションを軌道に乗せチームをサポートしました。`,
+      };
+    }
+    awards.push({
+      category: 'team-saver',
+      categoryLabel: AWARD_LABELS['team-saver'],
+      winner: { staffId: winner.staffId, name: winner.name, starLevel: winner.starLevel, roleCode: winner.roleCode },
+      evidenceBullets: [
+        `Quests completed: ${winner.questsDone}`,
+        `Team contribution score: ${winner.score}`,
+        `Hours worked: ${winner.hoursWorked?.toFixed(1) ?? 'N/A'}h`,
+      ],
+      reproducibleRule: AWARD_RULES['team-saver'],
+      evidence,
+      status: 'awarded',
+    });
+  } else {
+    awards.push({
+      category: 'team-saver',
+      categoryLabel: AWARD_LABELS['team-saver'],
+      winner: null,
+      evidenceBullets: [],
+      reproducibleRule: AWARD_RULES['team-saver'],
+      evidence: null,
+      status: 'no-winner',
+    });
+  }
+  
+  // 5. Most Improved: scoreTrend (7D) improvement is highest
+  const mostImprovedCandidates = activeNominees.filter(
+    n => n.scoreTrend !== null && n.scoreTrend > 0
+  ).sort((a, b) => (b.scoreTrend ?? 0) - (a.scoreTrend ?? 0));
+  
+  if (!hasScoreTrendData) {
+    awards.push({
+      category: 'most-improved',
+      categoryLabel: AWARD_LABELS['most-improved'],
+      winner: null,
+      evidenceBullets: [],
+      reproducibleRule: AWARD_RULES['most-improved'],
+      evidence: null,
+      status: 'not-tracked',
+      notTrackedReason: 'Trend data requires 7+ days of history',
+    });
+  } else if (mostImprovedCandidates.length > 0) {
+    const winner = mostImprovedCandidates[0];
+    const evidence = buildEvidence(winner.staffId);
+    if (evidence) {
+      evidence.reasonText = {
+        en: `${winner.name} improved their score by +${winner.scoreTrend} points over the period, showing great progress.`,
+        ja: `${winner.name}さんは期間中にスコアを+${winner.scoreTrend}ポイント改善し、素晴らしい進歩を見せました。`,
+      };
+    }
+    awards.push({
+      category: 'most-improved',
+      categoryLabel: AWARD_LABELS['most-improved'],
+      winner: { staffId: winner.staffId, name: winner.name, starLevel: winner.starLevel, roleCode: winner.roleCode },
+      evidenceBullets: [
+        `Score improvement: +${winner.scoreTrend}`,
+        `Current score: ${winner.score}`,
+        `Quests completed: ${winner.questsDone}`,
+      ],
+      reproducibleRule: AWARD_RULES['most-improved'],
+      evidence,
+      status: 'awarded',
+    });
+  } else {
+    awards.push({
+      category: 'most-improved',
+      categoryLabel: AWARD_LABELS['most-improved'],
+      winner: null,
+      evidenceBullets: [],
+      reproducibleRule: AWARD_RULES['most-improved'],
+      evidence: null,
+      status: 'no-winner',
+    });
+  }
+  
+  // Build snapshot
+  const winnersCount = awards.filter(a => a.status === 'awarded').length;
+  const eligibleStaffCount = activeNominees.length;
+  
+  const snapshot: AwardsSnapshot = {
+    winnersCount,
+    eligibleStaffCount,
+    lastUpdated: now.toISOString(),
+    period,
+    timeBand,
+  };
+  
+  return {
+    snapshot,
+    awards,
+    nominees,
+    dataAvailability: {
+      hasLaborData,
+      hasQuestData,
+      hasQualityData,
+      hasScoreTrendData,
+    },
+  };
 };

@@ -4,7 +4,7 @@
 // UI components should ONLY use selectors, never derive directly
 // ============================================================
 
-import { AppState, TimeBand, DailySalesMetrics, CockpitMetrics, ExceptionItem, DecisionEvent, ShiftSummary, SupplyDemandMetrics, Incident, IncidentSeverity, IncidentStatus, ForecastCell, StaffState, CalendarCell, TodoStats, WeeklyLaborMetrics, DailyScore, TeamDailyScore } from './types';
+import { AppState, TimeBand, DailySalesMetrics, CockpitMetrics, ExceptionItem, DecisionEvent, ShiftSummary, SupplyDemandMetrics, Incident, IncidentSeverity, IncidentStatus, ForecastCell, StaffState, CalendarCell, TodoStats, WeeklyLaborMetrics } from './types';
 import {
   deriveDailySalesMetrics,
   deriveLaborMetrics,
@@ -26,6 +26,29 @@ import {
   deriveForecastForDate,
   deriveActiveTodos,
   deriveCompletedTodos,
+  deriveTeamPerformanceMetrics,
+  deriveAwards,
+  deriveTodayEarnings,
+  deriveIncentivePool,
+  deriveIncentiveDistribution,
+  // Types from derive
+  type DailyScore,
+  type TeamDailyScore,
+  type StaffDailyScore,
+  type DailyScoreBreakdown,
+  type ScoreDeduction,
+  type DeductionCategory,
+  type Period,
+  type TeamPerformanceMetrics,
+  type AwardsMetrics,
+  type Award,
+  type AwardNominee,
+  type AwardEvidence,
+  type AwardCategory,
+  type TodayEarnings,
+  type IncentivePool,
+  type IncentiveDistribution,
+  type StaffIncentiveShare,
 } from './derive';
 import type { EnhancedCockpitMetrics } from './types';
 
@@ -481,7 +504,15 @@ export const selectTodoStats = (
 ): TodoStats => {
   const storeId = state.selectedStoreId;
   if (!storeId) {
-    return { pendingCount: 0, inProgressCount: 0, completedCount: 0 };
+    return { 
+      pendingCount: 0, 
+      inProgressCount: 0, 
+      completedCount: 0,
+      pending: 0,
+      inProgress: 0,
+      completed: 0,
+      total: 0,
+    };
   }
   
   return deriveTodoStats(state.events, storeId, roleId);
@@ -500,8 +531,9 @@ export const selectShiftSummary = (
   
   if (!storeId) {
     return {
-      plannedHours: 0,
+      plannedHours: null,
       actualHours: 0,
+      activeStaffCount: 0,
       skillMix: { star3: 0, star2: 0, star1: 0 },
       roleMix: { kitchen: 0, floor: 0, delivery: 0 },
       onBreakCount: 0,
@@ -604,6 +636,17 @@ export const selectDailyScore = (
       feedback: 'データがありません',
       bottlenecks: [],
       improvements: [],
+      deductions: [],
+      stats: {
+        totalQuests: 0,
+        completedQuests: 0,
+        onTimeQuests: 0,
+        breaksTaken: 0,
+        breaksExpected: 0,
+        plannedHours: 0,
+        actualHours: 0,
+        overtimeMinutes: 0,
+      },
     };
   }
   
@@ -625,6 +668,17 @@ export const selectTeamDailyScore = (
       feedback: 'データがありません',
       bottlenecks: [],
       improvements: [],
+      deductions: [],
+      stats: {
+        totalQuests: 0,
+        completedQuests: 0,
+        onTimeQuests: 0,
+        breaksTaken: 0,
+        breaksExpected: 0,
+        plannedHours: 0,
+        actualHours: 0,
+        overtimeMinutes: 0,
+      },
       staffScores: [],
       topPerformers: [],
       needsSupport: [],
@@ -633,3 +687,196 @@ export const selectTeamDailyScore = (
   
   return deriveTeamDailyScore(state.events, state.staff, storeId, targetDate);
 };
+
+// ------------------------------------------------------------
+// Team Performance Metrics Selector
+// ------------------------------------------------------------
+
+export const selectTeamPerformanceMetrics = (
+  state: AppState,
+  period: Period = 'today',
+  timeBand: TimeBand = 'all'
+): TeamPerformanceMetrics => {
+  const storeId = state.selectedStoreId;
+  
+  if (!storeId) {
+    return {
+      teamSnapshot: {
+        teamScoreAvg: null,
+        questCompletion: { completed: 0, total: 0, rate: null },
+        delayRate: null,
+        breakCompliance: null,
+        overtimeRate: null,
+        qualityNgRate: null,
+      },
+      skillMixCoverage: {
+        starMix: { star1: 0, star2: 0, star3: 0 },
+        roleMix: new Map(),
+        peakCoverage: null,
+        peakCoverageReason: 'No store selected',
+      },
+      individuals: [],
+      coachingActions: [],
+      promotionCandidates: [],
+      period,
+      timeBand,
+      lastUpdate: new Date().toISOString(),
+      dataAvailability: {
+        hasLaborData: false,
+        hasQuestData: false,
+        hasQualityData: false,
+      },
+    };
+  }
+  
+  return deriveTeamPerformanceMetrics(
+    state.events,
+    state.staff,
+    state.roles,
+    storeId,
+    period,
+    timeBand
+  );
+};
+
+// ------------------------------------------------------------
+// Awards Selector
+// ------------------------------------------------------------
+
+export const selectAwards = (
+  state: AppState,
+  period: Period = 'today',
+  timeBand: TimeBand = 'all'
+): AwardsMetrics => {
+  const storeId = state.selectedStoreId;
+  
+  if (!storeId) {
+    return {
+      snapshot: {
+        winnersCount: 0,
+        eligibleStaffCount: 0,
+        lastUpdated: new Date().toISOString(),
+        period,
+        timeBand,
+      },
+      awards: [],
+      nominees: [],
+      dataAvailability: {
+        hasLaborData: false,
+        hasQuestData: false,
+        hasQualityData: false,
+        hasScoreTrendData: false,
+      },
+    };
+  }
+  
+  return deriveAwards(
+    state.events,
+    state.staff,
+    state.roles,
+    storeId,
+    period,
+    timeBand
+  );
+};
+
+// ------------------------------------------------------------
+// Earnings & Incentive Selectors
+// ------------------------------------------------------------
+
+export const selectTodayEarnings = (
+  state: AppState,
+  staffId: string,
+  businessDate?: string
+): TodayEarnings => {
+  const date = businessDate ?? new Date().toISOString().split('T')[0];
+  return deriveTodayEarnings(state.events, state.staff, staffId, date);
+};
+
+export const selectIncentivePool = (
+  state: AppState,
+  businessDate?: string
+): IncentivePool => {
+  const storeId = state.selectedStoreId;
+  const date = businessDate ?? new Date().toISOString().split('T')[0];
+  
+  if (!storeId) {
+    return {
+      storeId: '',
+      businessDate: date,
+      targetSales: 0,
+      actualSales: 0,
+      runRateSales: 0,
+      useSalesValue: 'actual',
+      salesForCalculation: 0,
+      overAchievement: 0,
+      overAchievementRate: null,
+      poolShare: 0,
+      pool: 0,
+      status: 'not-tracked',
+    };
+  }
+  
+  return deriveIncentivePool(state.events, storeId, date);
+};
+
+export const selectIncentiveDistribution = (
+  state: AppState,
+  businessDate?: string
+): IncentiveDistribution => {
+  const storeId = state.selectedStoreId;
+  const date = businessDate ?? new Date().toISOString().split('T')[0];
+  
+  if (!storeId) {
+    return {
+      storeId: '',
+      businessDate: date,
+      pool: {
+        storeId: '',
+        businessDate: date,
+        targetSales: 0,
+        actualSales: 0,
+        runRateSales: 0,
+        useSalesValue: 'actual',
+        salesForCalculation: 0,
+        overAchievement: 0,
+        overAchievementRate: null,
+        poolShare: 0,
+        pool: 0,
+        status: 'not-tracked',
+      },
+      totalPoints: 0,
+      staffShares: [],
+      status: 'not-tracked',
+      lastUpdate: new Date().toISOString(),
+    };
+  }
+  
+  return deriveIncentiveDistribution(state.events, state.staff, storeId, date);
+};
+
+// Re-export types from derive for easier access
+export type { 
+  DailyScore, 
+  TeamDailyScore, 
+  StaffDailyScore, 
+  ScoreDeduction, 
+  DeductionCategory, 
+  DailyScoreBreakdown, 
+  Period, 
+  TeamPerformanceMetrics,
+  TeamSnapshot,
+  SkillMixCoverage,
+  IndividualPerformance,
+  CoachingAction,
+  PromotionCandidate,
+  AwardsMetrics,
+  Award,
+  AwardNominee,
+  AwardEvidence,
+  AwardCategory,
+  TodayEarnings,
+  IncentivePool,
+  IncentiveDistribution,
+  StaffIncentiveShare,
+} from './derive';
