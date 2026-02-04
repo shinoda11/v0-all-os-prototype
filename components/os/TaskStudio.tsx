@@ -154,10 +154,13 @@ function CategoryTreeItem({ category, categories, selectedCategoryId, onSelect, 
 
   return (
     <div>
-      <button
+      <div
         onClick={() => onSelect(category.id)}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onSelect(category.id); }}
         className={cn(
-          'w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors',
+          'w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors cursor-pointer',
           selectedCategoryId === category.id
             ? 'bg-primary text-primary-foreground'
             : 'hover:bg-muted'
@@ -165,25 +168,28 @@ function CategoryTreeItem({ category, categories, selectedCategoryId, onSelect, 
         style={{ paddingLeft: `${12 + level * 16}px` }}
       >
         {hasChildren ? (
-          <button
+          <span
             onClick={(e) => {
               e.stopPropagation();
               setIsExpanded(!isExpanded);
             }}
-            className="p-0.5 hover:bg-background/50 rounded"
+            className="p-0.5 hover:bg-background/50 rounded cursor-pointer"
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); setIsExpanded(!isExpanded); } }}
           >
             {isExpanded ? (
               <ChevronDown className="h-4 w-4" />
             ) : (
               <ChevronRight className="h-4 w-4" />
             )}
-          </button>
+          </span>
         ) : (
           <span className="w-5" />
         )}
         <FolderOpen className="h-4 w-4 shrink-0" />
         <span className="truncate">{category.name}</span>
-      </button>
+      </div>
       {hasChildren && isExpanded && (
         <div>
           {children.map((child) => (
