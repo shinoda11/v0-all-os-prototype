@@ -803,6 +803,8 @@ export const en = {
   'incentive.viewDetails': 'View Details',
   'incentive.topContributors': 'Top Contributors',
   'incentive.topContributorsNote': 'Top earners have the most hours worked and quests completed',
+  'incentive.eligible': 'Eligible',
+  'incentive.ineligible': 'Ineligible',
   
   // My Score
   'myscore.title': 'My Score',

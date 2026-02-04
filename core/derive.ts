@@ -2892,6 +2892,7 @@ export interface IncentivePool {
 export interface StaffIncentiveShare {
   staffId: string;
   staffName: string;
+  hoursWorked: number;
   points: number;
   sharePercentage: number;
   estimatedShare: number;
@@ -2903,6 +2904,9 @@ export interface IncentiveDistribution {
   businessDate: string;
   pool: IncentivePool;
   totalPoints: number;
+  eligibilityMinHours: number;
+  eligibleStaffCount: number;
+  totalStaffCount: number;
   staffShares: StaffIncentiveShare[];
   status: 'projected' | 'finalized' | 'not-tracked';
   lastUpdate: string;
@@ -3150,11 +3154,17 @@ export const deriveIncentiveDistribution = (
   // Calculate earnings for each staff member
   const staffEarnings = storeStaff.map(s => deriveTodayEarnings(events, staff, s.id, businessDate));
   
-  // Calculate total points
-  const totalPoints = staffEarnings.reduce((sum, e) => sum + (e.totalPoints ?? 0), 0);
+  // Filter by eligibility: minimum hours worked
+  const { eligibilityMinHours } = INCENTIVE_POLICY;
+  const eligibleEarnings = staffEarnings.filter(e => 
+    e.netHoursWorked !== null && e.netHoursWorked >= eligibilityMinHours
+  );
   
-  // Calculate each staff's share
-  const staffShares: StaffIncentiveShare[] = staffEarnings
+  // Calculate total points (only from eligible staff)
+  const totalPoints = eligibleEarnings.reduce((sum, e) => sum + (e.totalPoints ?? 0), 0);
+  
+  // Calculate each staff's share (only eligible staff)
+  const staffShares: StaffIncentiveShare[] = eligibleEarnings
     .filter(e => e.totalPoints !== null && e.totalPoints > 0)
     .map(e => {
       const sharePercentage = totalPoints > 0 
@@ -3167,6 +3177,7 @@ export const deriveIncentiveDistribution = (
       return {
         staffId: e.staffId,
         staffName: e.staffName,
+        hoursWorked: e.netHoursWorked ?? 0,
         points: e.totalPoints!,
         sharePercentage,
         estimatedShare,
@@ -3180,6 +3191,9 @@ export const deriveIncentiveDistribution = (
     businessDate,
     pool,
     totalPoints,
+    eligibilityMinHours,
+    eligibleStaffCount: eligibleEarnings.length,
+    totalStaffCount: staffEarnings.length,
     staffShares,
     status: pool.status,
     lastUpdate: new Date().toISOString(),

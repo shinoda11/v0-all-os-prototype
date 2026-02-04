@@ -401,7 +401,7 @@ export const ja = {
   'ask.completion.conclusionLow': '本日のチームスコアは{score}点、タ��ク完了率は{rate}%で改善が必要です。',
   'ask.completion.conclusionGood': '本日のチームスコアは{score}点、タスク完了率は{rate}%で順調です。',
   'ask.completion.teamScore': 'チームスコア',
-  'ask.completion.questCompletion': 'クエスト完���率',
+  'ask.completion.questCompletion': 'クエスト完�����率',
   'ask.completion.taskScore': 'タスク得点',
   'ask.completion.timeScore': '時間得点',
   'ask.completion.bottlenecks': 'ボトルネック',
@@ -465,7 +465,7 @@ export const ja = {
 
   // Incident Center
   'incidents.title': '案件センター',
-  'incidents.subtitle': 'エージェント協調による案件対応',
+  'incidents.subtitle': 'エージェント���調による案件対応',
   'incidents.filter.all': '全件',
   'incidents.filter.open': '未解決',
   'incidents.filter.critical': '緊急',
@@ -803,6 +803,8 @@ export const ja = {
   'incentive.viewDetails': '詳細を見る',
   'incentive.topContributors': 'トップ貢献者',
   'incentive.topContributorsNote': '上位獲得者は稼働時間と完了クエストが多いスタッフです',
+  'incentive.eligible': '対象者',
+  'incentive.ineligible': '対象外',
   
   // My Score
   'myscore.title': 'My Score',

@@ -24,6 +24,7 @@ import { normalizeEvents, normalizeStaff } from './normalizer';
 
 export interface IncentivePolicy {
   poolShare: number; // Percentage of over-achievement allocated to pool (e.g., 0.75 = 75%)
+  eligibilityMinHours: number; // Minimum hours worked to be eligible for incentive pool (e.g., 2.0)
   points: {
     perHour: number;    // Points earned per hour worked
     perQuestXP: number; // Points earned per quest XP
@@ -35,6 +36,7 @@ export interface IncentivePolicy {
 
 export const INCENTIVE_POLICY: IncentivePolicy = {
   poolShare: 0.75,
+  eligibilityMinHours: 2.0, // Minimum 2 hours worked to participate
   points: {
     perHour: 10,
     perQuestXP: 1,

@@ -38,11 +38,11 @@ export default function IncentivesPage() {
   
   const today = new Date().toISOString().split('T')[0];
   const distribution = selectIncentiveDistribution(state, today);
-  const { pool, staffShares, totalPoints, status } = distribution;
+  const { pool, staffShares, totalPoints, status, eligibilityMinHours, eligibleStaffCount, totalStaffCount } = distribution;
 
   // Summary stats
   const topContributors = staffShares.slice(0, 3);
-  const eligibleStaff = staffShares.length;
+  const ineligibleCount = totalStaffCount - eligibleStaffCount;
 
   if (!currentStore) {
     return (
@@ -171,6 +171,10 @@ export default function IncentivesPage() {
                     </div>
                     <div className="space-y-1 text-sm">
                       <div className="flex justify-between">
+                        <span className="text-muted-foreground">{t('incentive.hours')}</span>
+                        <span className="font-bold">{staff.hoursWorked.toFixed(1)}h</span>
+                      </div>
+                      <div className="flex justify-between">
                         <span className="text-muted-foreground">{t('incentive.points')}</span>
                         <span className="font-bold">{staff.points} pt</span>
                       </div>
@@ -211,6 +215,7 @@ export default function IncentivesPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>{t('incentive.staff')}</TableHead>
+                      <TableHead className="text-right">{t('incentive.hours')}</TableHead>
                       <TableHead className="text-right">{t('incentive.points')}</TableHead>
                       <TableHead className="text-right">{t('incentive.share')}</TableHead>
                       <TableHead className="text-right">{t('incentive.projectedBonus')}</TableHead>
@@ -225,6 +230,7 @@ export default function IncentivesPage() {
                             <span className="font-medium">{staff.staffName}</span>
                           </div>
                         </TableCell>
+                        <TableCell className="text-right font-mono">{staff.hoursWorked.toFixed(1)}h</TableCell>
                         <TableCell className="text-right font-mono">{staff.points}</TableCell>
                         <TableCell className="text-right font-mono">{staff.sharePercentage}%</TableCell>
                         <TableCell className="text-right font-mono font-bold text-emerald-700">
@@ -234,14 +240,28 @@ export default function IncentivesPage() {
                     ))}
                   </TableBody>
                 </Table>
-                <div className="flex justify-end gap-6 mt-4 pt-4 border-t text-sm">
-                  <div>
-                    <span className="text-muted-foreground">{t('incentive.totalPoints')}: </span>
-                    <span className="font-bold">{totalPoints} pt</span>
+                <div className="flex flex-wrap justify-between gap-4 mt-4 pt-4 border-t text-sm">
+                  <div className="flex gap-4">
+                    <div>
+                      <span className="text-muted-foreground">{t('incentive.eligible')}: </span>
+                      <span className="font-bold">{eligibleStaffCount}</span>
+                      <span className="text-muted-foreground text-xs ml-1">({eligibilityMinHours}h+)</span>
+                    </div>
+                    {ineligibleCount > 0 && (
+                      <div className="text-muted-foreground">
+                        {t('incentive.ineligible')}: {ineligibleCount}
+                      </div>
+                    )}
                   </div>
-                  <div>
-                    <span className="text-muted-foreground">{t('incentive.totalPool')}: </span>
-                    <span className="font-bold text-emerald-700">{formatCurrency(pool.pool, locale)}</span>
+                  <div className="flex gap-6">
+                    <div>
+                      <span className="text-muted-foreground">{t('incentive.totalPoints')}: </span>
+                      <span className="font-bold">{totalPoints} pt</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">{t('incentive.totalPool')}: </span>
+                      <span className="font-bold text-emerald-700">{formatCurrency(pool.pool, locale)}</span>
+                    </div>
                   </div>
                 </div>
               </div>
