@@ -75,6 +75,8 @@ export const ja = {
   'cockpit.badScenario': 'BAD想定',
   'cockpit.currentProjection': '現在見込',
   'cockpit.deltaToGood': 'GOOD比',
+  'cockpit.itemsAtRisk': '件のリスク',
+  'cockpit.viewInIncidents': 'インシデントで確認',
 
   // Shift Summary
   'shift.title': '本日のシフト概要',
@@ -396,7 +398,7 @@ export const ja = {
   'ask.taskDelay.proposalDesc': '遅延タスクの優先度を再検討し、WIPを削減する',
   'ask.labor.tasks': '件',
   // Low completion responses
-  'ask.completion.conclusionLow': '本日のチームスコアは{score}点、タスク完了率は{rate}%で改善が必要です。',
+  'ask.completion.conclusionLow': '本日のチームスコアは{score}点、タ��ク完了率は{rate}%で改善が必要です。',
   'ask.completion.conclusionGood': '本日のチームスコアは{score}点、タスク完了率は{rate}%で順調です。',
   'ask.completion.teamScore': 'チームスコア',
   'ask.completion.questCompletion': 'クエスト完了率',

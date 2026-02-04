@@ -31,7 +31,7 @@ import {
 } from '@/core/selectors';
 import { deriveLaborGuardrailSummary } from '@/core/derive';
 import { TodayBriefingModal, type OperationMode } from '@/components/cockpit/TodayBriefingModal';
-import type { TimeBand, Proposal, Role, ExceptionItem, RiskItem } from '@/core/types';
+import type { TimeBand, Proposal, Role, ExceptionItem } from '@/core/types';
 import {
   TrendingUp,
   TrendingDown,
@@ -578,10 +578,9 @@ export default function CockpitPage() {
     actualLaborCostSoFar: laborCost,
   });
   
-  // Supply/Demand (dynamic)
+  // Supply/Demand (dynamic) - details shown in Incidents
   const stockoutRisk = supplyDemandMetrics?.stockoutRiskCount ?? 0;
   const excessRisk = supplyDemandMetrics?.excessRiskCount ?? 0;
-  const topRiskItems = supplyDemandMetrics?.topRiskItems ?? [];
   const supplyDemandStatus = supplyDemandMetrics?.status ?? 'normal';
   
   // Operations
@@ -589,10 +588,9 @@ export default function CockpitPage() {
   const completionRate = prepMetrics?.completionRate ?? 0;
   const bottleneck = delayedCount > 0 ? { task: '仕込み', reason: `${delayedCount}件未着手` } : null;
   
-  // Exceptions
+  // Exceptions - details shown in Incidents
   const criticalCount = exceptions.filter((e: ExceptionItem) => e.severity === 'critical').length;
   const warningCount = exceptions.filter((e: ExceptionItem) => e.severity === 'warning').length;
-  const topException = exceptions[0] ?? null;
   
   // Time band forecasts for briefing modal
   const timeBandForecasts = [
@@ -765,7 +763,7 @@ export default function CockpitPage() {
           </div>
         </MetricCard>
 
-        {/* Supply/Demand Card - Enhanced */}
+        {/* Supply/Demand Card - Summary Only (Details in Incidents) */}
         <MetricCard
           title={t('cockpit.supplyDemand')}
           value={
@@ -774,7 +772,7 @@ export default function CockpitPage() {
           }
           subValue={
             stockoutRisk > 0 || excessRisk > 0 
-              ? `${t('cockpit.stockoutRisk')} ${stockoutRisk} / ${t('cockpit.excessRisk')} ${excessRisk}`
+              ? `${stockoutRisk + excessRisk}${t('cockpit.itemsAtRisk')}`
               : undefined
           }
           icon={<Package className="h-4 w-4" />}
@@ -784,26 +782,14 @@ export default function CockpitPage() {
           }
           lastUpdate={supplyDemandMetrics?.lastUpdate ?? lastUpdateTime}
         >
-          {topRiskItems.length > 0 && (
-            <div className="space-y-1.5 pt-1">
-              {topRiskItems.map((item: RiskItem, i: number) => (
-                <div key={i} className="text-[10px] flex flex-col gap-0.5">
-                  <div className="flex items-center gap-1">
-                    <Badge 
-                      variant="outline" 
-                      className={cn(
-                        'text-[9px] px-1 shrink-0',
-                        item.riskType === 'stockout' ? 'border-red-200 text-red-700 bg-red-50' : 'border-yellow-200 text-yellow-700 bg-yellow-50'
-                      )}
-                    >
-                      {item.riskType === 'stockout' ? t('cockpit.stockoutRisk') : t('cockpit.excessRisk')}
-                    </Badge>
-                    <span className="font-medium truncate">{item.itemName}</span>
-                  </div>
-                  <span className="text-muted-foreground pl-1 truncate">→ {item.recommendedAction}</span>
-                </div>
-              ))}
-            </div>
+          {(stockoutRisk > 0 || excessRisk > 0) && (
+            <Link 
+              href={`/stores/${currentStore?.id}/os/incidents?filter=open`}
+              className="text-xs text-primary hover:underline flex items-center gap-1"
+            >
+              {t('cockpit.viewInIncidents')}
+              <ExternalLink className="h-3 w-3" />
+            </Link>
           )}
         </MetricCard>
 
@@ -823,7 +809,7 @@ export default function CockpitPage() {
           )}
         </MetricCard>
 
-        {/* Exceptions Card */}
+        {/* Exceptions Card - Summary Only (Details in Incidents) */}
         <MetricCard
           title={t('cockpit.exceptions')}
           value={criticalCount > 0 ? `${t('cockpit.danger')} ${criticalCount}` : warningCount > 0 ? `${t('cockpit.caution')} ${warningCount}` : t('cockpit.normal')}
@@ -832,10 +818,14 @@ export default function CockpitPage() {
           status={criticalCount > 0 ? 'error' : warningCount > 0 ? 'warning' : 'success'}
           lastUpdate={lastUpdateTime}
         >
-          {topException && (
-            <div className="text-xs text-muted-foreground truncate">
-              {topException.title}
-            </div>
+          {(criticalCount > 0 || warningCount > 0) && (
+            <Link 
+              href={`/stores/${currentStore?.id}/os/incidents?filter=open`}
+              className="text-xs text-primary hover:underline flex items-center gap-1"
+            >
+              {t('cockpit.viewInIncidents')}
+              <ExternalLink className="h-3 w-3" />
+            </Link>
           )}
         </MetricCard>
 

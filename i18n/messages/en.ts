@@ -75,6 +75,8 @@ export const en = {
   'cockpit.badScenario': 'BAD',
   'cockpit.currentProjection': 'Current',
   'cockpit.deltaToGood': 'vs GOOD',
+  'cockpit.itemsAtRisk': ' items at risk',
+  'cockpit.viewInIncidents': 'View in Incidents',
 
   // Shift Summary
   'shift.title': "Today's Shift Summary",
