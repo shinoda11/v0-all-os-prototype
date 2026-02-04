@@ -78,6 +78,9 @@ interface StoreContextValue {
     addTaskCategory: (category: TaskCategory) => void;
     updateTaskCategory: (category: TaskCategory) => void;
     deleteTaskCategory: (categoryId: string) => void;
+    // Order Interrupt (POS urgent orders)
+    createOrderQuest: (order: { orderId: string; menuItemName: string; quantity: number; slaMinutes?: number }) => string;
+    completeOrderQuest: (orderId: string) => void;
   };
 }
 
@@ -526,6 +529,73 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     deleteTaskCategory: (categoryId: string) => {
       dispatch({ type: 'DELETE_TASK_CATEGORY', categoryId });
       publishStateUpdate('state:updated', 'task-category-deleted', ['taskCategories']);
+    },
+
+    // Order Interrupt - Create urgent order quest
+    createOrderQuest: (order: { orderId: string; menuItemName: string; quantity: number; slaMinutes?: number }) => {
+      const storeId = storeIdRef.current || 'store-1';
+      const now = new Date().toISOString();
+      const slaMinutes = order.slaMinutes ?? 3;
+      
+      // Create order event
+      const orderEvent: DomainEvent = {
+        id: `order-${order.orderId}`,
+        type: 'order',
+        storeId,
+        timestamp: now,
+        timeBand: 'lunch' as TimeBand,
+        orderId: order.orderId,
+        menuItemName: order.menuItemName,
+        quantity: order.quantity,
+        priority: 'urgent',
+        status: 'pending',
+        slaMinutes,
+      } as DomainEvent;
+      dispatch({ type: 'ADD_EVENT', event: orderEvent });
+      
+      // Create urgent decision event (Order Quest)
+      const questId = `order-quest-${order.orderId}`;
+      const deadline = new Date(Date.now() + slaMinutes * 60 * 1000).toISOString();
+      const questEvent: DecisionEvent = {
+        id: questId,
+        type: 'decision',
+        storeId,
+        timestamp: now,
+        timeBand: 'lunch' as TimeBand,
+        proposalId: questId,
+        action: 'approved', // Ready to start immediately
+        title: `[ORDER] ${order.menuItemName} x${order.quantity}`,
+        description: `POS注文: ${order.menuItemName} ${order.quantity}点`,
+        distributedToRoles: [], // Will be assigned based on role
+        priority: 'critical',
+        deadline,
+        estimatedMinutes: slaMinutes,
+        source: 'system',
+      };
+      dispatch({ type: 'ADD_EVENT', event: questEvent });
+      
+      publishStateUpdate('state:updated', 'order-quest-created', ['events']);
+      return questId;
+    },
+
+    completeOrderQuest: (orderId: string) => {
+      const now = new Date().toISOString();
+      const state = stateRef.current;
+      
+      // Find and complete the order event
+      const orderEvent = state.events.find(e => e.type === 'order' && (e as any).orderId === orderId);
+      if (orderEvent) {
+        const completedOrder: DomainEvent = {
+          ...orderEvent,
+          id: `${orderEvent.id}-completed`,
+          timestamp: now,
+          status: 'completed',
+          completedAt: now,
+        } as DomainEvent;
+        dispatch({ type: 'ADD_EVENT', event: completedOrder });
+      }
+      
+      publishStateUpdate('state:updated', 'order-quest-completed', ['events']);
     },
   }), []);
 

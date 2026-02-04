@@ -81,7 +81,8 @@ export type EventType =
   | 'prep'
   | 'delivery'
   | 'decision'
-  | 'forecast';
+  | 'forecast'
+  | 'order';
 
 export interface BaseEvent {
   id: string;
@@ -166,13 +167,27 @@ export interface ForecastEvent extends BaseEvent {
   forecastSales: number; // Auto-calculated: forecastCustomers * avgSpend
 }
 
+// Order event for POS urgent orders (interrupt handling)
+export interface OrderEvent extends BaseEvent {
+  type: 'order';
+  orderId: string;
+  menuItemName: string;
+  quantity: number;
+  priority: 'normal' | 'urgent';
+  status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
+  slaMinutes: number; // SLA target (e.g., 3 minutes)
+  startedAt?: string;
+  completedAt?: string;
+}
+
 export type DomainEvent =
   | SalesEvent
   | LaborEvent
   | PrepEvent
   | DeliveryEvent
   | DecisionEvent
-  | ForecastEvent;
+  | ForecastEvent
+  | OrderEvent;
 
 // ------------------------------------------------------------
 // Proposal Types (Rule-generated suggestions)
