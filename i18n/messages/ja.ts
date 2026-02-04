@@ -401,7 +401,7 @@ export const ja = {
   'ask.completion.conclusionLow': '本日のチームスコアは{score}点、タ��ク完了率は{rate}%で改善が必要です。',
   'ask.completion.conclusionGood': '本日のチームスコアは{score}点、タスク完了率は{rate}%で順調です。',
   'ask.completion.teamScore': 'チームスコア',
-  'ask.completion.questCompletion': 'クエスト完了率',
+  'ask.completion.questCompletion': 'クエスト完���率',
   'ask.completion.taskScore': 'タスク得点',
   'ask.completion.timeScore': '時間得点',
   'ask.completion.bottlenecks': 'ボトルネック',
@@ -929,6 +929,22 @@ export const ja = {
   'taskStudio.qualityCheck': '品質チェック',
   'taskStudio.notes': '備考',
   'taskStudio.notesPlaceholder': '備考を入力...',
+  // Simulation
+  'taskStudio.simulation': 'シミュレーション',
+  'taskStudio.forecastInput': '予測入力',
+  'taskStudio.forecastDescription': 'タイムバンド別の予測売上と注文数を入力してください',
+  'taskStudio.forecastSales': '予測売上（円）',
+  'taskStudio.orderCount': '予測注文数',
+  'taskStudio.generateQuests': 'クエスト生成',
+  'taskStudio.generatedQuests': '生成されたクエスト',
+  'taskStudio.deployQuests': 'Today Questsに配布',
+  'taskStudio.deployed': '配布完了',
+  'taskStudio.totalQuests': '総クエスト数',
+  'taskStudio.assigned': '割当済み',
+  'taskStudio.unassigned': '未割当',
+  'taskStudio.roles': 'ロール数',
+  'taskStudio.unassignedWarning': '未割当のクエストがあります',
+  'taskStudio.unassignedDescription': 'Ops Monitorで手動割当するか、スタッフが自分で取得できます',
 } as const;
 
 export type MessageKey = keyof typeof ja;
