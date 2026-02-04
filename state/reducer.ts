@@ -3,7 +3,7 @@
 // Single reducer for all state mutations
 // ============================================================
 
-import { AppState, AppAction, DomainEvent, Incident, IncidentStatus, AgentId, EvidenceItem, Hypothesis, RecommendationDraft } from '@/core/types';
+import { AppState, AppAction, DomainEvent, Incident, IncidentStatus, AgentId, EvidenceItem, Hypothesis, RecommendationDraft, TaskCard, TaskCategory } from '@/core/types';
 
 // Highlight duration in milliseconds
 const HIGHLIGHT_DURATION = 2000;
@@ -35,6 +35,10 @@ export const initialState: AppState = {
   roles: [],
   menus: [],
   prepItems: [],
+
+  // Task Studio
+  taskCards: [],
+  taskCategories: [],
 
   // Event log
   events: [],
@@ -169,6 +173,47 @@ export const appReducer = (state: AppState, action: AppAction): AppState => {
               }
             : i
         ),
+      };
+
+    // Task Studio actions
+    case 'ADD_TASK_CARD':
+      return {
+        ...state,
+        taskCards: [...(state.taskCards || []), action.taskCard],
+      };
+
+    case 'UPDATE_TASK_CARD':
+      return {
+        ...state,
+        taskCards: (state.taskCards || []).map((t) =>
+          t.id === action.taskCard.id ? action.taskCard : t
+        ),
+      };
+
+    case 'DELETE_TASK_CARD':
+      return {
+        ...state,
+        taskCards: (state.taskCards || []).filter((t) => t.id !== action.taskCardId),
+      };
+
+    case 'ADD_TASK_CATEGORY':
+      return {
+        ...state,
+        taskCategories: [...(state.taskCategories || []), action.category],
+      };
+
+    case 'UPDATE_TASK_CATEGORY':
+      return {
+        ...state,
+        taskCategories: (state.taskCategories || []).map((c) =>
+          c.id === action.category.id ? action.category : c
+        ),
+      };
+
+    case 'DELETE_TASK_CATEGORY':
+      return {
+        ...state,
+        taskCategories: (state.taskCategories || []).filter((c) => c.id !== action.categoryId),
       };
 
     case 'REPLAY_START':

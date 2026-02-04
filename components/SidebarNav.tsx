@@ -25,6 +25,7 @@ import {
   ClipboardList,
   Trophy,
   DollarSign,
+  Layers,
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -92,6 +93,11 @@ const kosSection: NavSection = {
       labelKey: 'nav.incentives',
       path: '/os/incentives',
       icon: <DollarSign className="h-5 w-5" />,
+    },
+    {
+      labelKey: 'nav.taskStudio',
+      path: '/os/task-studio',
+      icon: <Layers className="h-5 w-5" />,
     },
   ],
 };

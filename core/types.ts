@@ -595,6 +595,37 @@ export const INCIDENT_TYPE_NAMES: Record<IncidentType, string> = {
 };
 
 // ------------------------------------------------------------
+// Task Card Types (Task Studio)
+// ------------------------------------------------------------
+
+export type TaskRole = 'kitchen' | 'floor' | 'cashier' | 'prep' | 'runner' | 'unknown';
+export type StarRequirement = 1 | 2 | 3;
+export type QuantityMode = 'fixed' | 'byForecast' | 'byOrders';
+export type QualityCheck = 'none' | 'photo' | 'ai';
+
+export interface TaskCard {
+  id: string;
+  categoryId: string;
+  name: string;
+  role: TaskRole;
+  starRequirement: StarRequirement;
+  standardMinutes: number;
+  quantityMode: QuantityMode;
+  baseQuantity: number;
+  coefficient: number; // byForecast/byOrders時に使う
+  qualityCheck: QualityCheck;
+  xpReward: number;
+  enabled: boolean;
+  notes?: string;
+}
+
+export interface TaskCategory {
+  id: string;
+  name: string;
+  parentId?: string;
+}
+
+// ------------------------------------------------------------
 // Application State
 // ------------------------------------------------------------
 
@@ -605,6 +636,10 @@ export interface AppState {
   roles: Role[];
   menus: Menu[];
   prepItems: PrepItem[];
+  
+  // Task Studio
+  taskCards: TaskCard[];
+  taskCategories: TaskCategory[];
 
   // Event log (single source of truth)
   events: DomainEvent[];
@@ -652,6 +687,13 @@ export type AppAction =
   | { type: 'UPDATE_INCIDENT'; incident: Incident }
   | { type: 'UPDATE_INCIDENT_STATUS'; incidentId: string; status: IncidentStatus }
   | { type: 'ATTACH_AGENT_OUTPUT'; incidentId: string; agentId: AgentId; evidence: EvidenceItem[]; hypotheses: Hypothesis[]; drafts: RecommendationDraft[] }
+  // Task Studio actions
+  | { type: 'ADD_TASK_CARD'; taskCard: TaskCard }
+  | { type: 'UPDATE_TASK_CARD'; taskCard: TaskCard }
+  | { type: 'DELETE_TASK_CARD'; taskCardId: string }
+  | { type: 'ADD_TASK_CATEGORY'; category: TaskCategory }
+  | { type: 'UPDATE_TASK_CATEGORY'; category: TaskCategory }
+  | { type: 'DELETE_TASK_CATEGORY'; categoryId: string }
   // Replay actions
   | { type: 'REPLAY_START'; events: DomainEvent[] }
   | { type: 'REPLAY_STEP' }

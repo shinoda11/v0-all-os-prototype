@@ -6,7 +6,7 @@
 // ============================================================
 
 import React, { createContext, useContext, useReducer, useEffect, useCallback, useRef, useMemo } from 'react';
-import { AppState, AppAction, DomainEvent, Proposal, TimeBand, Incident, IncidentStatus, AgentId, EvidenceItem, Hypothesis, RecommendationDraft } from '@/core/types';
+import { AppState, AppAction, DomainEvent, Proposal, TimeBand, Incident, IncidentStatus, AgentId, EvidenceItem, Hypothesis, RecommendationDraft, TaskCard, TaskCategory } from '@/core/types';
 import { appReducer, initialState } from './reducer';
 import { loadMockData, loadSampleEvents } from '@/data/mock';
 import { generateProposals } from '@/core/proposals';
@@ -71,6 +71,13 @@ interface StoreContextValue {
       summary: string;
     }) => { incidentId: string; isNew: boolean };
     findExistingIncident: (storeId: string, businessDate: string, timeBand: TimeBand, type: string, menuItemId?: string) => Incident | undefined;
+    // Task Studio
+    addTaskCard: (taskCard: TaskCard) => void;
+    updateTaskCard: (taskCard: TaskCard) => void;
+    deleteTaskCard: (taskCardId: string) => void;
+    addTaskCategory: (category: TaskCategory) => void;
+    updateTaskCategory: (category: TaskCategory) => void;
+    deleteTaskCategory: (categoryId: string) => void;
   };
 }
 
@@ -488,6 +495,37 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       publishStateUpdate('state:updated', 'incident-created-from-signal', ['incidents']);
       
       return { incidentId, isNew: true };
+    },
+
+    // Task Studio
+    addTaskCard: (taskCard: TaskCard) => {
+      dispatch({ type: 'ADD_TASK_CARD', taskCard });
+      publishStateUpdate('state:updated', 'task-card-added', ['taskCards']);
+    },
+
+    updateTaskCard: (taskCard: TaskCard) => {
+      dispatch({ type: 'UPDATE_TASK_CARD', taskCard });
+      publishStateUpdate('state:updated', 'task-card-updated', ['taskCards']);
+    },
+
+    deleteTaskCard: (taskCardId: string) => {
+      dispatch({ type: 'DELETE_TASK_CARD', taskCardId });
+      publishStateUpdate('state:updated', 'task-card-deleted', ['taskCards']);
+    },
+
+    addTaskCategory: (category: TaskCategory) => {
+      dispatch({ type: 'ADD_TASK_CATEGORY', category });
+      publishStateUpdate('state:updated', 'task-category-added', ['taskCategories']);
+    },
+
+    updateTaskCategory: (category: TaskCategory) => {
+      dispatch({ type: 'UPDATE_TASK_CATEGORY', category });
+      publishStateUpdate('state:updated', 'task-category-updated', ['taskCategories']);
+    },
+
+    deleteTaskCategory: (categoryId: string) => {
+      dispatch({ type: 'DELETE_TASK_CATEGORY', categoryId });
+      publishStateUpdate('state:updated', 'task-category-deleted', ['taskCategories']);
     },
   }), []);
 
