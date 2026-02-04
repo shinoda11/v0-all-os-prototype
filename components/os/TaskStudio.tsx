@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
@@ -227,12 +227,9 @@ function TaskCardItem({ task, category, onEdit, onDuplicate, onToggleEnabled }: 
             </div>
           </div>
           <div className="flex flex-col items-end gap-2">
-            <Switch
+            <Checkbox
               checked={task.enabled}
-              onCheckedChange={(e) => {
-                e.stopPropagation?.();
-                onToggleEnabled(task);
-              }}
+              onCheckedChange={() => onToggleEnabled(task)}
               onClick={(e) => e.stopPropagation()}
             />
             <button
@@ -674,9 +671,9 @@ export function TaskStudio() {
 
               <div className="flex items-center justify-between py-2">
                 <Label>{t('taskStudio.enabled')}</Label>
-                <Switch
+                <Checkbox
                   checked={editingTask.enabled}
-                  onCheckedChange={(checked) => setEditingTask({ ...editingTask, enabled: checked })}
+                  onCheckedChange={(checked) => setEditingTask({ ...editingTask, enabled: !!checked })}
                 />
               </div>
             </div>
