@@ -787,7 +787,7 @@ export default function WeeklyReviewPage() {
                 <CardTitle>{t('weeklyReview.hrProposals')}</CardTitle>
               </div>
               <Badge variant="outline">
-                {(laborMetrics.winningMix ? 1 : 0) + laborMetrics.weakTimeBands.length + laborMetrics.chronicDelayQuests.length}
+                {(laborMetrics.winningMix ? 1 : 0) + (laborMetrics.weakTimeBands?.length ?? 0) + (laborMetrics.chronicDelayQuests?.length ?? 0)}
               </Badge>
             </div>
           </CardHeader>
@@ -838,7 +838,7 @@ export default function WeeklyReviewPage() {
             )}
             
             {/* Weak Time Bands */}
-            {laborMetrics.weakTimeBands.slice(0, 3).map((weak, idx) => (
+            {(laborMetrics.weakTimeBands ?? []).slice(0, 3).map((weak, idx) => (
               <div key={`weak-${idx}`} className="p-4 rounded border border-amber-200 bg-amber-50">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 space-y-2">
@@ -872,7 +872,7 @@ export default function WeeklyReviewPage() {
             ))}
             
             {/* Chronic Delay Quests */}
-            {laborMetrics.chronicDelayQuests.slice(0, 2).map((quest, idx) => (
+            {(laborMetrics.chronicDelayQuests ?? []).slice(0, 2).map((quest, idx) => (
               <div key={`delay-${idx}`} className="p-4 rounded border border-red-200 bg-red-50">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 space-y-2">
@@ -902,7 +902,7 @@ export default function WeeklyReviewPage() {
               </div>
             ))}
             
-            {!laborMetrics.winningMix && laborMetrics.weakTimeBands.length === 0 && laborMetrics.chronicDelayQuests.length === 0 && (
+            {!laborMetrics.winningMix && (laborMetrics.weakTimeBands?.length ?? 0) === 0 && (laborMetrics.chronicDelayQuests?.length ?? 0) === 0 && (
               <div className="text-center py-8 text-muted-foreground">
                 {t('weeklyReview.noHrProposals')}
               </div>
