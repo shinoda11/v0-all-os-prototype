@@ -7,7 +7,7 @@ export default function TaskStudioPage() {
   const { t } = useI18n();
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col min-h-screen">
       <div className="p-6 border-b">
         <h1 className="text-2xl font-bold">{t('taskStudio.title')}</h1>
         <p className="text-muted-foreground">{t('taskStudio.subtitle')}</p>

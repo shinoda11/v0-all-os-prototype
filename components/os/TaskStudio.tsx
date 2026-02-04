@@ -390,7 +390,7 @@ export function TaskStudio() {
   };
 
   return (
-    <div className="flex h-full">
+    <div className="flex min-h-[600px] h-full">
       {/* Left: Category Tree */}
       <div className="w-64 border-r bg-card flex flex-col">
         <div className="p-4 border-b">
