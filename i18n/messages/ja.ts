@@ -85,6 +85,7 @@ export const ja = {
   'cockpit.deltaToGood': 'GOOD比',
   'cockpit.itemsAtRisk': '件のリスク',
   'cockpit.viewInIncidents': 'インシデントで確認',
+  'cockpit.openOpsMonitor': 'Ops Monitor を開く',
 
   // Shift Summary
   'shift.title': '本日のシフト概要',
@@ -417,7 +418,7 @@ export const ja = {
   'ask.completion.proposalDesc': '{bottleneck}を解消するための施策',
   'ask.completion.general': '全体的な改善',
   // Today's projection responses
-  'ask.projection.conclusionGood': '本日の売上は予測に対して{rate}%達成しており、順調です。',
+  'ask.projection.conclusionGood': '本日の売上は予測に対して{rate}%���成しており、順調です。',
   'ask.projection.conclusionBehind': '本日の売上は予測に対して{rate}%で、¥{gap}のギャップがあります。',
   'ask.projection.forecast': '予測売上',
   'ask.projection.actual': '実績売上',

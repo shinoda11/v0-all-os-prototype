@@ -85,6 +85,7 @@ export const en = {
   'cockpit.deltaToGood': 'vs GOOD',
   'cockpit.itemsAtRisk': ' items at risk',
   'cockpit.viewInIncidents': 'View in Incidents',
+  'cockpit.openOpsMonitor': 'Open Ops Monitor',
 
   // Shift Summary
   'shift.title': "Today's Shift Summary",
