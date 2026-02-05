@@ -51,7 +51,7 @@ export function useViewMode(): [ViewMode, (mode: ViewMode) => void, boolean] {
   const setMode = useCallback((newMode: ViewMode) => {
     setModeState(newMode);
     if (typeof window !== 'undefined') {
-      localStorage.setItem(STORAGE_KEY, newMode);
+      localStorage.setItem(VIEW_MODE_STORAGE_KEY, newMode);
     }
   }, []);
 
