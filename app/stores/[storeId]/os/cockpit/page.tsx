@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { useStore } from '@/state/store';
-import { useI18n } from '@/i18n/context';
+import { useI18n } from '@/i18n/I18nProvider';
 import { selectCurrentStore, selectActiveTodos, selectCompletedTodos } from '@/core/selectors';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
