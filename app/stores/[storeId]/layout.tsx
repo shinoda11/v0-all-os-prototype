@@ -1,5 +1,6 @@
 'use client';
 
+// Store layout with view mode handling
 import React, { useLayoutEffect, useEffect, useRef, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useStore } from '@/state/store';
