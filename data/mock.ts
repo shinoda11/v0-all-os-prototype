@@ -24,24 +24,14 @@ import { normalizeEvents, normalizeStaff } from './normalizer';
 
 export interface IncentivePolicy {
   poolShare: number; // Percentage of over-achievement allocated to pool (e.g., 0.75 = 75%)
-  points: {
-    perHour: number;    // Points earned per hour worked
-    perQuestXP: number; // Points earned per quest XP
-  };
-  qualityPenalty: {
-    ngMultiplier: number; // Multiplier applied when quality is NG (e.g., 0.7 = 70%)
-  };
+  // Eligibility: checkedIn AND questDone >= minQuestsDone
+  eligibilityMinQuestsDone: number; // Minimum quests completed to be eligible (e.g., 1)
+  // Distribution is based purely on starLevel
 }
 
 export const INCENTIVE_POLICY: IncentivePolicy = {
   poolShare: 0.75,
-  points: {
-    perHour: 10,
-    perQuestXP: 1,
-  },
-  qualityPenalty: {
-    ngMultiplier: 0.7,
-  },
+  eligibilityMinQuestsDone: 1, // Must complete at least 1 quest to participate
 };
 
 // ------------------------------------------------------------

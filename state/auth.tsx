@@ -5,9 +5,13 @@
 // Provides current user and role-based access control
 // ============================================================
 
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import type { CurrentUser, UserRole } from '@/core/types';
 import { hasRoleLevel } from '@/core/types';
+
+// Storage keys for persisting selections
+const MOCK_USER_STORAGE_KEY = 'all_os_mock_user_role';
+const VIEW_MODE_STORAGE_KEY = 'all_os_view_mode';
 
 // ------------------------------------------------------------
 // Mock Users for Development
@@ -66,10 +70,48 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
   children, 
   defaultRole = 'manager' 
 }) => {
-  const [currentUser, setCurrentUser] = useState<CurrentUser>(MOCK_USERS[defaultRole]);
+  // Initialize from localStorage if available (client-side only)
+  const [currentUser, setCurrentUser] = useState<CurrentUser>(() => {
+    if (typeof window !== 'undefined') {
+      const savedRole = localStorage.getItem(MOCK_USER_STORAGE_KEY);
+      if (savedRole && MOCK_USERS[savedRole]) {
+        return MOCK_USERS[savedRole];
+      }
+    }
+    return MOCK_USERS[defaultRole];
+  });
+  
+  // Sync state with localStorage on mount and ensure view mode matches role
+  useEffect(() => {
+    const savedRole = localStorage.getItem(MOCK_USER_STORAGE_KEY);
+    const savedViewMode = localStorage.getItem(VIEW_MODE_STORAGE_KEY);
+    
+    if (savedRole && MOCK_USERS[savedRole]) {
+      if (MOCK_USERS[savedRole].id !== currentUser.id) {
+        setCurrentUser(MOCK_USERS[savedRole]);
+      }
+      
+      // Ensure view mode is set based on role if not already set
+      if (!savedViewMode) {
+        const defaultViewMode = (savedRole === 'manager' || savedRole === 'owner' || savedRole === 'sv') ? 'manager' : 'staff';
+        localStorage.setItem(VIEW_MODE_STORAGE_KEY, defaultViewMode);
+      }
+    } else {
+      // No saved role, set defaults based on defaultRole
+      localStorage.setItem(MOCK_USER_STORAGE_KEY, defaultRole);
+      const defaultViewMode = (defaultRole === 'manager' || defaultRole === 'owner' || defaultRole === 'sv') ? 'manager' : 'staff';
+      localStorage.setItem(VIEW_MODE_STORAGE_KEY, defaultViewMode);
+    }
+  }, []);
 
   const setMockUser = useCallback((role: UserRole) => {
     setCurrentUser(MOCK_USERS[role]);
+    // Persist to localStorage
+    localStorage.setItem(MOCK_USER_STORAGE_KEY, role);
+    
+    // Reset view mode based on new user's role
+    const defaultViewMode = (role === 'manager' || role === 'owner' || role === 'sv') ? 'manager' : 'staff';
+    localStorage.setItem(VIEW_MODE_STORAGE_KEY, defaultViewMode);
   }, []);
 
   const hasRole = useCallback((requiredRole: UserRole) => {

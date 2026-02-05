@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { Clock, CheckCircle, AlertCircle } from 'lucide-react';
 import { useI18n } from '@/i18n/I18nProvider';
@@ -56,8 +56,15 @@ export function FreshnessBadge({
   compact = false,
 }: FreshnessBadgeProps) {
   const { locale, t } = useI18n();
+  const [mounted, setMounted] = useState(false);
+  
+  // Only render time on client to avoid hydration mismatch due to timezone differences
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+  
   const status = getFreshnessStatus(lastUpdate);
-  const time = formatUpdateTime(lastUpdate, locale);
+  const time = mounted ? formatUpdateTime(lastUpdate, locale) : '--:--';
   const label = getFreshnessLabel(status, t);
   
   // 2.3: 状態はアイコン+ラベル併用。色のみに依存しない
@@ -120,8 +127,15 @@ export function FreshnessIndicator({
   className?: string;
 }) {
   const { locale, t } = useI18n();
+  const [mounted, setMounted] = useState(false);
+  
+  // Only render time on client to avoid hydration mismatch
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+  
   const status = getFreshnessStatus(lastUpdate);
-  const time = formatUpdateTime(lastUpdate, locale);
+  const time = mounted ? formatUpdateTime(lastUpdate, locale) : '--:--';
   const label = getFreshnessLabel(status, t);
   
   return (

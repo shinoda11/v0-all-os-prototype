@@ -2368,7 +2368,7 @@ export const deriveDemandDropExceptions = (
       type: 'demand-drop',
       severity: drop.severity,
       title: `${drop.menuName}の出数下降`,
-      description: `直近3日平均${drop.avg3Day}食 vs 前週${drop.avg7Day}食（${Math.round(drop.dropRate * 100)}%減）`,
+      description: `直���3日平均${drop.avg3Day}食 vs 前週${drop.avg7Day}食（${Math.round(drop.dropRate * 100)}%減）`,
       relatedEventId: `menu-${drop.menuId}`,
       detectedAt: now.toISOString(),
       resolved: false,
@@ -2857,15 +2857,12 @@ export interface TodayEarnings {
   // Base Pay
   hourlyWage: number;
   basePay: number | null;
-  // Quest XP
+  // Quest stats
   questsCompleted: number;
   questXP: number; // Only from eligible quests (excludes unapproved ad-hoc)
-  adHocQuestCount: number; // Count of unapproved ad-hoc quests (0 points)
+  questCountDone: number; // Total quests completed (for eligibility)
+  adHocQuestCount: number; // Count of unapproved ad-hoc quests
   qualityNgCount: number;
-  // Points
-  pointsFromHours: number | null;
-  pointsFromQuests: number;
-  totalPoints: number | null;
   // Status
   status: 'working' | 'checked-out' | 'not-tracked';
 }
@@ -2892,7 +2889,9 @@ export interface IncentivePool {
 export interface StaffIncentiveShare {
   staffId: string;
   staffName: string;
-  points: number;
+  starLevel: number;
+  hoursWorked: number;
+  questsDone: number;
   sharePercentage: number;
   estimatedShare: number;
   isEstimate: boolean; // true = projected, not finalized
@@ -2902,7 +2901,10 @@ export interface IncentiveDistribution {
   storeId: string;
   businessDate: string;
   pool: IncentivePool;
-  totalPoints: number;
+  totalStars: number;
+  eligibilityMinQuestsDone: number;
+  eligibleStaffCount: number;
+  totalStaffCount: number;
   staffShares: StaffIncentiveShare[];
   status: 'projected' | 'finalized' | 'not-tracked';
   lastUpdate: string;
@@ -3036,19 +3038,8 @@ export const deriveTodayEarnings = (
   // Quality NG count (applies to all quests, not just eligible ones)
   const qualityNgCount = completedQuests.filter(q => q.qualityStatus === 'ng').length;
   
-  // Calculate points
-  const { points } = INCENTIVE_POLICY;
-  const pointsFromHours = netHoursWorked !== null ? Math.round(netHoursWorked * points.perHour) : null;
-  const pointsFromQuests = questXP * points.perQuestXP;
-  
-  // Apply quality penalty if there are NG quests
-  let totalPoints: number | null = null;
-  if (pointsFromHours !== null) {
-    totalPoints = pointsFromHours + pointsFromQuests;
-    if (qualityNgCount > 0) {
-      totalPoints = Math.round(totalPoints * INCENTIVE_POLICY.qualityPenalty.ngMultiplier);
-    }
-  }
+  // Quest count done (for eligibility check in star-based distribution)
+  const questCountDone = completedQuests.length;
   
   return {
     staffId,
@@ -3061,11 +3052,9 @@ export const deriveTodayEarnings = (
     basePay,
     questsCompleted,
     questXP,
+    questCountDone,
     adHocQuestCount,
     qualityNgCount,
-    pointsFromHours,
-    pointsFromQuests,
-    totalPoints,
     status: !hasLaborData ? 'not-tracked' : isCheckedOut ? 'checked-out' : 'working',
   };
 };
@@ -3150,36 +3139,55 @@ export const deriveIncentiveDistribution = (
   // Calculate earnings for each staff member
   const staffEarnings = storeStaff.map(s => deriveTodayEarnings(events, staff, s.id, businessDate));
   
-  // Calculate total points
-  const totalPoints = staffEarnings.reduce((sum, e) => sum + (e.totalPoints ?? 0), 0);
+  // Eligibility: checkedIn (has labor data) AND questDone >= minQuestsDone
+  const { eligibilityMinQuestsDone } = INCENTIVE_POLICY;
+  const eligibleEarnings = staffEarnings.filter(e => {
+    const isCheckedIn = e.netHoursWorked !== null && e.netHoursWorked > 0;
+    const hasEnoughQuests = (e.questCountDone ?? 0) >= eligibilityMinQuestsDone;
+    return isCheckedIn && hasEnoughQuests;
+  });
   
-  // Calculate each staff's share
-  const staffShares: StaffIncentiveShare[] = staffEarnings
-    .filter(e => e.totalPoints !== null && e.totalPoints > 0)
-    .map(e => {
-      const sharePercentage = totalPoints > 0 
-        ? Math.round((e.totalPoints! / totalPoints) * 1000) / 10 
-        : 0;
-      const estimatedShare = totalPoints > 0 
-        ? Math.round(pool.pool * (e.totalPoints! / totalPoints)) 
-        : 0;
-      
-      return {
-        staffId: e.staffId,
-        staffName: e.staffName,
-        points: e.totalPoints!,
-        sharePercentage,
-        estimatedShare,
-        isEstimate: pool.status === 'projected',
-      };
-    })
-    .sort((a, b) => b.points - a.points);
+  // Get star levels for eligible staff
+  const eligibleWithStars = eligibleEarnings.map(e => {
+    const staffMember = storeStaff.find(s => s.id === e.staffId);
+    return {
+      ...e,
+      starLevel: staffMember?.starLevel ?? 1,
+    };
+  });
+  
+  // Calculate total stars (only from eligible staff)
+  const totalStars = eligibleWithStars.reduce((sum, e) => sum + e.starLevel, 0);
+  
+  // Calculate each staff's share based on starLevel
+  const staffShares: StaffIncentiveShare[] = eligibleWithStars.map(e => {
+    const sharePercentage = totalStars > 0 
+      ? Math.round((e.starLevel / totalStars) * 1000) / 10 
+      : 0;
+    const estimatedShare = totalStars > 0 
+      ? Math.round(pool.pool * (e.starLevel / totalStars)) 
+      : 0;
+    
+    return {
+      staffId: e.staffId,
+      staffName: e.staffName,
+      starLevel: e.starLevel,
+      hoursWorked: e.netHoursWorked ?? 0,
+      questsDone: e.questCountDone ?? 0,
+      sharePercentage,
+      estimatedShare,
+      isEstimate: pool.status === 'projected',
+    };
+  }).sort((a, b) => b.starLevel - a.starLevel || b.questsDone - a.questsDone);
   
   return {
     storeId,
     businessDate,
     pool,
-    totalPoints,
+    totalStars,
+    eligibilityMinQuestsDone,
+    eligibleStaffCount: eligibleEarnings.length,
+    totalStaffCount: staffEarnings.length,
     staffShares,
     status: pool.status,
     lastUpdate: new Date().toISOString(),

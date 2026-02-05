@@ -38,11 +38,11 @@ export default function IncentivesPage() {
   
   const today = new Date().toISOString().split('T')[0];
   const distribution = selectIncentiveDistribution(state, today);
-  const { pool, staffShares, totalPoints, status } = distribution;
+  const { pool, staffShares, totalStars, status, eligibilityMinQuestsDone, eligibleStaffCount, totalStaffCount } = distribution;
 
   // Summary stats
   const topContributors = staffShares.slice(0, 3);
-  const eligibleStaff = staffShares.length;
+  const ineligibleCount = totalStaffCount - eligibleStaffCount;
 
   if (!currentStore) {
     return (
@@ -171,8 +171,16 @@ export default function IncentivesPage() {
                     </div>
                     <div className="space-y-1 text-sm">
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">{t('incentive.points')}</span>
-                        <span className="font-bold">{staff.points} pt</span>
+                        <span className="text-muted-foreground">{t('incentive.star')}</span>
+                        <span className="font-bold flex items-center gap-0.5">
+                          {[1, 2, 3].map(i => (
+                            <Star key={i} className={cn('h-3 w-3', i <= staff.starLevel ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/30')} />
+                          ))}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">{t('incentive.questsDone')}</span>
+                        <span className="font-bold">{staff.questsDone}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">{t('incentive.share')}</span>
@@ -211,7 +219,9 @@ export default function IncentivesPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>{t('incentive.staff')}</TableHead>
-                      <TableHead className="text-right">{t('incentive.points')}</TableHead>
+                      <TableHead className="text-center">{t('incentive.star')}</TableHead>
+                      <TableHead className="text-right">{t('incentive.hours')}</TableHead>
+                      <TableHead className="text-right">{t('incentive.questsDone')}</TableHead>
                       <TableHead className="text-right">{t('incentive.share')}</TableHead>
                       <TableHead className="text-right">{t('incentive.projectedBonus')}</TableHead>
                     </TableRow>
@@ -225,7 +235,15 @@ export default function IncentivesPage() {
                             <span className="font-medium">{staff.staffName}</span>
                           </div>
                         </TableCell>
-                        <TableCell className="text-right font-mono">{staff.points}</TableCell>
+                        <TableCell className="text-center">
+                          <span className="flex items-center justify-center gap-0.5">
+                            {[1, 2, 3].map(i => (
+                              <Star key={i} className={cn('h-3 w-3', i <= staff.starLevel ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/30')} />
+                            ))}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right font-mono">{staff.hoursWorked.toFixed(1)}h</TableCell>
+                        <TableCell className="text-right font-mono">{staff.questsDone}</TableCell>
                         <TableCell className="text-right font-mono">{staff.sharePercentage}%</TableCell>
                         <TableCell className="text-right font-mono font-bold text-emerald-700">
                           {formatCurrency(staff.estimatedShare, locale)}
@@ -234,14 +252,28 @@ export default function IncentivesPage() {
                     ))}
                   </TableBody>
                 </Table>
-                <div className="flex justify-end gap-6 mt-4 pt-4 border-t text-sm">
-                  <div>
-                    <span className="text-muted-foreground">{t('incentive.totalPoints')}: </span>
-                    <span className="font-bold">{totalPoints} pt</span>
+                <div className="flex flex-wrap justify-between gap-4 mt-4 pt-4 border-t text-sm">
+                  <div className="flex gap-4">
+                    <div>
+                      <span className="text-muted-foreground">{t('incentive.eligible')}: </span>
+                      <span className="font-bold">{eligibleStaffCount}</span>
+                      <span className="text-muted-foreground text-xs ml-1">({eligibilityMinQuestsDone}+ quests)</span>
+                    </div>
+                    {ineligibleCount > 0 && (
+                      <div className="text-muted-foreground">
+                        {t('incentive.ineligible')}: {ineligibleCount}
+                      </div>
+                    )}
                   </div>
-                  <div>
-                    <span className="text-muted-foreground">{t('incentive.totalPool')}: </span>
-                    <span className="font-bold text-emerald-700">{formatCurrency(pool.pool, locale)}</span>
+                  <div className="flex gap-6">
+                    <div>
+                      <span className="text-muted-foreground">{t('incentive.totalStars')}: </span>
+                      <span className="font-bold">{totalStars}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">{t('incentive.totalPool')}: </span>
+                      <span className="font-bold text-emerald-700">{formatCurrency(pool.pool, locale)}</span>
+                    </div>
                   </div>
                 </div>
               </div>

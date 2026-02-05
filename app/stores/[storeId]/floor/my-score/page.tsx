@@ -328,31 +328,45 @@ export default function MyScorePage() {
                   <span className="font-bold tabular-nums">{formatCurrency(todayEarnings.basePay)}</span>
                 </div>
                 
-                {/* Points Breakdown */}
+                {/* Incentive Share */}
                 <div className="border-t border-emerald-200 pt-3 space-y-2">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <Target className="h-4 w-4 text-blue-600" />
-                      <span className="text-sm">{t('earnings.pointsFromHours')}</span>
-                    </div>
-                    <span className="font-bold tabular-nums">{todayEarnings.pointsFromHours ?? 0} pt</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
                       <CheckCircle className="h-4 w-4 text-emerald-600" />
-                      <span className="text-sm">{t('earnings.pointsFromQuests')}</span>
+                      <span className="text-sm">{t('earnings.questsDone')}</span>
                     </div>
-                    <span className="font-bold tabular-nums">{todayEarnings.pointsFromQuests} pt</span>
+                    <span className="font-bold tabular-nums">{todayEarnings.questCountDone ?? 0}</span>
                   </div>
-                  <div className="flex items-center justify-between pt-1">
-                    <span className="text-sm font-bold">{t('earnings.totalPoints')}</span>
-                    <span className="font-bold tabular-nums text-blue-700">{todayEarnings.totalPoints ?? 0} pt</span>
+                  {/* Star-based distribution transparency */}
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">{t('earnings.myStars')}</span>
+                    <div className="flex items-center gap-1">
+                      {[1, 2, 3].map((i) => (
+                        <Star
+                          key={i}
+                          className={cn(
+                            'h-4 w-4',
+                            i <= (myShare?.starLevel ?? 0)
+                              ? 'fill-amber-400 text-amber-400'
+                              : 'text-muted-foreground/30'
+                          )}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">{t('earnings.totalStarsOnDuty')}</span>
+                    <span className="font-medium tabular-nums">{incentiveDistribution.totalStars}</span>
                   </div>
                   {myShare && (
-                    <div className="text-xs text-muted-foreground text-right">
-                      {t('earnings.sharePercent')}: {myShare.sharePercentage}%
+                    <div className="flex items-center justify-between pt-1">
+                      <span className="text-sm font-bold">{t('earnings.yourShare')}</span>
+                      <span className="font-bold tabular-nums text-blue-700">{myShare.sharePercentage}%</span>
                     </div>
                   )}
+                  <div className="text-xs text-muted-foreground text-right">
+                    {t('earnings.starBasedDistribution')}
+                  </div>
                 </div>
                 
                 {/* Projected Bonus */}

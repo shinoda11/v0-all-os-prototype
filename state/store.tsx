@@ -6,12 +6,13 @@
 // ============================================================
 
 import React, { createContext, useContext, useReducer, useEffect, useCallback, useRef, useMemo } from 'react';
-import { AppState, AppAction, DomainEvent, Proposal, TimeBand, Incident, IncidentStatus, AgentId, EvidenceItem, Hypothesis, RecommendationDraft } from '@/core/types';
+import { AppState, AppAction, DomainEvent, Proposal, TimeBand, Incident, IncidentStatus, AgentId, EvidenceItem, Hypothesis, RecommendationDraft, TaskCard, TaskCategory, BoxTemplate } from '@/core/types';
 import { appReducer, initialState } from './reducer';
 import { loadMockData, loadSampleEvents } from '@/data/mock';
 import { generateProposals } from '@/core/proposals';
 import * as commands from '@/core/commands';
 import { eventBus, type EventBusEventType } from './eventBus';
+import * as repo from '@/core/repo';
 
 // ------------------------------------------------------------
 // Context Types
@@ -71,6 +72,23 @@ interface StoreContextValue {
       summary: string;
     }) => { incidentId: string; isNew: boolean };
     findExistingIncident: (storeId: string, businessDate: string, timeBand: TimeBand, type: string, menuItemId?: string) => Incident | undefined;
+    // Task Studio
+    addTaskCard: (taskCard: TaskCard) => void;
+    updateTaskCard: (taskCard: TaskCard) => void;
+    deleteTaskCard: (taskCardId: string) => void;
+    addTaskCategory: (category: TaskCategory) => void;
+    updateTaskCategory: (category: TaskCategory) => void;
+    deleteTaskCategory: (categoryId: string) => void;
+    // Box Templates
+    addBoxTemplate: (boxTemplate: BoxTemplate) => void;
+    updateBoxTemplate: (boxTemplate: BoxTemplate) => void;
+    deleteBoxTemplate: (boxTemplateId: string) => void;
+    // Order Interrupt (POS urgent orders)
+    createOrderQuest: (order: { orderId: string; menuItemName: string; quantity: number; slaMinutes?: number }) => string;
+    completeOrderQuest: (orderId: string) => void;
+    // Data Management
+    seedDemoData: () => void;
+    resetAllData: () => void;
   };
 }
 
@@ -98,10 +116,31 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const replayIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const highlightTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Load initial mock data
+  // Load initial data from localStorage or fall back to mock data
   useEffect(() => {
-    const mockData = loadMockData();
-    dispatch({ type: 'LOAD_INITIAL_DATA', data: mockData });
+    const savedState = repo.loadState();
+    
+    if (savedState) {
+      // Load from localStorage
+      dispatch({ type: 'LOAD_INITIAL_DATA', data: savedState });
+    } else {
+      // No saved state, load mock data
+      const mockData = loadMockData();
+      dispatch({ type: 'LOAD_INITIAL_DATA', data: mockData });
+    }
+    
+    // Setup cross-tab synchronization
+    const cleanup = repo.setupCrossTabSync();
+    
+    // Subscribe to cross-tab updates
+    const unsubscribe = repo.subscribe((newState) => {
+      dispatch({ type: 'LOAD_INITIAL_DATA', data: newState });
+    });
+    
+    return () => {
+      cleanup();
+      unsubscribe();
+    };
   }, []);
 
   // Handle replay playback (single interval)
@@ -124,6 +163,23 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
     };
   }, [state.replay.isPlaying, state.replay.isPaused, state.replay.currentIndex, state.replay.pendingEvents.length]);
+
+  // Persist state changes to localStorage
+  const isInitializedRef = useRef(false);
+  useEffect(() => {
+    // Skip initial render to avoid overwriting with initialState
+    if (!isInitializedRef.current) {
+      isInitializedRef.current = true;
+      return;
+    }
+    
+    // Save state to localStorage (debounced via RAF)
+    const timeoutId = setTimeout(() => {
+      repo.saveState(state);
+    }, 100);
+    
+    return () => clearTimeout(timeoutId);
+  }, [state]);
 
   // Handle highlight timeout (single timer)
   useEffect(() => {
@@ -488,6 +544,146 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       publishStateUpdate('state:updated', 'incident-created-from-signal', ['incidents']);
       
       return { incidentId, isNew: true };
+    },
+
+    // Task Studio
+    addTaskCard: (taskCard: TaskCard) => {
+      dispatch({ type: 'ADD_TASK_CARD', taskCard });
+      publishStateUpdate('state:updated', 'task-card-added', ['taskCards']);
+    },
+
+    updateTaskCard: (taskCard: TaskCard) => {
+      dispatch({ type: 'UPDATE_TASK_CARD', taskCard });
+      publishStateUpdate('state:updated', 'task-card-updated', ['taskCards']);
+    },
+
+    deleteTaskCard: (taskCardId: string) => {
+      dispatch({ type: 'DELETE_TASK_CARD', taskCardId });
+      publishStateUpdate('state:updated', 'task-card-deleted', ['taskCards']);
+    },
+
+    addTaskCategory: (category: TaskCategory) => {
+      dispatch({ type: 'ADD_TASK_CATEGORY', category });
+      publishStateUpdate('state:updated', 'task-category-added', ['taskCategories']);
+    },
+
+    updateTaskCategory: (category: TaskCategory) => {
+      dispatch({ type: 'UPDATE_TASK_CATEGORY', category });
+      publishStateUpdate('state:updated', 'task-category-updated', ['taskCategories']);
+    },
+
+    deleteTaskCategory: (categoryId: string) => {
+      dispatch({ type: 'DELETE_TASK_CATEGORY', categoryId });
+      publishStateUpdate('state:updated', 'task-category-deleted', ['taskCategories']);
+    },
+
+    // Box Templates
+    addBoxTemplate: (boxTemplate: BoxTemplate) => {
+      dispatch({ type: 'ADD_BOX_TEMPLATE', boxTemplate });
+      publishStateUpdate('state:updated', 'box-template-added', ['boxTemplates']);
+    },
+
+    updateBoxTemplate: (boxTemplate: BoxTemplate) => {
+      dispatch({ type: 'UPDATE_BOX_TEMPLATE', boxTemplate });
+      publishStateUpdate('state:updated', 'box-template-updated', ['boxTemplates']);
+    },
+
+    deleteBoxTemplate: (boxTemplateId: string) => {
+      dispatch({ type: 'DELETE_BOX_TEMPLATE', boxTemplateId });
+      publishStateUpdate('state:updated', 'box-template-deleted', ['boxTemplates']);
+    },
+
+    // Order Interrupt - Create urgent order quest
+    createOrderQuest: (order: { orderId: string; menuItemName: string; quantity: number; slaMinutes?: number }) => {
+      const storeId = storeIdRef.current || 'store-1';
+      const now = new Date().toISOString();
+      const slaMinutes = order.slaMinutes ?? 3;
+      
+      // Create order event
+      const orderEvent: DomainEvent = {
+        id: `order-${order.orderId}`,
+        type: 'order',
+        storeId,
+        timestamp: now,
+        timeBand: 'lunch' as TimeBand,
+        orderId: order.orderId,
+        menuItemName: order.menuItemName,
+        quantity: order.quantity,
+        priority: 'urgent',
+        status: 'pending',
+        slaMinutes,
+      } as DomainEvent;
+      dispatch({ type: 'ADD_EVENT', event: orderEvent });
+      
+      // Create urgent decision event (Order Quest)
+      const questId = `order-quest-${order.orderId}`;
+      const deadline = new Date(Date.now() + slaMinutes * 60 * 1000).toISOString();
+      const questEvent: DecisionEvent = {
+        id: questId,
+        type: 'decision',
+        storeId,
+        timestamp: now,
+        timeBand: 'lunch' as TimeBand,
+        proposalId: questId,
+        action: 'approved', // Ready to start immediately
+        title: `[ORDER] ${order.menuItemName} x${order.quantity}`,
+        description: `POS注文: ${order.menuItemName} ${order.quantity}点`,
+        distributedToRoles: [], // Will be assigned based on role
+        priority: 'critical',
+        deadline,
+        estimatedMinutes: slaMinutes,
+        source: 'system',
+      };
+      dispatch({ type: 'ADD_EVENT', event: questEvent });
+      
+      publishStateUpdate('state:updated', 'order-quest-created', ['events']);
+      return questId;
+    },
+
+    completeOrderQuest: (orderId: string) => {
+      const now = new Date().toISOString();
+      const state = stateRef.current;
+      
+      // Find and complete the order event
+      const orderEvent = state.events.find(e => e.type === 'order' && (e as any).orderId === orderId);
+      if (orderEvent) {
+        const completedOrder: DomainEvent = {
+          ...orderEvent,
+          id: `${orderEvent.id}-completed`,
+          timestamp: now,
+          status: 'completed',
+          completedAt: now,
+        } as DomainEvent;
+        dispatch({ type: 'ADD_EVENT', event: completedOrder });
+      }
+      
+      publishStateUpdate('state:updated', 'order-quest-completed', ['events']);
+    },
+    
+    // Data Management
+    seedDemoData: () => {
+      const storeId = storeIdRef.current ?? '1';
+      const demoData = repo.seedDemoData(storeId);
+      
+      // Merge with existing mock data
+      const mockData = loadMockData();
+      const mergedData = {
+        ...mockData,
+        staff: demoData.staff ?? mockData.staff,
+        taskCategories: demoData.taskCategories ?? mockData.taskCategories ?? [],
+        taskCards: demoData.taskCards ?? mockData.taskCards ?? [],
+        events: [...(mockData.events ?? []), ...(demoData.events ?? [])],
+      };
+      
+      dispatch({ type: 'LOAD_INITIAL_DATA', data: mergedData });
+      publishStateUpdate('state:updated', 'demo-data-seeded', ['staff', 'taskCards', 'events']);
+    },
+    
+    resetAllData: () => {
+      repo.clearState();
+      const mockData = loadMockData();
+      dispatch({ type: 'LOAD_INITIAL_DATA', data: mockData });
+      publishStateUpdate('state:updated', 'data-reset', ['all']);
     },
   }), []);
 

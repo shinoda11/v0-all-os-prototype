@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/i18n/I18nProvider';
 import { useAuth } from '@/state/auth';
+import { useViewMode, type ViewMode } from '@/core/viewMode';
 import type { UserRole } from '@/core/types';
 import {
   BarChart3,
@@ -25,6 +26,8 @@ import {
   ClipboardList,
   Trophy,
   DollarSign,
+  Layers,
+  CalendarCheck,
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -42,6 +45,7 @@ interface NavSection {
   descriptionKey?: string; // i18n key
   items: NavItem[];
   requiredRole?: UserRole; // Minimum role required to see this section
+  viewMode?: ViewMode; // Which view mode this section belongs to
 }
 
 /**
@@ -57,6 +61,7 @@ const kosSection: NavSection = {
   titleKey: 'nav.kos',
   descriptionKey: 'nav.kosDesc',
   requiredRole: 'manager',
+  viewMode: 'manager',
   items: [
     {
       labelKey: 'nav.cockpit',
@@ -93,6 +98,21 @@ const kosSection: NavSection = {
       path: '/os/incentives',
       icon: <DollarSign className="h-5 w-5" />,
     },
+    {
+      labelKey: 'nav.taskCatalog',
+      path: '/os/task-catalog',
+      icon: <Layers className="h-5 w-5" />,
+    },
+    {
+      labelKey: 'nav.plan',
+      path: '/os/plan',
+      icon: <CalendarCheck className="h-5 w-5" />,
+    },
+    {
+      labelKey: 'nav.timeclockSummary',
+      path: '/os/timeclock-summary',
+      icon: <Clock className="h-5 w-5" />,
+    },
   ],
 };
 
@@ -101,6 +121,7 @@ const opsOsSection: NavSection = {
   titleKey: 'nav.opsOs',
   descriptionKey: 'nav.opsOsDesc',
   requiredRole: 'staff',
+  viewMode: 'staff',
   items: [
     {
       labelKey: 'nav.todayQuests',
@@ -125,6 +146,7 @@ const incidentsSection: NavSection = {
   titleKey: 'nav.incidents',
   descriptionKey: 'nav.incidentsDesc',
   requiredRole: 'manager',
+  viewMode: 'manager',
   items: [
     {
       labelKey: 'nav.incidentCenter',
@@ -231,11 +253,16 @@ export function SidebarNav({ storeId }: SidebarNavProps) {
   const pathname = usePathname();
   const { t } = useI18n();
   const { hasRole } = useAuth();
+  const [viewMode, , viewModeLoaded] = useViewMode();
 
-  // Filter sections based on user role
-  const visibleSections = navSections.filter(section => 
-    !section.requiredRole || hasRole(section.requiredRole)
-  );
+  // Filter sections based on user role AND view mode
+  const visibleSections = navSections.filter(section => {
+    // Check role requirement
+    const hasRequiredRole = !section.requiredRole || hasRole(section.requiredRole);
+    // Check view mode - if section has a viewMode, it must match current viewMode
+    const matchesViewMode = !section.viewMode || section.viewMode === viewMode;
+    return hasRequiredRole && matchesViewMode;
+  });
 
   return (
     <nav className="flex flex-col gap-1 p-2">
