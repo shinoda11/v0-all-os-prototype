@@ -51,6 +51,7 @@ import {
   Trophy,
   Gift,
   ExternalLink,
+  ClipboardList,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -254,6 +255,13 @@ function DynamicShiftSummary() {
               {t('cockpit.quest.noQuestsBottleneck')}
             </div>
           )}
+          {/* Open Ops Monitor button */}
+          <Link href={`/stores/${storeId}/os/ops-monitor`}>
+            <Button variant="outline" size="sm" className="w-full mt-2 gap-2">
+              <ClipboardList className="h-4 w-4" />
+              {t('cockpit.openOpsMonitor')}
+            </Button>
+          </Link>
         </div>
       </CardContent>
     </Card>
