@@ -9,8 +9,9 @@ import React, { createContext, useContext, useState, useCallback, useEffect } fr
 import type { CurrentUser, UserRole } from '@/core/types';
 import { hasRoleLevel } from '@/core/types';
 
-// Storage key for persisting mock user selection
+// Storage keys for persisting selections
 const MOCK_USER_STORAGE_KEY = 'all_os_mock_user_role';
+const VIEW_MODE_STORAGE_KEY = 'all_os_view_mode';
 
 // ------------------------------------------------------------
 // Mock Users for Development
@@ -92,6 +93,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
     setCurrentUser(MOCK_USERS[role]);
     // Persist to localStorage
     localStorage.setItem(MOCK_USER_STORAGE_KEY, role);
+    
+    // Reset view mode based on new user's role
+    const defaultViewMode = (role === 'manager' || role === 'owner' || role === 'sv') ? 'manager' : 'staff';
+    localStorage.setItem(VIEW_MODE_STORAGE_KEY, defaultViewMode);
   }, []);
 
   const hasRole = useCallback((requiredRole: UserRole) => {
