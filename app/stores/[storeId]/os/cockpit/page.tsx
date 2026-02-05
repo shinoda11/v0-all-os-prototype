@@ -18,27 +18,14 @@ import {
   Clock,
   ClipboardList,
   ChevronRight,
-  RefreshCw,
-  Database,
 } from 'lucide-react';
 
 export default function CockpitPage() {
-  const { state, actions } = useStore();
+  const { state } = useStore();
   const currentStore = selectCurrentStore(state);
   const { t, locale } = useI18n();
   const params = useParams();
   const storeId = params?.storeId as string;
-
-  // Dev-only handlers for demo data management
-  const handleSeedData = () => {
-    actions.seedDemoData();
-  };
-
-  const handleResetData = () => {
-    if (window.confirm(t('cockpit.confirmReset'))) {
-      actions.resetAllData();
-    }
-  };
 
   // Early return if store not loaded
   if (!currentStore) {
@@ -155,37 +142,6 @@ export default function CockpitPage() {
               </Button>
             </Link>
           )}
-        </CardContent>
-      </Card>
-    </div>
-
-      {/* Dev-only: Data Management */}
-      <Card className="border-dashed border-amber-300 bg-amber-50/50">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm text-amber-700 flex items-center gap-2">
-            <Database className="h-4 w-4" />
-            {t('cockpit.devTools')}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="flex gap-2">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={handleSeedData}
-            className="gap-2"
-          >
-            <Database className="h-4 w-4" />
-            {t('cockpit.seedDemoData')}
-          </Button>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={handleResetData}
-            className="gap-2 text-destructive hover:text-destructive"
-          >
-            <RefreshCw className="h-4 w-4" />
-            {t('cockpit.resetData')}
-          </Button>
         </CardContent>
       </Card>
     </div>
