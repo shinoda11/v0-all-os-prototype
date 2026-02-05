@@ -81,11 +81,26 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
     return MOCK_USERS[defaultRole];
   });
   
-  // Sync state with localStorage on mount (handles SSR hydration)
+  // Sync state with localStorage on mount and ensure view mode matches role
   useEffect(() => {
     const savedRole = localStorage.getItem(MOCK_USER_STORAGE_KEY);
-    if (savedRole && MOCK_USERS[savedRole] && MOCK_USERS[savedRole].id !== currentUser.id) {
-      setCurrentUser(MOCK_USERS[savedRole]);
+    const savedViewMode = localStorage.getItem(VIEW_MODE_STORAGE_KEY);
+    
+    if (savedRole && MOCK_USERS[savedRole]) {
+      if (MOCK_USERS[savedRole].id !== currentUser.id) {
+        setCurrentUser(MOCK_USERS[savedRole]);
+      }
+      
+      // Ensure view mode is set based on role if not already set
+      if (!savedViewMode) {
+        const defaultViewMode = (savedRole === 'manager' || savedRole === 'owner' || savedRole === 'sv') ? 'manager' : 'staff';
+        localStorage.setItem(VIEW_MODE_STORAGE_KEY, defaultViewMode);
+      }
+    } else {
+      // No saved role, set defaults based on defaultRole
+      localStorage.setItem(MOCK_USER_STORAGE_KEY, defaultRole);
+      const defaultViewMode = (defaultRole === 'manager' || defaultRole === 'owner' || defaultRole === 'sv') ? 'manager' : 'staff';
+      localStorage.setItem(VIEW_MODE_STORAGE_KEY, defaultViewMode);
     }
   }, []);
 
