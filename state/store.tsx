@@ -12,6 +12,7 @@ import { loadMockData, loadSampleEvents } from '@/data/mock';
 import { generateProposals } from '@/core/proposals';
 import * as commands from '@/core/commands';
 import { eventBus, type EventBusEventType } from './eventBus';
+import * as repo from '@/core/repo';
 
 // ------------------------------------------------------------
 // Context Types
@@ -85,6 +86,9 @@ interface StoreContextValue {
     // Order Interrupt (POS urgent orders)
     createOrderQuest: (order: { orderId: string; menuItemName: string; quantity: number; slaMinutes?: number }) => string;
     completeOrderQuest: (orderId: string) => void;
+    // Data Management
+    seedDemoData: () => void;
+    resetAllData: () => void;
   };
 }
 
@@ -112,10 +116,31 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const replayIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const highlightTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Load initial mock data
+  // Load initial data from localStorage or fall back to mock data
   useEffect(() => {
-    const mockData = loadMockData();
-    dispatch({ type: 'LOAD_INITIAL_DATA', data: mockData });
+    const savedState = repo.loadState();
+    
+    if (savedState) {
+      // Load from localStorage
+      dispatch({ type: 'LOAD_INITIAL_DATA', data: savedState });
+    } else {
+      // No saved state, load mock data
+      const mockData = loadMockData();
+      dispatch({ type: 'LOAD_INITIAL_DATA', data: mockData });
+    }
+    
+    // Setup cross-tab synchronization
+    const cleanup = repo.setupCrossTabSync();
+    
+    // Subscribe to cross-tab updates
+    const unsubscribe = repo.subscribe((newState) => {
+      dispatch({ type: 'LOAD_INITIAL_DATA', data: newState });
+    });
+    
+    return () => {
+      cleanup();
+      unsubscribe();
+    };
   }, []);
 
   // Handle replay playback (single interval)
@@ -138,6 +163,23 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
     };
   }, [state.replay.isPlaying, state.replay.isPaused, state.replay.currentIndex, state.replay.pendingEvents.length]);
+
+  // Persist state changes to localStorage
+  const isInitializedRef = useRef(false);
+  useEffect(() => {
+    // Skip initial render to avoid overwriting with initialState
+    if (!isInitializedRef.current) {
+      isInitializedRef.current = true;
+      return;
+    }
+    
+    // Save state to localStorage (debounced via RAF)
+    const timeoutId = setTimeout(() => {
+      repo.saveState(state);
+    }, 100);
+    
+    return () => clearTimeout(timeoutId);
+  }, [state]);
 
   // Handle highlight timeout (single timer)
   useEffect(() => {
@@ -616,6 +658,32 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
       
       publishStateUpdate('state:updated', 'order-quest-completed', ['events']);
+    },
+    
+    // Data Management
+    seedDemoData: () => {
+      const storeId = storeIdRef.current ?? '1';
+      const demoData = repo.seedDemoData(storeId);
+      
+      // Merge with existing mock data
+      const mockData = loadMockData();
+      const mergedData = {
+        ...mockData,
+        staff: demoData.staff ?? mockData.staff,
+        taskCategories: demoData.taskCategories ?? mockData.taskCategories ?? [],
+        taskCards: demoData.taskCards ?? mockData.taskCards ?? [],
+        events: [...(mockData.events ?? []), ...(demoData.events ?? [])],
+      };
+      
+      dispatch({ type: 'LOAD_INITIAL_DATA', data: mergedData });
+      publishStateUpdate('state:updated', 'demo-data-seeded', ['staff', 'taskCards', 'events']);
+    },
+    
+    resetAllData: () => {
+      repo.clearState();
+      const mockData = loadMockData();
+      dispatch({ type: 'LOAD_INITIAL_DATA', data: mockData });
+      publishStateUpdate('state:updated', 'data-reset', ['all']);
     },
   }), []);
 

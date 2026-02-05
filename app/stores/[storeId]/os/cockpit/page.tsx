@@ -675,6 +675,39 @@ export default function CockpitPage() {
 
       {/* ReplayControls - dev only */}
       {process.env.NODE_ENV === 'development' && <ReplayControls />}
+      
+      {/* Dev Data Controls - dev only */}
+      {process.env.NODE_ENV === 'development' && (
+        <Card className="border-dashed border-amber-400 bg-amber-50/50">
+          <CardContent className="py-2 px-4">
+            <div className="flex items-center gap-4 text-xs">
+              <span className="text-amber-600 font-medium">[DEV] Data Controls:</span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  actions.seedDemoData();
+                }}
+                className="h-7 text-xs"
+              >
+                Seed Demo Data
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (confirm('Reset all data? This cannot be undone.')) {
+                    actions.resetAllData();
+                  }
+                }}
+                className="h-7 text-xs text-red-600 hover:text-red-700"
+              >
+                Reset All Data
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Active Incidents Strip - Only shows when there are active incidents */}
       {openIncidents.length > 0 && (
