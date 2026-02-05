@@ -5,7 +5,6 @@ import React, { useLayoutEffect, useEffect, useRef, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useStore } from '@/state/store';
 import { AppShell } from '@/components/AppShell';
-import { ViewModeMismatchBanner } from '@/components/ViewModeMismatchBanner';
 
 // Valid store IDs (hardcoded to avoid race condition with store loading)
 const VALID_STORE_IDS = ['1', '2', '3', '4'];
@@ -44,7 +43,6 @@ export default function StoreLayout({ children }: StoreLayoutProps) {
   
   return (
     <AppShell storeId={storeId}>
-      <ViewModeMismatchBanner />
       {children}
     </AppShell>
   );
