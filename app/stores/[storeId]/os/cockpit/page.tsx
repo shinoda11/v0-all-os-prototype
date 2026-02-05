@@ -537,357 +537,351 @@ export default function CockpitPage() {
 
   // Subscribe to state updates via event bus
   const { lastUpdateTime: busUpdateTime } = useStateSubscription([
-    'sales', 'labor', 'prep', 'delivery', 'decision', 'cockpit-sales', 'cockpit-labor', 'cockpit-operations'
+    'sales', 'labor', 'prep', 'delivery', 'decision', 'cockpit-sales', 'cockpit-operations'
   ]);
 
-  // All hooks must be called before any early returns
-  const selectedStoreId = state.selectedStoreId;
-  
-  const metrics = selectCockpitMetrics(state, undefined, timeBand);
-  const laborMetrics = selectLaborMetrics(state);
-  const prepMetrics = selectPrepMetrics(state);
-  const exceptions = selectExceptions(state);
-  const shiftSummary = selectShiftSummary(state);
+  // Get current data from state
+  const metrics = selectCockpitMetrics(state, timeBand);
+  const exceptions = selectExceptions(state, timeBand);
+  const prepMetrics = selectPrepMetrics(state, timeBand);
+  const laborMetrics = selectLaborMetrics(state, timeBand);
   const incentivePool = selectIncentivePool(state);
-  
-  // Active incidents for strip
+  const incentiveDistribution = selectIncentiveDistribution(state);
   const openIncidents = selectOpenIncidents(state);
   const criticalIncidents = selectCriticalIncidents(state);
-  const today = new Date().toISOString().split('T')[0];
-  const incentiveDistribution = selectIncentiveDistribution(state, today);
-  const todoStats = selectTodoStats(state);
-
-  // Calculate enhanced metrics - use bus update time for freshness
+  
+  // Get labor guardrail summary
+  const laborGuardrail = deriveLaborGuardrailSummary(state.events, state.selectedStoreId ?? '1');
+  
+  // Derive shift totals
+  const shiftTotals = selectShiftSummary(state);
+  
+  // Determine time band based on current time for context
   const now = new Date();
-  const lastUpdateTime = busUpdateTime;
+  const currentHour = now.getHours();
   
-  // Sales calculations
-  const salesActual = metrics?.sales?.actual ?? 0;
-  const salesForecast = metrics?.sales?.forecast ?? 0;
-  const salesDiff = salesActual - salesForecast;
-  const salesAchievementRate = metrics?.sales?.achievementRate ?? 0;
-  
-  // Landing estimate with time band curve
+  // Calculate landing estimate
   const landingEstimate = calculateLandingEstimate(
-    selectedStoreId ?? '1',
-    salesActual,
-    salesForecast,
+    currentStore.id,
+    metrics.salesActual,
+    metrics.salesForecast,
     now
   );
-  const landingMin = landingEstimate.min;
-  const landingMax = landingEstimate.max;
-  const landingExplanation = landingEstimate.explanation;
-  
-  // Labor calculations (using dynamic shift summary)
-  const laborCost = laborMetrics?.laborCostEstimate ?? 0;
-  const laborRate = salesActual > 0 ? (laborCost / salesActual) * 100 : 0;
-  const salesPerLabor = laborCost > 0 ? salesActual / laborCost : 0;
-  const plannedHours = shiftSummary?.plannedHours ?? 48;
-  const actualHours = shiftSummary?.actualHours ?? laborMetrics?.totalHoursToday ?? 0;
-  const breakCount = shiftSummary?.onBreakCount ?? laborMetrics?.onBreakCount ?? 0;
-  
-  // Labor guardrail calculation
-  const dayOfWeek = now.getDay();
-  const dayType: 'weekday' | 'weekend' = (dayOfWeek === 0 || dayOfWeek === 6) ? 'weekend' : 'weekday';
-  const plannedLaborCostDaily = plannedHours * 1200; // Average wage assumption
-  const runRateSalesDaily = landingEstimate.min > 0 ? (landingEstimate.min + landingEstimate.max) / 2 : salesForecast;
-  
-  const guardrailSummary = deriveLaborGuardrailSummary({
-    businessDate: now.toISOString().split('T')[0],
-    dayType,
-    forecastSalesDaily: salesForecast,
-    runRateSalesDaily,
-    plannedLaborCostDaily,
-    actualLaborCostSoFar: laborCost,
-  });
-  
-  // Operations
-  const delayedCount = prepMetrics?.plannedCount ?? 0;
-  const completionRate = prepMetrics?.completionRate ?? 0;
-  const bottleneck = delayedCount > 0 ? { task: '仕込み', reason: `${delayedCount}件未着手` } : null;
-  
-  // Time band forecasts for briefing modal
-  const timeBandForecasts = [
-    { band: 'lunch' as TimeBand, label: t('timeband.lunch'), salesForecast: Math.round(salesForecast * 0.35), weight: 35 },
-    { band: 'idle' as TimeBand, label: t('timeband.idle'), salesForecast: Math.round(salesForecast * 0.15), weight: 15 },
-    { band: 'dinner' as TimeBand, label: t('timeband.dinner'), salesForecast: Math.round(salesForecast * 0.50), weight: 50 },
-  ];
-  
-  // Initial todos for briefing (proposals converted to todos)
-  const initialTodos = state.proposals.filter((p) => 
-    p.storeId === selectedStoreId && 
-    (p.type === 'extra-prep' || p.type === 'prep-reorder')
-  );
 
-  // Briefing modal handlers
-  const handleDistributeTodos = (todos: Proposal[], mode: OperationMode) => {
-    setOperationMode(mode);
-    // Distribute todos by approving each one
-    for (const todo of todos) {
-      actions.approveProposal(todo);
+  // Sales CTA logic
+  const salesGap = metrics.salesActual - metrics.salesForecast;
+  const salesGapPercent = metrics.salesForecast > 0 
+    ? ((metrics.salesActual - metrics.salesForecast) / metrics.salesForecast) * 100 
+    : 0;
+  const isBehindTarget = salesGapPercent < -5;
+  
+  // Labor guardrail status
+  const laborStatus = laborGuardrail.status;
+  const laborStatusColor = laborStatus === 'green' ? 'emerald' : laborStatus === 'yellow' ? 'amber' : 'red';
+
+  // Get incentive CTA message
+  const getIncentiveCTA = () => {
+    if (incentivePool.locked) {
+      return { message: t('cockpit.incentive.locked'), type: 'warning' as const };
     }
-    setBriefingOpen(false);
+    if (incentivePool.currentPool > 0) {
+      return { message: t('cockpit.incentive.available'), type: 'success' as const };
+    }
+    return { message: t('cockpit.incentive.empty'), type: 'neutral' as const };
   };
+  const incentiveCTA = getIncentiveCTA();
 
-  // Now we can have early returns after all hooks
   if (!currentStore) {
-    return (
-<div className="flex items-center justify-center h-64">
-        <p className="text-muted-foreground">{t('common.loading')}</p>
-      </div>
-    );
+    return <div className="p-4">Loading...</div>;
   }
-
-  const shortName = currentStore.name.replace('Aburi TORA 熟成鮨と炙り鮨 ', '');
 
   return (
     <div className="space-y-6">
-      {/* OS Header with Ask OS button */}
-      <OSHeader
-        title={t('cockpit.title')}
-        timeBand={timeBand}
-        onTimeBandChange={setTimeBand}
-        showTimeBandTabs={false}
-      />
+      <OSHeader storeName={currentStore.name} lastUpdate={busUpdateTime} />
       
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          <PageHeader title={t('cockpit.title')} subtitle={shortName} />
-          <Button
-            onClick={() => setBriefingOpen(true)}
-            variant="outline"
-            size="sm"
-            className="gap-2 bg-transparent"
-          >
-            <Target className="h-4 w-4" />
-            {t('briefing.button')}
-          </Button>
-        </div>
+      <div className="flex items-center gap-4 flex-wrap">
         <TimeBandTabs value={timeBand} onChange={setTimeBand} />
+        <Button 
+          variant="outline" 
+          size="sm"
+          onClick={() => setBriefingOpen(true)}
+          className="ml-auto"
+        >
+          Today Briefing
+        </Button>
       </div>
-      
-      {/* Today's Briefing Modal */}
-      <TodayBriefingModal
-        open={briefingOpen}
-        onOpenChange={setBriefingOpen}
-        forecastSales={salesForecast}
-        timeBandForecasts={timeBandForecasts}
-        shiftSummary={shiftSummary}
-        guardrailSummary={guardrailSummary}
-        prepMetrics={prepMetrics}
-        initialTodos={initialTodos}
-        onDistributeTodos={handleDistributeTodos}
-        onClose={() => setBriefingOpen(false)}
-      />
+
+      {/* Hero Metrics Row */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Sales Card - Enhanced with landing estimate */}
+        <Card className={cn(
+          isBehindTarget && 'border-red-200 bg-red-50/50'
+        )}>
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <DollarSign className="h-4 w-4" />
+                {t('cockpit.sales.title')}
+              </CardTitle>
+              <FreshnessBadge lastUpdate={metrics.lastSalesUpdate} compact />
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <div className="flex items-baseline gap-2">
+              <span className="text-2xl font-bold tabular-nums">
+                {formatCurrency(metrics.salesActual, locale)}
+              </span>
+              <span className="text-sm text-muted-foreground">
+                / {formatCurrency(metrics.salesForecast, locale)}
+              </span>
+            </div>
+            <div className={cn(
+              'flex items-center gap-1 text-sm',
+              salesGapPercent >= 0 ? 'text-emerald-700' : 'text-red-700'
+            )}>
+              {salesGapPercent >= 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+              {formatCurrencyDiff(salesGap, locale)} ({salesGapPercent >= 0 ? '+' : ''}{salesGapPercent.toFixed(1)}%)
+            </div>
+            {/* Landing Estimate */}
+            <div className="pt-2 border-t border-border space-y-1">
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Landing Est.</span>
+                <span className="font-medium tabular-nums">
+                  ¥{landingEstimate.min.toLocaleString()}〜¥{landingEstimate.max.toLocaleString()}
+                </span>
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {landingEstimate.explanation}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Labor Card - with guardrail status */}
+        <Card className={cn(
+          laborStatus === 'red' && 'border-red-200 bg-red-50/50',
+          laborStatus === 'yellow' && 'border-amber-200 bg-amber-50/50'
+        )}>
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                {t('cockpit.labor.title')}
+              </CardTitle>
+              <Badge variant={laborStatus === 'green' ? 'default' : laborStatus === 'yellow' ? 'secondary' : 'destructive'}>
+                {laborStatus.toUpperCase()}
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <div className="flex items-baseline gap-2">
+              <span className="text-2xl font-bold tabular-nums">
+                {formatPercent(laborMetrics.laborCostPercent, locale)}
+              </span>
+              <span className="text-sm text-muted-foreground">
+                / {formatPercent(laborMetrics.laborCostTarget, locale)} target
+              </span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Hours</span>
+              <span className="font-medium">{formatHours(laborMetrics.totalHours, locale)} / {formatHours(laborMetrics.plannedHours, locale)}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Productivity</span>
+              <span className="font-medium">{formatCurrency(laborMetrics.salesPerHour, locale)}/h</span>
+            </div>
+            {laborGuardrail.alerts.length > 0 && (
+              <div className="pt-2 border-t border-border">
+                <div className={cn('text-xs', `text-${laborStatusColor}-700`)}>
+                  {laborGuardrail.alerts[0]}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Prep Status */}
+        <Card className={cn(
+          prepMetrics.completionRate < 70 && 'border-amber-200 bg-amber-50/50'
+        )}>
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Package className="h-4 w-4" />
+                {t('cockpit.prep.title')}
+              </CardTitle>
+              <FreshnessBadge lastUpdate={prepMetrics.lastUpdate} compact />
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <div className="flex items-baseline gap-2">
+              <span className="text-2xl font-bold tabular-nums">
+                {formatPercent(prepMetrics.completionRate, locale)}
+              </span>
+              <span className="text-sm text-muted-foreground">complete</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Items</span>
+              <span className="font-medium">{prepMetrics.completed} / {prepMetrics.total}</span>
+            </div>
+            {prepMetrics.critical > 0 && (
+              <div className="flex items-center gap-1 text-sm text-red-700">
+                <AlertTriangle className="h-4 w-4" />
+                {prepMetrics.critical} critical items behind
+              </div>
+            )}
+            <Link href={`/stores/${currentStore.id}/os/prep-monitor`}>
+              <Button variant="ghost" size="sm" className="w-full mt-2 gap-2 text-xs">
+                <ExternalLink className="h-3 w-3" />
+                View Prep Monitor
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+
+        {/* Incentive Pool */}
+        <Card className={cn(
+          incentivePool.locked && 'border-amber-200 bg-amber-50/50'
+        )}>
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Gift className="h-4 w-4" />
+                {t('cockpit.incentive.title')}
+              </CardTitle>
+              {incentivePool.locked && (
+                <Badge variant="secondary">Locked</Badge>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <div className="flex items-baseline gap-2">
+              <span className="text-2xl font-bold tabular-nums">
+                {formatCurrency(incentivePool.currentPool, locale)}
+              </span>
+              <span className="text-sm text-muted-foreground">pool</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Distributed</span>
+              <span className="font-medium">{formatCurrency(incentivePool.distributed, locale)}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Eligible</span>
+              <span className="font-medium">{incentiveDistribution.eligibleCount} staff</span>
+            </div>
+            <div className={cn(
+              'text-xs pt-2 border-t border-border',
+              incentiveCTA.type === 'success' && 'text-emerald-700',
+              incentiveCTA.type === 'warning' && 'text-amber-700'
+            )}>
+              {incentiveCTA.message}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Shift Summary + Team Score Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <DynamicShiftSummary />
+        <TeamScoreCard />
+        
+        {/* Incidents Card */}
+        <Card className={cn(
+          criticalIncidents.length > 0 ? 'border-red-200 bg-red-50/50' :
+          openIncidents.length > 0 ? 'border-amber-200 bg-amber-50/50' : ''
+        )}>
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4" />
+                {t('cockpit.incidents.title')}
+              </CardTitle>
+              <Badge variant={criticalIncidents.length > 0 ? 'destructive' : openIncidents.length > 0 ? 'secondary' : 'default'}>
+                {openIncidents.length} Open
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {openIncidents.length === 0 ? (
+              <div className="text-sm text-muted-foreground text-center py-4">
+                {t('cockpit.incidents.none')}
+              </div>
+            ) : (
+              <>
+                {criticalIncidents.length > 0 && (
+                  <div className="space-y-1">
+                    <div className="text-xs font-bold text-red-700">CRITICAL</div>
+                    {criticalIncidents.slice(0, 2).map((incident) => (
+                      <div key={incident.id} className="text-sm text-red-700 flex items-center gap-1">
+                        <AlertTriangle className="h-3 w-3 shrink-0" />
+                        {incident.title}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {openIncidents.filter(i => i.severity !== 'critical').length > 0 && (
+                  <div className="space-y-1">
+                    <div className="text-xs font-bold text-amber-700">OTHER</div>
+                    {openIncidents.filter(i => i.severity !== 'critical').slice(0, 2).map((incident) => (
+                      <div key={incident.id} className="text-sm flex items-center gap-1">
+                        <span className={cn('h-2 w-2 rounded-full shrink-0', 
+                          incident.severity === 'high' ? 'bg-red-500' :
+                          incident.severity === 'medium' ? 'bg-amber-500' : 'bg-blue-500'
+                        )} />
+                        {incident.title}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+            <Link href={`/stores/${currentStore.id}/os/incidents`}>
+              <Button variant="outline" size="sm" className="w-full mt-2 gap-2">
+                <ExternalLink className="h-3 w-3" />
+                {t('cockpit.incidents.viewAll')}
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Exceptions List */}
+      {exceptions.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-amber-600" />
+              {t('cockpit.exceptions.title')} ({exceptions.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {exceptions.slice(0, 5).map((exception, i) => (
+                <div key={i} className="flex items-center justify-between text-sm p-2 bg-muted/50 rounded">
+                  <div className="flex items-center gap-2">
+                    <Badge variant={exception.severity === 'high' ? 'destructive' : 'secondary'}>
+                      {exception.type}
+                    </Badge>
+                    <span>{exception.message}</span>
+                  </div>
+                  <span className="text-muted-foreground text-xs">{exception.time}</span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* ReplayControls - dev only */}
       {process.env.NODE_ENV === 'development' && <ReplayControls />}
-      
-      {/* Dev Data Controls - dev only */}
-      {process.env.NODE_ENV === 'development' && (
-        <Card className="border-dashed border-amber-400 bg-amber-50/50">
-          <CardContent className="py-2 px-4">
-            <div className="flex items-center gap-4 text-xs">
-              <span className="text-amber-600 font-medium">[DEV] Data Controls:</span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  actions.seedDemoData();
-                }}
-                className="h-7 text-xs"
-              >
-                Seed Demo Data
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  if (confirm('Reset all data? This cannot be undone.')) {
-                    actions.resetAllData();
-                  }
-                }}
-                className="h-7 text-xs text-red-600 hover:text-red-700"
-              >
-                Reset All Data
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
-      {/* Active Incidents Strip - Only shows when there are active incidents */}
-      {openIncidents.length > 0 && (
-        <Card className={cn(
-          'border',
-          criticalIncidents.length > 0 ? 'border-red-300 bg-red-50/50' : 'border-amber-300 bg-amber-50/50'
-        )}>
-          <CardContent className="py-3 px-4">
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-3 min-w-0">
-                <div className={cn(
-                  'p-2 rounded-full',
-                  criticalIncidents.length > 0 ? 'bg-red-100' : 'bg-amber-100'
-                )}>
-                  <Bell className={cn(
-                    'h-4 w-4',
-                    criticalIncidents.length > 0 ? 'text-red-600' : 'text-amber-600'
-                  )} />
-                </div>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium text-sm">
-                      {t('cockpit.activeIncidents')}
-                    </span>
-                    <Badge variant="outline" className={cn(
-                      'text-xs',
-                      criticalIncidents.length > 0 ? 'bg-red-100 text-red-800 border-red-200' : 'bg-amber-100 text-amber-800 border-amber-200'
-                    )}>
-                      {openIncidents.length}
-                    </Badge>
-                    {criticalIncidents.length > 0 && (
-                      <Badge variant="destructive" className="text-xs">
-                        {criticalIncidents.length} {t('cockpit.critical')}
-                      </Badge>
-                    )}
-                  </div>
-                  <div className="text-xs text-muted-foreground truncate mt-0.5">
-                    {openIncidents.slice(0, 2).map(i => i.title).join(' / ')}
-                  </div>
-                </div>
-              </div>
-              <Link href={`/stores/${currentStore?.id}/os/incidents?filter=open`}>
-                <Button variant="outline" size="sm" className="gap-2 whitespace-nowrap">
-                  {t('cockpit.viewIncidents')}
-                  <ExternalLink className="h-3 w-3" />
-                </Button>
-              </Link>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* KPI Cards - Focused on People + Quests + Sales/Labor */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {/* Sales Card */}
-        <MetricCard
-          title={t('cockpit.sales')}
-          value={formatCurrency(salesActual, locale)}
-          subValue={`${t('cockpit.forecast')} ${formatCurrency(salesForecast, locale)}`}
-          trend={salesDiff >= 0 ? 'up' : 'down'}
-          trendValue={formatCurrencyDiff(salesDiff, locale)}
-          icon={<TrendingUp className="h-4 w-4" />}
-          status={salesAchievementRate >= 100 ? 'success' : salesAchievementRate >= 80 ? 'default' : 'warning'}
-          lastUpdate={lastUpdateTime}
-        >
-          <div className="space-y-1">
-            <div className="text-xs text-muted-foreground truncate">
-              {t('cockpit.landing')}: {formatCurrency(landingMin, locale)} ~ {formatCurrency(landingMax, locale)}
-            </div>
-            <div className="text-[10px] text-muted-foreground/80 bg-muted/50 px-1.5 py-0.5 rounded truncate">
-              {landingExplanation}
-            </div>
-          </div>
-        </MetricCard>
-
-        {/* Labor Card - Simplified */}
-        <MetricCard
-          title={t('cockpit.labor')}
-          value={formatCurrency(laborCost, locale)}
-          subValue={`${t('cockpit.laborRate')} ${formatPercent(laborRate, locale)}`}
-          icon={<DollarSign className="h-4 w-4" />}
-          status={guardrailSummary.status === 'danger' ? 'error' : guardrailSummary.status === 'caution' ? 'warning' : 'success'}
-          lastUpdate={lastUpdateTime}
-        >
-          <div className="space-y-1.5 text-xs">
-            {/* Compact guardrail status */}
-            <div className="flex justify-between items-center">
-              <span className="text-muted-foreground">{t('cockpit.currentProjection')}</span>
-              <span className={cn(
-                'font-medium',
-                guardrailSummary.status === 'danger' ? 'text-red-600' : 
-                guardrailSummary.status === 'caution' ? 'text-yellow-600' : 'text-green-600'
-              )}>
-                {formatPercent(guardrailSummary.projectedLaborRateEOD * 100, locale)}
-              </span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-muted-foreground">{t('cockpit.deltaToGood')}</span>
-              <span className={cn(
-                'font-medium',
-                guardrailSummary.deltaToGood > 0 ? 'text-red-600' : 'text-green-600'
-              )}>
-                {guardrailSummary.deltaToGood > 0 ? '+' : ''}{(guardrailSummary.deltaToGood * 100).toFixed(1)}pt
-              </span>
-            </div>
-            {/* Hours and break */}
-            <div className="flex justify-between items-center pt-1 border-t">
-              <span className="text-muted-foreground">{t('shift.hours')}</span>
-              <span className={cn('font-medium', actualHours > plannedHours && 'text-red-600')}>
-                {formatHours(actualHours, locale)} / {formatHours(plannedHours, locale, 0)}
-              </span>
-            </div>
-            <div className="flex items-center gap-1 text-muted-foreground">
-              <Coffee className="h-3 w-3" />
-              <span>{t('cockpit.onBreak')} {breakCount}</span>
-            </div>
-          </div>
-        </MetricCard>
-
-        {/* Incentive Pool Card */}
-        <MetricCard
-          title={t('incentive.title')}
-          value={formatCurrency(incentivePool.pool, locale)}
-          subValue={`${t('incentive.overachievement')} ${formatCurrency(incentivePool.overAchievement, locale)}`}
-          icon={<Gift className="h-4 w-4" />}
-          status={incentivePool.pool > 0 ? 'success' : 'default'}
-          lastUpdate={lastUpdateTime}
-        >
-          <div className="space-y-1 text-xs">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">{t('incentive.targetSales')}</span>
-              <span className="font-medium">{formatCurrency(incentivePool.targetSales, locale)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">{t('incentive.projectedSales')}</span>
-              <span className="font-medium">{formatCurrency(incentivePool.salesForCalculation, locale)}</span>
-            </div>
-            <div className="flex justify-between pt-1 border-t border-muted">
-              <span className="text-muted-foreground">{t('incentive.poolShare')}</span>
-              <span className="font-medium">{(incentivePool.poolShare * 100).toFixed(0)}%</span>
-            </div>
-            {/* Payout per star */}
-            <div className="flex justify-between pt-1 border-t border-muted">
-              <span className="text-muted-foreground">{t('incentive.payoutPerStar')}</span>
-              <span className="font-medium text-emerald-700">
-                {incentiveDistribution.totalStars > 0 
-                  ? formatCurrency(incentivePool.pool / incentiveDistribution.totalStars, locale)
-                  : '-'}
-              </span>
-            </div>
-            <div className="text-muted-foreground text-[10px] pt-1">
-              {t('incentive.totalStarsOnDuty')}: {incentiveDistribution.totalStars}
-            </div>
-            {/* Downside note */}
-            <div className="pt-2 text-[10px] text-muted-foreground italic">
-              {t('incentive.downsideNote')}
-            </div>
-            <Link
-              href={`/stores/${currentStore?.id}/os/incentives`}
-              className="flex items-center justify-end gap-1 pt-1 text-primary hover:underline"
-            >
-              {t('incentive.viewDetails')}
-              <ExternalLink className="h-3 w-3" />
-            </Link>
-          </div>
-        </MetricCard>
-      </div>
-
-      {/* Staff Status + Team Score */}
-      <div className="grid gap-4 lg:grid-cols-2">
-        <DynamicShiftSummary />
-        <TeamScoreCard />
-      </div>
+      {/* Today Briefing Modal */}
+      <TodayBriefingModal 
+        open={briefingOpen} 
+        onOpenChange={setBriefingOpen}
+        mode={operationMode}
+        onModeChange={setOperationMode}
+      />
     </div>
   );
 }
