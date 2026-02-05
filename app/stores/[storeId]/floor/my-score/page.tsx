@@ -337,6 +337,27 @@ export default function MyScorePage() {
                     </div>
                     <span className="font-bold tabular-nums">{todayEarnings.questCountDone ?? 0}</span>
                   </div>
+                  {/* Star-based distribution transparency */}
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">{t('earnings.myStars')}</span>
+                    <div className="flex items-center gap-1">
+                      {[1, 2, 3].map((i) => (
+                        <Star
+                          key={i}
+                          className={cn(
+                            'h-4 w-4',
+                            i <= (myShare?.starLevel ?? 0)
+                              ? 'fill-amber-400 text-amber-400'
+                              : 'text-muted-foreground/30'
+                          )}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">{t('earnings.totalStarsOnDuty')}</span>
+                    <span className="font-medium tabular-nums">{incentiveDistribution.totalStars}</span>
+                  </div>
                   {myShare && (
                     <div className="flex items-center justify-between pt-1">
                       <span className="text-sm font-bold">{t('earnings.yourShare')}</span>

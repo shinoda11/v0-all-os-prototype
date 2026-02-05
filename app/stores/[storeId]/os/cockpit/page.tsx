@@ -28,7 +28,8 @@ import {
   selectTodoStats,
   selectTeamDailyScore,
   selectIncentivePool,
-} from '@/core/selectors';
+  selectIncentiveDistribution,
+  } from '@/core/selectors';
 import { deriveLaborGuardrailSummary } from '@/core/derive';
 import { TodayBriefingModal, type OperationMode } from '@/components/cockpit/TodayBriefingModal';
 import type { TimeBand, Proposal, Role, ExceptionItem } from '@/core/types';
@@ -540,6 +541,8 @@ export default function CockpitPage() {
   const shiftSummary = selectShiftSummary(state);
   const supplyDemandMetrics = selectSupplyDemandMetrics(state, undefined, timeBand);
   const incentivePool = selectIncentivePool(state);
+  const today = new Date().toISOString().split('T')[0];
+  const incentiveDistribution = selectIncentiveDistribution(state, today);
   const todoStats = selectTodoStats(state);
 
   // Calculate enhanced metrics - use bus update time for freshness
@@ -858,6 +861,22 @@ export default function CockpitPage() {
             <div className="flex justify-between pt-1 border-t border-muted">
               <span className="text-muted-foreground">{t('incentive.poolShare')}</span>
               <span className="font-medium">{(incentivePool.poolShare * 100).toFixed(0)}%</span>
+            </div>
+            {/* Payout per star */}
+            <div className="flex justify-between pt-1 border-t border-muted">
+              <span className="text-muted-foreground">{t('incentive.payoutPerStar')}</span>
+              <span className="font-medium text-emerald-700">
+                {incentiveDistribution.totalStars > 0 
+                  ? formatCurrency(incentivePool.pool / incentiveDistribution.totalStars, locale)
+                  : '-'}
+              </span>
+            </div>
+            <div className="text-muted-foreground text-[10px] pt-1">
+              {t('incentive.totalStarsOnDuty')}: {incentiveDistribution.totalStars}
+            </div>
+            {/* Downside note */}
+            <div className="pt-2 text-[10px] text-muted-foreground italic">
+              {t('incentive.downsideNote')}
             </div>
             <Link
               href={`/stores/${currentStore?.id}/os/incentives`}

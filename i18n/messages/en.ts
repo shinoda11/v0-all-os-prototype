@@ -650,6 +650,8 @@ export const en = {
   'earnings.projectedTotal': 'Projected Total',
   'earnings.questsDone': 'Quests Done',
   'earnings.yourShare': 'Your Share',
+  'earnings.myStars': 'My Stars',
+  'earnings.totalStarsOnDuty': 'Total Stars on Duty',
   'earnings.starBasedDistribution': 'Distributed by star level',
   'earnings.estimated': 'Bonus is estimated until close',
   'earnings.notWorked': 'Not started yet',
@@ -902,6 +904,9 @@ export const en = {
   'incentive.topContributorsNote': 'Staff with higher star levels receive larger shares',
   'incentive.eligible': 'Eligible',
   'incentive.ineligible': 'Ineligible',
+  'incentive.payoutPerStar': 'Payout per Star',
+  'incentive.totalStarsOnDuty': 'Total Stars on Duty',
+  'incentive.downsideNote': 'If sales fall short, staff are not penalized',
   
   // My Score
   'myscore.title': 'My Score',

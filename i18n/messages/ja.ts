@@ -402,7 +402,7 @@ export const ja = {
   'ask.taskDelay.causeOverloaded': 'タスク量が多すぎる',
   'ask.taskDelay.causeNoBreak': '休憩が取れていない',
   'ask.taskDelay.causeTooManyWIP': '同時進行タスクが多い',
-  'ask.taskDelay.causeEstimation': '見積り���間が短すぎる',
+  'ask.taskDelay.causeEstimation': '見積り����間が短すぎる',
   'ask.taskDelay.proposalTitle': 'タスク優先度の見直し',
   'ask.taskDelay.proposalDesc': '遅延タスクの優先度を再検討し、WIPを削減する',
   'ask.labor.tasks': '���',
@@ -650,6 +650,8 @@ export const ja = {
   'earnings.projectedTotal': '見込合計',
   'earnings.questsDone': '完了クエスト',
   'earnings.yourShare': 'あなたのシェア',
+  'earnings.myStars': 'あなたのスター',
+  'earnings.totalStarsOnDuty': '出勤中の合計スター',
   'earnings.starBasedDistribution': 'スター数に基づいて配分',
   'earnings.estimated': 'ボーナスは閉店時まで推定値です',
   'earnings.notWorked': 'まだ出勤していません',
@@ -714,7 +716,7 @@ export const ja = {
   'teamPerformance.snapshot.noData': 'データなし',
   // Skill Mix Coverage
   'teamPerformance.skillMix.title': 'スキルミックス',
-  'teamPerformance.skillMix.starMix': '星ミッ����',
+  'teamPerformance.skillMix.starMix': '星ミ������',
   'teamPerformance.skillMix.roleMix': '役割構成',
   'teamPerformance.skillMix.peakCoverage': 'ピーク対応',
   'teamPerformance.skillMix.peakGood': '良好',
@@ -902,6 +904,9 @@ export const ja = {
   'incentive.topContributorsNote': 'スターレベルが高いスタッフがより多くのシェアを獲得します',
   'incentive.eligible': '対象者',
   'incentive.ineligible': '対象外',
+  'incentive.payoutPerStar': 'スター1つあたり',
+  'incentive.totalStarsOnDuty': '出勤中の合計スター',
+  'incentive.downsideNote': '売上未達の場合、スタッフへのペナルティはありません',
   
   // My Score
   'myscore.title': 'My Score',
