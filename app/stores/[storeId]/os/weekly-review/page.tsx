@@ -787,7 +787,7 @@ export default function WeeklyReviewPage() {
                 <CardTitle>{t('weeklyReview.hrProposals')}</CardTitle>
               </div>
               <Badge variant="outline">
-                {(laborMetrics.winningMix ? 1 : 0) + laborMetrics.weakTimeBands.length + laborMetrics.chronicDelayQuests.length}
+                {(laborMetrics.winningMix ? 1 : 0) + (laborMetrics.weakTimeBands?.length ?? 0) + (laborMetrics.chronicDelayQuests?.length ?? 0)}
               </Badge>
             </div>
           </CardHeader>
