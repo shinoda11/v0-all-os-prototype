@@ -24,11 +24,12 @@ import {
   selectPrepMetrics,
   selectLaborMetrics,
   selectShiftSummary,
-  selectSupplyDemandMetrics,
   selectTodoStats,
   selectTeamDailyScore,
   selectIncentivePool,
   selectIncentiveDistribution,
+  selectOpenIncidents,
+  selectCriticalIncidents,
   } from '@/core/selectors';
 import { deriveLaborGuardrailSummary } from '@/core/derive';
 import { TodayBriefingModal, type OperationMode } from '@/components/cockpit/TodayBriefingModal';
@@ -53,6 +54,7 @@ import {
   Gift,
   ExternalLink,
   ClipboardList,
+  Bell,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -539,8 +541,11 @@ export default function CockpitPage() {
   const prepMetrics = selectPrepMetrics(state);
   const exceptions = selectExceptions(state);
   const shiftSummary = selectShiftSummary(state);
-  const supplyDemandMetrics = selectSupplyDemandMetrics(state, undefined, timeBand);
   const incentivePool = selectIncentivePool(state);
+  
+  // Active incidents for strip
+  const openIncidents = selectOpenIncidents(state);
+  const criticalIncidents = selectCriticalIncidents(state);
   const today = new Date().toISOString().split('T')[0];
   const incentiveDistribution = selectIncentiveDistribution(state, today);
   const todoStats = selectTodoStats(state);
@@ -589,19 +594,10 @@ export default function CockpitPage() {
     actualLaborCostSoFar: laborCost,
   });
   
-  // Supply/Demand (dynamic) - details shown in Incidents
-  const stockoutRisk = supplyDemandMetrics?.stockoutRiskCount ?? 0;
-  const excessRisk = supplyDemandMetrics?.excessRiskCount ?? 0;
-  const supplyDemandStatus = supplyDemandMetrics?.status ?? 'normal';
-  
   // Operations
   const delayedCount = prepMetrics?.plannedCount ?? 0;
   const completionRate = prepMetrics?.completionRate ?? 0;
   const bottleneck = delayedCount > 0 ? { task: '仕込み', reason: `${delayedCount}件未着手` } : null;
-  
-  // Exceptions - details shown in Incidents
-  const criticalCount = exceptions.filter((e: ExceptionItem) => e.severity === 'critical').length;
-  const warningCount = exceptions.filter((e: ExceptionItem) => e.severity === 'warning').length;
   
   // Time band forecasts for briefing modal
   const timeBandForecasts = [
@@ -680,8 +676,59 @@ export default function CockpitPage() {
       {/* ReplayControls - dev only */}
       {process.env.NODE_ENV === 'development' && <ReplayControls />}
 
-      {/* KPI Cards - Decision Focused */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      {/* Active Incidents Strip - Only shows when there are active incidents */}
+      {openIncidents.length > 0 && (
+        <Card className={cn(
+          'border',
+          criticalIncidents.length > 0 ? 'border-red-300 bg-red-50/50' : 'border-amber-300 bg-amber-50/50'
+        )}>
+          <CardContent className="py-3 px-4">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className={cn(
+                  'p-2 rounded-full',
+                  criticalIncidents.length > 0 ? 'bg-red-100' : 'bg-amber-100'
+                )}>
+                  <Bell className={cn(
+                    'h-4 w-4',
+                    criticalIncidents.length > 0 ? 'text-red-600' : 'text-amber-600'
+                  )} />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-sm">
+                      {t('cockpit.activeIncidents')}
+                    </span>
+                    <Badge variant="outline" className={cn(
+                      'text-xs',
+                      criticalIncidents.length > 0 ? 'bg-red-100 text-red-800 border-red-200' : 'bg-amber-100 text-amber-800 border-amber-200'
+                    )}>
+                      {openIncidents.length}
+                    </Badge>
+                    {criticalIncidents.length > 0 && (
+                      <Badge variant="destructive" className="text-xs">
+                        {criticalIncidents.length} {t('cockpit.critical')}
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="text-xs text-muted-foreground truncate mt-0.5">
+                    {openIncidents.slice(0, 2).map(i => i.title).join(' / ')}
+                  </div>
+                </div>
+              </div>
+              <Link href={`/stores/${currentStore?.id}/os/incidents?filter=open`}>
+                <Button variant="outline" size="sm" className="gap-2 whitespace-nowrap">
+                  {t('cockpit.viewIncidents')}
+                  <ExternalLink className="h-3 w-3" />
+                </Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* KPI Cards - Focused on People + Quests + Sales/Labor */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {/* Sales Card */}
         <MetricCard
           title={t('cockpit.sales')}
@@ -703,7 +750,7 @@ export default function CockpitPage() {
           </div>
         </MetricCard>
 
-        {/* Labor Card - Cost Focused with Guardrail */}
+        {/* Labor Card - Simplified */}
         <MetricCard
           title={t('cockpit.labor')}
           value={formatCurrency(laborCost, locale)}
@@ -712,132 +759,39 @@ export default function CockpitPage() {
           status={guardrailSummary.status === 'danger' ? 'error' : guardrailSummary.status === 'caution' ? 'warning' : 'success'}
           lastUpdate={lastUpdateTime}
         >
-          <div className="space-y-2 text-xs">
-            {/* Guardrail Summary */}
-            <div className="bg-muted/50 rounded-md p-2 space-y-1.5">
-              <div className="flex items-center justify-between text-[10px] font-medium text-muted-foreground">
-                <span>{t('cockpit.guardrail')}</span>
-                <Badge variant="outline" className="text-[9px] px-1">
-                  {dayType === 'weekend' ? t('cockpit.weekend') : t('cockpit.weekday')}
-                </Badge>
-              </div>
-              {/* Good scenario */}
-              <div className="flex justify-between items-center">
-                <span className="text-green-600">{t('cockpit.goodScenario')}</span>
-                <span className="text-green-600 font-medium">
-                  {formatCurrency(guardrailSummary.goodRateSales, locale)} @ {formatPercent(guardrailSummary.selectedBracket.goodRate * 100, locale)}
-                </span>
-              </div>
-              {/* Bad scenario */}
-              <div className="flex justify-between items-center">
-                <span className="text-red-600">{t('cockpit.badScenario')}</span>
-                <span className="text-red-600 font-medium">
-                  {formatCurrency(guardrailSummary.badRateSales, locale)} @ {formatPercent(guardrailSummary.selectedBracket.badRate * 100, locale)}
-                </span>
-              </div>
-              {/* Current projection */}
-              <div className="flex justify-between items-center border-t border-muted pt-1.5">
-                <span className="font-medium">{t('cockpit.currentProjection')}</span>
-                <span className={cn(
-                  'font-medium',
-                  guardrailSummary.status === 'danger' ? 'text-red-600' : 
-                  guardrailSummary.status === 'caution' ? 'text-yellow-600' : 'text-green-600'
-                )}>
-                  {formatCurrency(runRateSalesDaily, locale)} @ {formatPercent(guardrailSummary.projectedLaborRateEOD * 100, locale)}
-                </span>
-              </div>
-              {/* Delta to good */}
-              <div className="flex justify-between items-center">
-                <span className="text-muted-foreground">{t('cockpit.deltaToGood')}</span>
-                <span className={cn(
-                  'font-medium',
-                  guardrailSummary.deltaToGood > 0 ? 'text-red-600' : 'text-green-600'
-                )}>
-                  {guardrailSummary.deltaToGood > 0 ? '+' : ''}{(guardrailSummary.deltaToGood * 100).toFixed(1)}pt
-                </span>
-              </div>
+          <div className="space-y-1.5 text-xs">
+            {/* Compact guardrail status */}
+            <div className="flex justify-between items-center">
+              <span className="text-muted-foreground">{t('cockpit.currentProjection')}</span>
+              <span className={cn(
+                'font-medium',
+                guardrailSummary.status === 'danger' ? 'text-red-600' : 
+                guardrailSummary.status === 'caution' ? 'text-yellow-600' : 'text-green-600'
+              )}>
+                {formatPercent(guardrailSummary.projectedLaborRateEOD * 100, locale)}
+              </span>
             </div>
-            
-            {/* Hours and break info */}
-            <div className="space-y-1 text-muted-foreground">
-              <div className="flex justify-between">
-                <span>{t('shift.hours')}</span>
-                <span className={cn('font-medium', actualHours > plannedHours && 'text-red-600')}>
-                  {formatHours(actualHours, locale)} / {formatHours(plannedHours, locale, 0)}
-                </span>
-              </div>
-              <div className="flex items-center gap-1">
-                <Coffee className="h-3 w-3" />
-                <span>{t('cockpit.onBreak')} {breakCount}</span>
-              </div>
+            <div className="flex justify-between items-center">
+              <span className="text-muted-foreground">{t('cockpit.deltaToGood')}</span>
+              <span className={cn(
+                'font-medium',
+                guardrailSummary.deltaToGood > 0 ? 'text-red-600' : 'text-green-600'
+              )}>
+                {guardrailSummary.deltaToGood > 0 ? '+' : ''}{(guardrailSummary.deltaToGood * 100).toFixed(1)}pt
+              </span>
+            </div>
+            {/* Hours and break */}
+            <div className="flex justify-between items-center pt-1 border-t">
+              <span className="text-muted-foreground">{t('shift.hours')}</span>
+              <span className={cn('font-medium', actualHours > plannedHours && 'text-red-600')}>
+                {formatHours(actualHours, locale)} / {formatHours(plannedHours, locale, 0)}
+              </span>
+            </div>
+            <div className="flex items-center gap-1 text-muted-foreground">
+              <Coffee className="h-3 w-3" />
+              <span>{t('cockpit.onBreak')} {breakCount}</span>
             </div>
           </div>
-        </MetricCard>
-
-        {/* Supply/Demand Card - Summary Only (Details in Incidents) */}
-        <MetricCard
-          title={t('cockpit.supplyDemand')}
-          value={
-            supplyDemandStatus === 'danger' ? t('cockpit.danger') :
-            supplyDemandStatus === 'caution' ? t('cockpit.caution') : t('cockpit.normal')
-          }
-          subValue={
-            stockoutRisk > 0 || excessRisk > 0 
-              ? `${stockoutRisk + excessRisk}${t('cockpit.itemsAtRisk')}`
-              : undefined
-          }
-          icon={<Package className="h-4 w-4" />}
-          status={
-            supplyDemandStatus === 'danger' ? 'error' :
-            supplyDemandStatus === 'caution' ? 'warning' : 'success'
-          }
-          lastUpdate={supplyDemandMetrics?.lastUpdate ?? lastUpdateTime}
-        >
-          {(stockoutRisk > 0 || excessRisk > 0) && (
-            <Link 
-              href={`/stores/${currentStore?.id}/os/incidents?filter=open`}
-              className="text-xs text-primary hover:underline flex items-center gap-1"
-            >
-              {t('cockpit.viewInIncidents')}
-              <ExternalLink className="h-3 w-3" />
-            </Link>
-          )}
-        </MetricCard>
-
-        {/* Operations Card */}
-        <MetricCard
-          title={t('cockpit.operations')}
-          value={`${t('cockpit.prepCompleted')} ${completionRate.toFixed(0)}%`}
-          subValue={delayedCount > 0 ? `${t('todo.pending')} ${delayedCount}` : t('cockpit.normal')}
-          icon={<Clock className="h-4 w-4" />}
-          status={completionRate >= 80 ? 'success' : completionRate >= 50 ? 'warning' : 'error'}
-          lastUpdate={lastUpdateTime}
-        >
-          {bottleneck && (
-            <div className="text-xs text-red-600">
-              ボトルネック: {bottleneck.task} ({bottleneck.reason})
-            </div>
-          )}
-        </MetricCard>
-
-        {/* Exceptions Card - Summary Only (Details in Incidents) */}
-        <MetricCard
-          title={t('cockpit.exceptions')}
-          value={criticalCount > 0 ? `${t('cockpit.danger')} ${criticalCount}` : warningCount > 0 ? `${t('cockpit.caution')} ${warningCount}` : t('cockpit.normal')}
-          subValue={criticalCount > 0 && warningCount > 0 ? `+ ${t('cockpit.caution')} ${warningCount}` : undefined}
-          icon={<AlertTriangle className="h-4 w-4" />}
-          status={criticalCount > 0 ? 'error' : warningCount > 0 ? 'warning' : 'success'}
-          lastUpdate={lastUpdateTime}
-        >
-          {(criticalCount > 0 || warningCount > 0) && (
-            <Link 
-              href={`/stores/${currentStore?.id}/os/incidents?filter=open`}
-              className="text-xs text-primary hover:underline flex items-center gap-1"
-            >
-              {t('cockpit.viewInIncidents')}
-              <ExternalLink className="h-3 w-3" />
-            </Link>
-          )}
         </MetricCard>
 
         {/* Incentive Pool Card */}

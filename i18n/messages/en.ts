@@ -86,6 +86,9 @@ export const en = {
   'cockpit.itemsAtRisk': ' items at risk',
   'cockpit.viewInIncidents': 'View in Incidents',
   'cockpit.openOpsMonitor': 'Open Ops Monitor',
+  'cockpit.activeIncidents': 'Active Incidents',
+  'cockpit.viewIncidents': 'View Incidents',
+  'cockpit.critical': 'Critical',
 
   // Shift Summary
   'shift.title': "Today's Shift Summary",
