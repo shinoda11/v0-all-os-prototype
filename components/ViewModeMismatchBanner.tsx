@@ -1,6 +1,5 @@
 'use client';
 
-// ViewModeMismatchBanner - Shows when viewing wrong mode page
 import { usePathname, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { useViewMode, getViewModeMismatch, type ViewMode } from '@/core/viewMode';
