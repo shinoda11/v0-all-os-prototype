@@ -29,7 +29,10 @@ import {
   selectCompletedTodos,
   selectCurrentStore,
 } from '@/core/selectors';
-import type { DecisionEvent, Staff } from '@/core/types';
+import type { DecisionEvent, Staff, BoxTemplate, TaskCard } from '@/core/types';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Progress } from '@/components/ui/progress';
+import { Package } from 'lucide-react';
 import {
   Clock,
   CheckCircle,
@@ -416,6 +419,184 @@ function ReassignModal({ quest, open, onOpenChange, staffList, onConfirm }: Reas
   );
 }
 
+// Box Performance Card
+interface BoxStatsProps {
+  box: BoxTemplate;
+  tasks: TaskCard[];
+  allQuests: DecisionEvent[];
+}
+
+function BoxStatsCard({ box, tasks, allQuests }: BoxStatsProps) {
+  const { t } = useI18n();
+  
+  // Find quests that might be related to this box's tasks
+  const boxTaskNames = tasks
+    .filter((task) => box.taskCardIds.includes(task.id))
+    .map((task) => task.name);
+  
+  // Match quests by task name (simplified matching)
+  const relatedQuests = allQuests.filter((q) => 
+    boxTaskNames.some((name) => q.title.includes(name) || q.description?.includes(name))
+  );
+  
+  const completedQuests = relatedQuests.filter((q) => q.action === 'completed');
+  const totalTasks = box.taskCardIds.length;
+  const completedCount = completedQuests.length;
+  const completionRate = totalTasks > 0 ? Math.round((completedCount / Math.max(totalTasks, relatedQuests.length)) * 100) : 0;
+  
+  // Delayed count
+  const delayedCount = completedQuests.filter((q) => {
+    if (!q.deadline || !q.completedAt) return false;
+    return new Date(q.completedAt) > new Date(q.deadline);
+  }).length;
+  
+  // Average duration
+  const durations = completedQuests
+    .filter((q) => q.actualMinutes !== undefined)
+    .map((q) => q.actualMinutes!);
+  const avgDuration = durations.length > 0 
+    ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length) 
+    : null;
+
+  return (
+    <Card className={cn('min-w-[200px]', !box.enabled && 'opacity-50')}>
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <Package className="h-4 w-4" />
+            {box.name}
+          </CardTitle>
+          <Badge variant="outline" className="text-xs">{box.timeBand}</Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="space-y-1">
+          <div className="flex justify-between text-xs">
+            <span className="text-muted-foreground">{t('opsMonitor.completionRate')}</span>
+            <span className="font-bold">{completionRate}%</span>
+          </div>
+          <Progress 
+            value={completionRate} 
+            className={cn(
+              'h-2',
+              completionRate >= 80 ? '[&>div]:bg-emerald-500' :
+              completionRate >= 50 ? '[&>div]:bg-amber-500' :
+              '[&>div]:bg-red-500'
+            )}
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-2 text-center text-xs">
+          <div>
+            <div className={cn('font-bold tabular-nums', delayedCount > 0 ? 'text-red-600' : 'text-emerald-600')}>
+              {delayedCount}
+            </div>
+            <div className="text-muted-foreground">{t('opsMonitor.delayed')}</div>
+          </div>
+          <div>
+            <div className="font-bold tabular-nums">
+              {avgDuration !== null ? `${avgDuration}m` : '-'}
+            </div>
+            <div className="text-muted-foreground">{t('opsMonitor.avgTime')}</div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// Staff Performance Table
+interface StaffPerformance {
+  staffId: string;
+  staffName: string;
+  starLevel: number;
+  completedCount: number;
+  avgMinutes: number | null;
+  qualityNgCount: number;
+  onTimeRate: number;
+}
+
+function StaffPerformanceTable({ 
+  staffPerformance 
+}: { 
+  staffPerformance: StaffPerformance[];
+}) {
+  const { t } = useI18n();
+
+  if (staffPerformance.length === 0) {
+    return (
+      <Card>
+        <CardContent className="py-8 text-center text-muted-foreground">
+          {t('opsMonitor.noStaffData')}
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>{t('opsMonitor.staff')}</TableHead>
+            <TableHead className="text-center">{t('opsMonitor.completed')}</TableHead>
+            <TableHead className="text-center">{t('opsMonitor.avgTime')}</TableHead>
+            <TableHead className="text-center">{t('opsMonitor.onTimeRate')}</TableHead>
+            <TableHead className="text-center">{t('opsMonitor.qualityNg')}</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {staffPerformance.map((perf) => (
+            <TableRow key={perf.staffId}>
+              <TableCell>
+                <div className="flex items-center gap-2">
+                  <span className="font-medium">{perf.staffName}</span>
+                  <span className="flex items-center gap-0.5">
+                    {[1, 2, 3].map((i) => (
+                      <Star
+                        key={i}
+                        className={cn(
+                          'h-3 w-3',
+                          i <= perf.starLevel ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/30'
+                        )}
+                      />
+                    ))}
+                  </span>
+                </div>
+              </TableCell>
+              <TableCell className="text-center tabular-nums font-medium">{perf.completedCount}</TableCell>
+              <TableCell className="text-center tabular-nums">
+                {perf.avgMinutes !== null ? `${perf.avgMinutes}m` : '-'}
+              </TableCell>
+              <TableCell className="text-center">
+                <Badge 
+                  variant="outline" 
+                  className={cn(
+                    'tabular-nums',
+                    perf.onTimeRate >= 90 ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                    perf.onTimeRate >= 70 ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                    'bg-red-50 text-red-700 border-red-200'
+                  )}
+                >
+                  {perf.onTimeRate}%
+                </Badge>
+              </TableCell>
+              <TableCell className="text-center">
+                {perf.qualityNgCount > 0 ? (
+                  <Badge variant="destructive" className="tabular-nums">
+                    {perf.qualityNgCount}
+                  </Badge>
+                ) : (
+                  <span className="text-emerald-600">-</span>
+                )}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </Card>
+  );
+}
+
 // Summary Card
 function SummaryCard({ 
   notStarted, 
@@ -489,6 +670,11 @@ export default function OpsMonitorPage() {
   // Get all quests
   const activeTodos = selectActiveTodos(state, undefined);
   const completedTodos = selectCompletedTodos(state);
+  const allQuests = useMemo(() => [...activeTodos, ...completedTodos], [activeTodos, completedTodos]);
+
+  // Box templates and tasks
+  const boxTemplates = state.boxTemplates || [];
+  const taskCards = state.taskCards || [];
 
   // Staff map for lookups
   const storeStaff = useMemo(() => 
@@ -499,6 +685,39 @@ export default function OpsMonitorPage() {
     new Map(storeStaff.map((s) => [s.id, s])),
     [storeStaff]
   );
+
+  // Calculate staff performance
+  const staffPerformance = useMemo<StaffPerformance[]>(() => {
+    return storeStaff.map((s) => {
+      const staffCompleted = completedTodos.filter((q) => q.assigneeId === s.id);
+      const durations = staffCompleted
+        .filter((q) => q.actualMinutes !== undefined)
+        .map((q) => q.actualMinutes!);
+      const avgMinutes = durations.length > 0 
+        ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length) 
+        : null;
+      
+      const qualityNgCount = staffCompleted.filter((q) => q.qualityStatus === 'ng').length;
+      
+      const onTimeCount = staffCompleted.filter((q) => {
+        if (!q.deadline || !q.completedAt) return true;
+        return new Date(q.completedAt) <= new Date(q.deadline);
+      }).length;
+      const onTimeRate = staffCompleted.length > 0 
+        ? Math.round((onTimeCount / staffCompleted.length) * 100) 
+        : 100;
+      
+      return {
+        staffId: s.id,
+        staffName: s.name,
+        starLevel: s.starLevel,
+        completedCount: staffCompleted.length,
+        avgMinutes,
+        qualityNgCount,
+        onTimeRate,
+      };
+    }).sort((a, b) => b.completedCount - a.completedCount);
+  }, [storeStaff, completedTodos]);
 
   // Categorize quests
   const notStartedQuests = useMemo(() => 
@@ -600,6 +819,35 @@ export default function OpsMonitorPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Box Performance */}
+      {boxTemplates.length > 0 && (
+        <div>
+          <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
+            <Package className="h-5 w-5" />
+            {t('opsMonitor.boxPerformance')}
+          </h2>
+          <div className="flex gap-4 overflow-x-auto pb-2">
+            {boxTemplates.filter((b) => b.enabled).map((box) => (
+              <BoxStatsCard
+                key={box.id}
+                box={box}
+                tasks={taskCards}
+                allQuests={allQuests}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Staff Performance */}
+      <div>
+        <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
+          <Users className="h-5 w-5" />
+          {t('opsMonitor.staffPerformance')}
+        </h2>
+        <StaffPerformanceTable staffPerformance={staffPerformance} />
+      </div>
 
       {/* 4-Column Kanban */}
       <div className="flex gap-4 overflow-x-auto pb-4">

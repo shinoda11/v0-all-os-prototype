@@ -663,6 +663,14 @@ export const en = {
   'opsMonitor.bottleneck.notStarted': 'Not Started',
   'opsMonitor.noBottlenecks': 'No bottlenecks detected',
   'opsMonitor.summary': 'Quest Summary',
+  'opsMonitor.boxPerformance': 'Box Performance',
+  'opsMonitor.staffPerformance': 'Staff Performance',
+  'opsMonitor.completionRate': 'Completion',
+  'opsMonitor.avgTime': 'Avg Time',
+  'opsMonitor.onTimeRate': 'On-Time',
+  'opsMonitor.qualityNg': 'Quality NG',
+  'opsMonitor.staff': 'Staff',
+  'opsMonitor.noStaffData': 'No staff data available',
   
   // Team Performance
   'teamPerformance.title': 'Team Performance',

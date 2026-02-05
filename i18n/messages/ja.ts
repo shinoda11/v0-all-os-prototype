@@ -401,7 +401,7 @@ export const ja = {
   'ask.completion.conclusionLow': '本日のチームスコアは{score}点、タ��ク完了率は{rate}%で改善が必要です。',
   'ask.completion.conclusionGood': '本日のチームスコアは{score}点、タスク完了率は{rate}%で順調です。',
   'ask.completion.teamScore': 'チームスコア',
-  'ask.completion.questCompletion': 'クエス���完���������率',
+  'ask.completion.questCompletion': 'クエ������完���������率',
   'ask.completion.taskScore': 'タスク得点',
   'ask.completion.timeScore': '時間得点',
   'ask.completion.bottlenecks': 'ボトルネック',
@@ -663,6 +663,14 @@ export const ja = {
   'opsMonitor.bottleneck.notStarted': '未着手',
   'opsMonitor.noBottlenecks': 'ボトルネックは検出されませんでした',
   'opsMonitor.summary': 'クエスト概況',
+  'opsMonitor.boxPerformance': 'ボックス別パフォーマンス',
+  'opsMonitor.staffPerformance': '個人別パフォーマンス',
+  'opsMonitor.completionRate': '完了率',
+  'opsMonitor.avgTime': '平均時間',
+  'opsMonitor.onTimeRate': '時間内率',
+  'opsMonitor.qualityNg': '品質NG',
+  'opsMonitor.staff': 'スタッフ',
+  'opsMonitor.noStaffData': 'スタッフデータがありません',
   
   // Team Performance
   'teamPerformance.title': 'Team Performance',
