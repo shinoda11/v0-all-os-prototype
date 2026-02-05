@@ -1,7 +1,6 @@
 'use client';
 
 import { usePathname, useRouter } from 'next/navigation';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { useViewMode, getViewModeMismatch, type ViewMode } from '@/core/viewMode';
 import { useStore } from '@/state/store';
@@ -43,24 +42,26 @@ export function ViewModeMismatchBanner() {
   const isStaffInManagerPage = mismatch === 'staff-in-manager-page';
 
   return (
-    <Alert variant="default" className="mb-4 border-amber-300 bg-amber-50">
-      <AlertTriangle className="h-4 w-4 text-amber-600" />
-      <AlertTitle className="text-amber-800">
-        {isStaffInManagerPage 
-          ? t('viewMode.staffInManagerPage') 
-          : t('viewMode.managerInStaffPage')}
-      </AlertTitle>
-      <AlertDescription className="flex items-center justify-between">
-        <span className="text-amber-700">
-          {isStaffInManagerPage 
-            ? t('viewMode.staffInManagerPageDesc') 
-            : t('viewMode.managerInStaffPageDesc')}
-        </span>
+    <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-4">
+      <div className="flex items-start gap-3">
+        <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+        <div className="flex-1 min-w-0">
+          <h4 className="font-medium text-amber-800">
+            {isStaffInManagerPage 
+              ? t('viewMode.staffInManagerPage') 
+              : t('viewMode.managerInStaffPage')}
+          </h4>
+          <p className="text-sm text-amber-700 mt-1">
+            {isStaffInManagerPage 
+              ? t('viewMode.staffInManagerPageDesc') 
+              : t('viewMode.managerInStaffPageDesc')}
+          </p>
+        </div>
         <Button 
           variant="outline" 
           size="sm" 
           onClick={handleSwitchMode}
-          className="ml-4 gap-2 border-amber-300 text-amber-800 hover:bg-amber-100"
+          className="gap-2 border-amber-300 text-amber-800 hover:bg-amber-100 flex-shrink-0"
         >
           {isStaffInManagerPage ? (
             <>
@@ -74,7 +75,7 @@ export function ViewModeMismatchBanner() {
             </>
           )}
         </Button>
-      </AlertDescription>
-    </Alert>
+      </div>
+    </div>
   );
 }
