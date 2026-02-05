@@ -55,7 +55,6 @@ import {
   ExternalLink,
   ClipboardList,
   Bell,
-  Play,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -253,23 +252,19 @@ function DynamicShiftSummary() {
               style={{ width: questTotal === 0 ? '0%' : `${questCompletionRate}%` }}
             />
           </div>
-          {/* CTA when no quests - link to Plan page */}
-          {questTotal === 0 ? (
-            <Link href={`/stores/${storeId}/os/plan`}>
-              <Button variant="default" size="sm" className="w-full mt-2 gap-2">
-                <Play className="h-4 w-4" />
-                {t('cockpit.generatePlan')}
-              </Button>
-            </Link>
-          ) : (
-            /* Open Ops Monitor button when quests exist */
-            <Link href={`/stores/${storeId}/os/ops-monitor`}>
-              <Button variant="outline" size="sm" className="w-full mt-2 gap-2">
-                <ClipboardList className="h-4 w-4" />
-                {t('cockpit.openOpsMonitor')}
-              </Button>
-            </Link>
+          {/* Bottleneck message when no quests */}
+          {questTotal === 0 && (
+            <div className="text-xs text-muted-foreground italic">
+              {t('cockpit.quest.noQuestsBottleneck')}
+            </div>
           )}
+          {/* Open Ops Monitor button */}
+          <Link href={`/stores/${storeId}/os/ops-monitor`}>
+            <Button variant="outline" size="sm" className="w-full mt-2 gap-2">
+              <ClipboardList className="h-4 w-4" />
+              {t('cockpit.openOpsMonitor')}
+            </Button>
+          </Link>
         </div>
       </CardContent>
     </Card>

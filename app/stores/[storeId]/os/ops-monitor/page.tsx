@@ -757,14 +757,25 @@ export default function OpsMonitorPage() {
 
   const totalQuests = notStartedQuests.length + inProgressQuests.length + delayedQuests.length + doneQuests.length;
 
-  // Handle reassign - uses the new assignQuest action
+  // Handle reassign
   const handleReassign = (questId: string, newAssigneeId: string) => {
-    actions.assignQuest(questId, newAssigneeId);
-  };
-  
-  // Demo: Simulate Peak Order
-  const handleSimulatePeakOrder = () => {
-    actions.createPeakQuest('Peak Order - Urgent');
+    const newStaff = staffMap.get(newAssigneeId);
+    if (!newStaff) return;
+    
+    // Find the quest and create an updated event
+    const quest = [...activeTodos, ...completedTodos].find((q) => q.id === questId);
+    if (!quest) return;
+    
+    // Create a new event with updated assignee
+    const updatedEvent: DecisionEvent = {
+      ...quest,
+      id: `${quest.proposalId}-reassigned-${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      assigneeId: newAssigneeId,
+      assigneeName: newStaff.name,
+    };
+    
+    actions.addEvent(updatedEvent);
   };
 
   if (!currentStore) {
@@ -773,21 +784,10 @@ export default function OpsMonitorPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <PageHeader
-          title={t('opsMonitor.title')}
-          subtitle={`${currentStore.name} - ${new Date().toLocaleDateString(locale === 'ja' ? 'ja-JP' : 'en-US', { month: 'long', day: 'numeric' })}`}
-        />
-        {/* Demo: Simulate Peak Order */}
-        <Button 
-          variant="outline" 
-          onClick={handleSimulatePeakOrder}
-          className="gap-2 border-amber-200 text-amber-600 hover:bg-amber-50"
-        >
-          <AlertTriangle className="h-4 w-4" />
-          {t('quests.simulatePeakOrder')}
-        </Button>
-      </div>
+      <PageHeader
+        title={t('opsMonitor.title')}
+        subtitle={`${currentStore.name} - ${new Date().toLocaleDateString(locale === 'ja' ? 'ja-JP' : 'en-US', { month: 'long', day: 'numeric' })}`}
+      />
 
       {/* Summary */}
       <SummaryCard

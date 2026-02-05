@@ -295,29 +295,6 @@ export const selectCompletedTodos = (state: AppState): DecisionEvent[] => {
   if (!storeId) return [];
   
   return deriveCompletedTodos(state.events, storeId);
-  };
-
-// Select quests assigned to a specific staff member
-export const selectQuestsByAssignee = (
-  state: AppState,
-  staffId: string | null
-): { active: DecisionEvent[]; completed: DecisionEvent[] } => {
-  const storeId = state.selectedStoreId;
-  if (!storeId) return { active: [], completed: [] };
-  
-  const activeTodos = deriveActiveTodos(state.events, storeId);
-  const completedTodos = deriveCompletedTodos(state.events, storeId);
-  
-  // Filter by assignee (or return all if staffId is null)
-  const filterByAssignee = (quests: DecisionEvent[]) => {
-    if (!staffId) return quests;
-    return quests.filter(q => q.assigneeId === staffId);
-  };
-  
-  return {
-    active: filterByAssignee(activeTodos),
-    completed: filterByAssignee(completedTodos),
-  };
 };
 
 // ------------------------------------------------------------

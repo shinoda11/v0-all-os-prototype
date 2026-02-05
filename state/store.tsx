@@ -6,7 +6,7 @@
 // ============================================================
 
 import React, { createContext, useContext, useReducer, useEffect, useCallback, useRef, useMemo } from 'react';
-import { AppState, AppAction, DomainEvent, DecisionEvent, Proposal, TimeBand, Incident, IncidentStatus, AgentId, EvidenceItem, Hypothesis, RecommendationDraft, TaskCard, TaskCategory, BoxTemplate } from '@/core/types';
+import { AppState, AppAction, DomainEvent, Proposal, TimeBand, Incident, IncidentStatus, AgentId, EvidenceItem, Hypothesis, RecommendationDraft, TaskCard, TaskCategory, BoxTemplate } from '@/core/types';
 import { appReducer, initialState } from './reducer';
 import { loadMockData, loadSampleEvents } from '@/data/mock';
 import { generateProposals } from '@/core/proposals';
@@ -89,13 +89,6 @@ interface StoreContextValue {
     // Data Management
     seedDemoData: () => void;
     resetAllData: () => void;
-    // Quest Actions (work directly with quest/event IDs)
-    startQuest: (questId: string, staffId?: string) => void;
-    pauseQuest: (questId: string, reason?: string) => void;
-    resumeQuest: (questId: string) => void;
-    completeQuest: (questId: string, data?: { actualMinutes?: number; qualityStatus?: 'ok' | 'ng'; qualityNote?: string }) => void;
-    assignQuest: (questId: string, staffId: string) => void;
-    createPeakQuest: (title: string, staffId?: string) => string;
   };
 }
 
@@ -691,140 +684,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const mockData = loadMockData();
       dispatch({ type: 'LOAD_INITIAL_DATA', data: mockData });
       publishStateUpdate('state:updated', 'data-reset', ['all']);
-    },
-    
-    // Quest Actions - work directly with event IDs
-    startQuest: (questId: string, staffId?: string) => {
-      const storeId = storeIdRef.current;
-      if (!storeId) return;
-      const state = stateRef.current;
-      
-      // Find the quest event
-      const questEvent = state.events.find(e => e.id === questId && e.type === 'decision') as DecisionEvent | undefined;
-      if (!questEvent) return;
-      
-      const startEvent: DomainEvent = {
-        ...questEvent,
-        id: `${questEvent.proposalId}-started-${Date.now()}`,
-        action: 'started',
-        timestamp: new Date().toISOString(),
-        startedAt: new Date().toISOString(),
-        assigneeId: staffId || questEvent.assigneeId,
-      };
-      dispatch({ type: 'ADD_EVENT', event: startEvent });
-      publishStateUpdate('decision:changed', 'started', ['decision', 'todo']);
-    },
-    
-    pauseQuest: (questId: string, reason?: string) => {
-      const storeId = storeIdRef.current;
-      if (!storeId) return;
-      const state = stateRef.current;
-      
-      const questEvent = state.events.find(e => e.id === questId && e.type === 'decision') as DecisionEvent | undefined;
-      if (!questEvent) return;
-      
-      const pauseEvent: DomainEvent = {
-        ...questEvent,
-        id: `${questEvent.proposalId}-paused-${Date.now()}`,
-        action: 'paused',
-        timestamp: new Date().toISOString(),
-        pausedAt: new Date().toISOString(),
-        pauseReason: reason,
-      };
-      dispatch({ type: 'ADD_EVENT', event: pauseEvent });
-      publishStateUpdate('decision:changed', 'paused', ['decision', 'todo']);
-    },
-    
-    resumeQuest: (questId: string) => {
-      const storeId = storeIdRef.current;
-      if (!storeId) return;
-      const state = stateRef.current;
-      
-      const questEvent = state.events.find(e => e.id === questId && e.type === 'decision') as DecisionEvent | undefined;
-      if (!questEvent) return;
-      
-      const resumeEvent: DomainEvent = {
-        ...questEvent,
-        id: `${questEvent.proposalId}-started-${Date.now()}`,
-        action: 'started',
-        timestamp: new Date().toISOString(),
-        startedAt: new Date().toISOString(),
-      };
-      dispatch({ type: 'ADD_EVENT', event: resumeEvent });
-      publishStateUpdate('decision:changed', 'started', ['decision', 'todo']);
-    },
-    
-    completeQuest: (questId: string, data?: { actualMinutes?: number; qualityStatus?: 'ok' | 'ng'; qualityNote?: string }) => {
-      const storeId = storeIdRef.current;
-      if (!storeId) return;
-      const state = stateRef.current;
-      
-      const questEvent = state.events.find(e => e.id === questId && e.type === 'decision') as DecisionEvent | undefined;
-      if (!questEvent) return;
-      
-      const completeEvent: DomainEvent = {
-        ...questEvent,
-        id: `${questEvent.proposalId}-completed-${Date.now()}`,
-        action: 'completed',
-        timestamp: new Date().toISOString(),
-        completedAt: new Date().toISOString(),
-        actualMinutes: data?.actualMinutes,
-        qualityStatus: data?.qualityStatus,
-        qualityNote: data?.qualityNote,
-      };
-      dispatch({ type: 'ADD_EVENT', event: completeEvent });
-      publishStateUpdate('decision:changed', 'completed', ['decision', 'todo', 'prep', 'cockpit-operations']);
-    },
-    
-    assignQuest: (questId: string, staffId: string) => {
-      const storeId = storeIdRef.current;
-      if (!storeId) return;
-      const state = stateRef.current;
-      
-      const questEvent = state.events.find(e => e.id === questId && e.type === 'decision') as DecisionEvent | undefined;
-      if (!questEvent) return;
-      
-      const staff = state.staff.find(s => s.id === staffId);
-      
-      const assignEvent: DomainEvent = {
-        ...questEvent,
-        id: `${questEvent.proposalId}-assigned-${Date.now()}`,
-        timestamp: new Date().toISOString(),
-        assigneeId: staffId,
-        assigneeName: staff?.name,
-      };
-      dispatch({ type: 'ADD_EVENT', event: assignEvent });
-      publishStateUpdate('decision:changed', 'assigned', ['decision', 'todo']);
-    },
-    
-    createPeakQuest: (title: string, staffId?: string) => {
-      const storeId = storeIdRef.current ?? '1';
-      const state = stateRef.current;
-      const now = new Date().toISOString();
-      const questId = `peak-${Date.now()}`;
-      
-      const staff = staffId ? state.staff.find(s => s.id === staffId) : null;
-      
-      const peakQuest: DomainEvent = {
-        id: questId,
-        type: 'decision',
-        storeId,
-        timestamp: now,
-        timeBand: 'lunch',
-        proposalId: questId,
-        action: 'pending',
-        title: title || 'Peak Order',
-        description: 'Urgent peak order - prioritize immediately',
-        distributedToRoles: ['kitchen', 'hall'],
-        priority: 'critical',
-        estimatedMinutes: 10,
-        source: 'peak',
-        assigneeId: staffId,
-        assigneeName: staff?.name,
-      };
-      dispatch({ type: 'ADD_EVENT', event: peakQuest });
-      publishStateUpdate('decision:changed', 'peak-quest-created', ['decision', 'todo']);
-      return questId;
     },
   }), []);
 
