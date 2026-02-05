@@ -26,6 +26,7 @@ import {
   Trophy,
   DollarSign,
   Layers,
+  CalendarCheck,
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -98,6 +99,11 @@ const kosSection: NavSection = {
       labelKey: 'nav.taskStudio',
       path: '/os/task-studio',
       icon: <Layers className="h-5 w-5" />,
+    },
+    {
+      labelKey: 'nav.planBuilder',
+      path: '/os/plan-builder',
+      icon: <CalendarCheck className="h-5 w-5" />,
     },
   ],
 };
