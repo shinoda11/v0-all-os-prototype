@@ -91,6 +91,18 @@ export const en = {
   'cockpit.activeIncidents': 'Active Incidents',
   'cockpit.viewIncidents': 'View Incidents',
   'cockpit.critical': 'Critical',
+  'cockpit.sales': 'Sales',
+  'cockpit.staff': 'Staff',
+  'cockpit.quests': 'Quests',
+  'cockpit.progress': 'Progress',
+  'cockpit.questProgress': 'Quest Progress',
+  'cockpit.questsCompleted': 'completed',
+  'cockpit.noQuests': 'No quests for today',
+  'cockpit.generatePlan': 'Generate Plan',
+  'cockpit.devTools': 'Dev Tools (Demo)',
+  'cockpit.seedDemoData': 'Seed Demo Data',
+  'cockpit.resetData': 'Reset Data',
+  'cockpit.confirmReset': 'Reset all data? This action cannot be undone.',
 
   // Shift Summary
   'shift.title': "Today's Shift Summary",
