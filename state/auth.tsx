@@ -5,9 +5,12 @@
 // Provides current user and role-based access control
 // ============================================================
 
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import type { CurrentUser, UserRole } from '@/core/types';
 import { hasRoleLevel } from '@/core/types';
+
+// Storage key for persisting mock user selection
+const MOCK_USER_STORAGE_KEY = 'all_os_mock_user_role';
 
 // ------------------------------------------------------------
 // Mock Users for Development
@@ -66,10 +69,29 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
   children, 
   defaultRole = 'manager' 
 }) => {
-  const [currentUser, setCurrentUser] = useState<CurrentUser>(MOCK_USERS[defaultRole]);
+  // Initialize from localStorage if available (client-side only)
+  const [currentUser, setCurrentUser] = useState<CurrentUser>(() => {
+    if (typeof window !== 'undefined') {
+      const savedRole = localStorage.getItem(MOCK_USER_STORAGE_KEY);
+      if (savedRole && MOCK_USERS[savedRole]) {
+        return MOCK_USERS[savedRole];
+      }
+    }
+    return MOCK_USERS[defaultRole];
+  });
+  
+  // Sync state with localStorage on mount (handles SSR hydration)
+  useEffect(() => {
+    const savedRole = localStorage.getItem(MOCK_USER_STORAGE_KEY);
+    if (savedRole && MOCK_USERS[savedRole] && MOCK_USERS[savedRole].id !== currentUser.id) {
+      setCurrentUser(MOCK_USERS[savedRole]);
+    }
+  }, []);
 
   const setMockUser = useCallback((role: UserRole) => {
     setCurrentUser(MOCK_USERS[role]);
+    // Persist to localStorage
+    localStorage.setItem(MOCK_USER_STORAGE_KEY, role);
   }, []);
 
   const hasRole = useCallback((requiredRole: UserRole) => {
