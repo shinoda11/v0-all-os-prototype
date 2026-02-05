@@ -10,8 +10,9 @@ import { useStore } from '@/state/store';
 import { useAuth } from '@/state/auth';
 import { selectCurrentStore } from '@/core/selectors';
 import { useI18n, useLocaleDateFormat } from '@/i18n/I18nProvider';
+import { useViewMode, type ViewMode } from '@/core/viewMode';
 import type { TimeBand } from '@/core/types';
-import { RefreshCw, Globe, MessageCircle, Users, Briefcase, ChevronDown } from 'lucide-react';
+import { RefreshCw, Globe, MessageCircle, Users, Briefcase, ChevronDown, Check } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -41,15 +42,15 @@ export function OSHeader({
   const pathname = usePathname();
   const router = useRouter();
   
-  // Determine current view from pathname
-  const isManagerView = pathname.includes('/os/');
-  const currentView = isManagerView ? 'manager' : 'staff';
+  // Use persistent view mode from localStorage
+  const [viewMode, setViewMode, viewModeLoaded] = useViewMode();
   
-  // Handle view switch
-  const handleViewSwitch = (view: 'manager' | 'staff') => {
+  // Handle view switch - update localStorage and navigate
+  const handleViewSwitch = (newMode: ViewMode) => {
     if (!currentStore) return;
+    setViewMode(newMode);
     const storeId = currentStore.id;
-    if (view === 'manager') {
+    if (newMode === 'manager') {
       router.push(`/stores/${storeId}/os/cockpit`);
     } else {
       router.push(`/stores/${storeId}/floor/todo`);
@@ -111,33 +112,35 @@ export function OSHeader({
           </div>
           
           {/* View Switcher - Only for Manager+ */}
-          {canSwitchView && (
+          {canSwitchView && viewModeLoaded && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="default" className="px-3 gap-2">
-                  {currentView === 'manager' ? (
+                  {viewMode === 'manager' ? (
                     <Briefcase className="h-4 w-4" />
                   ) : (
                     <Users className="h-4 w-4" />
                   )}
-                  <span>{t(currentView === 'manager' ? 'view.manager' : 'view.staff')}</span>
+                  <span>{t(viewMode === 'manager' ? 'view.manager' : 'view.staff')}</span>
                   <ChevronDown className="h-3 w-3 ml-1" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem 
                   onClick={() => handleViewSwitch('manager')}
-                  className={currentView === 'manager' ? 'bg-accent' : ''}
+                  className="gap-2"
                 >
-                  <Briefcase className="h-4 w-4 mr-2" />
+                  <Briefcase className="h-4 w-4" />
                   {t('view.manager')}
+                  {viewMode === 'manager' && <Check className="h-4 w-4 ml-auto" />}
                 </DropdownMenuItem>
                 <DropdownMenuItem 
                   onClick={() => handleViewSwitch('staff')}
-                  className={currentView === 'staff' ? 'bg-accent' : ''}
+                  className="gap-2"
                 >
-                  <Users className="h-4 w-4 mr-2" />
+                  <Users className="h-4 w-4" />
                   {t('view.staff')}
+                  {viewMode === 'staff' && <Check className="h-4 w-4 ml-auto" />}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

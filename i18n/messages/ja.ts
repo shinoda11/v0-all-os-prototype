@@ -35,8 +35,16 @@ export const ja = {
   
   // View Switcher
   'view.label': '表示',
-  'view.manager': '店長',
-  'view.staff': 'スタッフ',
+  'view.manager': '店長ビュー',
+  'view.staff': 'スタッフビュー',
+  
+  // View Mode Mismatch
+  'viewMode.staffInManagerPage': '店長向けページです',
+  'viewMode.staffInManagerPageDesc': 'このページは店長向けです。店長ビューに切り替えてください。',
+  'viewMode.managerInStaffPage': 'スタッフ向けページです',
+  'viewMode.managerInStaffPageDesc': 'このページはスタッフ向けです。スタッフビューに切り替えてください。',
+  'viewMode.switchToManager': '店長ビューへ',
+  'viewMode.switchToStaff': 'スタッフビューへ',
   
   // Error Pages
   'error.forbidden.title': 'アクセス権限がありません',
@@ -401,7 +409,7 @@ export const ja = {
   'ask.completion.conclusionLow': '本日のチームスコアは{score}点、タ��ク完了率は{rate}%で改善が必要です。',
   'ask.completion.conclusionGood': '本日のチームスコアは{score}点、タスク完了率は{rate}%で順調です。',
   'ask.completion.teamScore': 'チームスコア',
-  'ask.completion.questCompletion': 'クエ��������完���������率',
+  'ask.completion.questCompletion': 'クエ����������完���������率',
   'ask.completion.taskScore': 'タスク得点',
   'ask.completion.timeScore': '時間得点',
   'ask.completion.bottlenecks': 'ボトルネック',

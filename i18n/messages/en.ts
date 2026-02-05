@@ -35,8 +35,16 @@ export const en = {
   
   // View Switcher
   'view.label': 'View',
-  'view.manager': 'Manager',
-  'view.staff': 'Staff',
+  'view.manager': 'Manager View',
+  'view.staff': 'Staff View',
+  
+  // View Mode Mismatch
+  'viewMode.staffInManagerPage': 'This page is for managers',
+  'viewMode.staffInManagerPageDesc': 'This page is designed for managers. Switch to Manager View to continue.',
+  'viewMode.managerInStaffPage': 'This page is for staff',
+  'viewMode.managerInStaffPageDesc': 'This page is designed for staff. Switch to Staff View to continue.',
+  'viewMode.switchToManager': 'Switch to Manager View',
+  'viewMode.switchToStaff': 'Switch to Staff View',
   
   // Error Pages
   'error.forbidden.title': 'Access Denied',
