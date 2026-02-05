@@ -248,6 +248,21 @@ export const ja = {
   'timeclock.dataError': 'データ不整合',
   'timeclock.calculating': '計算中',
 
+  // Timeclock Summary (Manager view)
+  'timeclockSummary.title': '勤怠サマリー',
+  'timeclockSummary.onDuty': '出勤中',
+  'timeclockSummary.onBreak': '休憩中',
+  'timeclockSummary.total': '合計',
+  'timeclockSummary.actualHours': '稼働時間',
+  'timeclockSummary.planned': '予定',
+  'timeclockSummary.overtime': '残業',
+  'timeclockSummary.staffStatus': 'スタッフ状況',
+  'timeclockSummary.name': '名前',
+  'timeclockSummary.role': '役割',
+  'timeclockSummary.stars': 'レベル',
+  'timeclockSummary.status': 'ステータス',
+  'timeclockSummary.hoursWorked': '稼働時間',
+
   // Timeclock actions
   'action.checkIn': '出勤',
   'action.checkOut': '退勤',
@@ -578,6 +593,14 @@ export const ja = {
   'earnings.adHocNote': '{count}件のアドホッククエストがポイント対象外',
   'quests.completeModal.title': 'タスク完了',
   'quests.completeModal.actualTime': '実績時間（分）',
+  // Quest Actions
+  'quests.assignedTo': '担当',
+  'quests.iAm': '私は',
+  'quests.selectStaff': 'スタッフを選択',
+  'quests.peak': 'ピーク',
+  'quests.simulatePeakOrder': 'ピーク注文をシミュレート',
+  'quests.peakOrderTitle': 'ピーク注文',
+  'quests.allStaff': '全スタッフ',
   'quests.completeModal.quantity': '数量（任意）',
   'quests.completeModal.delayReason': '遅延理由（任意）',
   'quests.completeModal.qualityStatus': '品質チェック',

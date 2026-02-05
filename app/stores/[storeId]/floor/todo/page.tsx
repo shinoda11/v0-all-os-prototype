@@ -32,7 +32,7 @@ import {
   selectCompletedTodos,
   selectCurrentStore,
 } from '@/core/selectors';
-import { proposalFromDecision } from '@/core/commands';
+// Quest actions are now handled directly via useStore().actions
 import type { DecisionEvent, TimeBand } from '@/core/types';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Textarea } from '@/components/ui/textarea';
@@ -741,6 +741,14 @@ export default function TodayQuestsPage() {
   const [completingQuest, setCompletingQuest] = useState<DecisionEvent | null>(null);
   const [inProgressStartTime, setInProgressStartTime] = useState<string | null>(null);
   
+  // Staff selector - persisted in localStorage
+  const [selectedStaffId, setSelectedStaffId] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('all_os_current_staff_id') || null;
+    }
+    return null;
+  });
+  
   // Order interrupt state
   const [pendingOrderQuest, setPendingOrderQuest] = useState<DecisionEvent | null>(null);
   const [showOrderInterrupt, setShowOrderInterrupt] = useState(false);
@@ -750,33 +758,65 @@ export default function TodayQuestsPage() {
 
   // Subscribe to state updates
   useStateSubscription(['todo', 'decision', 'prep', 'order']);
+  
+  // Get staff list for the current store
+  const storeStaff = useMemo(() => 
+    state.staff.filter((s) => s.storeId === state.selectedStoreId),
+    [state.staff, state.selectedStoreId]
+  );
+  
+  // Handle staff selection change
+  const handleStaffChange = useCallback((staffId: string) => {
+    const newStaffId = staffId === 'all' ? null : staffId;
+    setSelectedStaffId(newStaffId);
+    if (typeof window !== 'undefined') {
+      if (newStaffId) {
+        localStorage.setItem('all_os_current_staff_id', newStaffId);
+      } else {
+        localStorage.removeItem('all_os_current_staff_id');
+      }
+    }
+  }, []);
+  
+  // Auto-select first staff if none selected
+  useEffect(() => {
+    if (!selectedStaffId && storeStaff.length > 0) {
+      handleStaffChange(storeStaff[0].id);
+    }
+  }, [selectedStaffId, storeStaff, handleStaffChange]);
 
-  // Get quests - filter by current user's assigned quests or role
+  // Get quests - filter by selected staff
   const allActiveTodos = selectActiveTodos(state, undefined);
   const allCompletedTodos = selectCompletedTodos(state);
   
-  // Find current user's staff record
-  const myStaff = state.staff.find((s) => 
-    s.storeId === state.selectedStoreId && s.id === `staff-${currentUser.id}`
-  ) ?? state.staff.find((s) => s.storeId === state.selectedStoreId);
+  // Find selected staff record
+  const myStaff = selectedStaffId 
+    ? state.staff.find((s) => s.id === selectedStaffId)
+    : state.staff.find((s) => s.storeId === state.selectedStoreId && s.id === `staff-${currentUser.id}`)
+      ?? state.staff.find((s) => s.storeId === state.selectedStoreId);
   const myRoleId = myStaff?.roleId;
   
-  // Filter to only show quests assigned to current user or their role
-  const activeTodos = useMemo(() => 
-    allActiveTodos.filter((quest) => 
-      quest.assigneeId === myStaff?.id || 
+  // Filter to only show quests assigned to selected staff or their role
+  const activeTodos = useMemo(() => {
+    if (!selectedStaffId) {
+      // Show all quests when no staff selected
+      return allActiveTodos;
+    }
+    return allActiveTodos.filter((quest) => 
+      quest.assigneeId === selectedStaffId || 
       (myRoleId && quest.distributedToRoles.includes(myRoleId))
-    ),
-    [allActiveTodos, myStaff?.id, myRoleId]
-  );
+    );
+  }, [allActiveTodos, selectedStaffId, myRoleId]);
   
-  const completedTodos = useMemo(() => 
-    allCompletedTodos.filter((quest) => 
-      quest.assigneeId === myStaff?.id || 
+  const completedTodos = useMemo(() => {
+    if (!selectedStaffId) {
+      return allCompletedTodos;
+    }
+    return allCompletedTodos.filter((quest) => 
+      quest.assigneeId === selectedStaffId || 
       (myRoleId && quest.distributedToRoles.includes(myRoleId))
-    ),
-    [allCompletedTodos, myStaff?.id, myRoleId]
-  );
+    );
+  }, [allCompletedTodos, selectedStaffId, myRoleId]);
 
   // Categorize quests - Order quests at the top
   const orderQuests = useMemo(() =>
@@ -830,18 +870,16 @@ export default function TodayQuestsPage() {
     
     // If there's a task in progress, pause it first
     if (currentInProgressQuest) {
-      const proposal = proposalFromDecision(currentInProgressQuest);
-      actions.pauseDecision(proposal);
+      actions.pauseQuest(currentInProgressQuest.id);
       setLastPausedQuest(currentInProgressQuest);
     }
     
-    // Start the order quest
-    const orderProposal = proposalFromDecision(pendingOrderQuest);
-    actions.startDecision(orderProposal);
+    // Start the order quest using the new quest action
+    actions.startQuest(pendingOrderQuest.id, selectedStaffId || undefined);
     
     setShowOrderInterrupt(false);
     setPendingOrderQuest(null);
-  }, [pendingOrderQuest, currentInProgressQuest, actions]);
+  }, [pendingOrderQuest, currentInProgressQuest, actions, selectedStaffId]);
 
   // Demo: Simulate POS order
   const handleSimulateOrder = () => {
@@ -865,8 +903,8 @@ export default function TodayQuestsPage() {
     // Single-task constraint: don't allow starting if another task is in progress
     if (hasTaskInProgress) return;
     
-    const proposal = proposalFromDecision(quest);
-    actions.startDecision(proposal);
+    // Use the new quest actions that work with event IDs
+    actions.startQuest(quest.id, selectedStaffId || undefined);
     
     if (quest.targetPrepItemIds && quest.targetPrepItemIds.length > 0) {
       actions.startPrep(quest.targetPrepItemIds[0], quest.quantity || 1, undefined, quest.proposalId);
@@ -874,16 +912,14 @@ export default function TodayQuestsPage() {
   };
 
   const handlePause = (quest: DecisionEvent) => {
-    const proposal = proposalFromDecision(quest);
-    actions.pauseDecision(proposal);
+    actions.pauseQuest(quest.id);
   };
 
   const handleResume = (quest: DecisionEvent) => {
     // Single-task constraint: don't allow resuming if another task is in progress
     if (hasTaskInProgress) return;
     
-    const proposal = proposalFromDecision(quest);
-    actions.resumeDecision(proposal);
+    actions.resumeQuest(quest.id);
   };
 
   const handleCompleteClick = (quest: DecisionEvent) => {
@@ -900,18 +936,12 @@ export default function TodayQuestsPage() {
   }) => {
     if (!completingQuest) return;
 
-    const completedEvent: DecisionEvent = {
-      ...completingQuest,
-      id: `${completingQuest.proposalId}-completed-${Date.now()}`,
-      action: 'completed',
-      timestamp: new Date().toISOString(),
-      actualQuantity: data.actualQuantity,
+    // Use the new quest complete action
+    actions.completeQuest(completingQuest.id, {
       actualMinutes: data.actualMinutes,
-      delayReason: data.delayReason,
       qualityStatus: data.qualityStatus,
       qualityNote: data.qualityNote,
-    };
-    actions.addEvent(completedEvent);
+    });
 
     if (completingQuest.targetPrepItemIds && completingQuest.targetPrepItemIds.length > 0) {
       actions.completePrep(
@@ -936,11 +966,16 @@ export default function TodayQuestsPage() {
   // Handle resume from prompt
   const handleResumeFromPrompt = () => {
     if (lastPausedQuest) {
-      const proposal = proposalFromDecision(lastPausedQuest);
-      actions.resumeDecision(proposal);
+      actions.resumeQuest(lastPausedQuest.id);
       setLastPausedQuest(null);
     }
     setShowResumePrompt(false);
+  };
+  
+  // Demo: Simulate Peak Order
+  const handleSimulatePeakOrder = () => {
+    const peakTitle = t('quests.peakOrderTitle');
+    actions.createPeakQuest(peakTitle, selectedStaffId || undefined);
   };
 
   const handleDismissResumePrompt = () => {
@@ -963,20 +998,63 @@ export default function TodayQuestsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <PageHeader
           title={t('quests.title')}
           subtitle={`${currentStore.name} - ${new Date().toLocaleDateString(locale === 'ja' ? 'ja-JP' : 'en-US', { month: 'long', day: 'numeric' })}`}
         />
-        {/* Demo: Simulate POS Order */}
-        <Button 
-          variant="outline" 
-          onClick={handleSimulateOrder}
-          className="gap-2 border-red-200 text-red-600 hover:bg-red-50"
-        >
-          <Bell className="h-4 w-4" />
-          {t('quests.simulateOrder')}
-        </Button>
+        <div className="flex items-center gap-3">
+          {/* Staff Selector */}
+          <div className="flex items-center gap-2">
+            <Label className="text-sm font-medium whitespace-nowrap">{t('quests.iAm')}:</Label>
+            <Select value={selectedStaffId || 'all'} onValueChange={handleStaffChange}>
+              <SelectTrigger className="w-[160px] h-10">
+                <SelectValue placeholder={t('quests.selectStaff')} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t('quests.allStaff')}</SelectItem>
+                {storeStaff.map((staff) => (
+                  <SelectItem key={staff.id} value={staff.id}>
+                    <div className="flex items-center gap-2">
+                      <span>{staff.name}</span>
+                      <span className="flex items-center gap-0.5">
+                        {[1, 2, 3].map((i) => (
+                          <Star
+                            key={i}
+                            className={cn(
+                              'h-3 w-3',
+                              i <= staff.starLevel ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/30'
+                            )}
+                          />
+                        ))}
+                      </span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          
+          {/* Demo: Simulate Peak Order */}
+          <Button 
+            variant="outline" 
+            onClick={handleSimulatePeakOrder}
+            className="gap-2 border-amber-200 text-amber-600 hover:bg-amber-50"
+          >
+            <Zap className="h-4 w-4" />
+            {t('quests.simulatePeakOrder')}
+          </Button>
+          
+          {/* Demo: Simulate POS Order */}
+          <Button 
+            variant="outline" 
+            onClick={handleSimulateOrder}
+            className="gap-2 border-red-200 text-red-600 hover:bg-red-50"
+          >
+            <Bell className="h-4 w-4" />
+            {t('quests.simulateOrder')}
+          </Button>
+        </div>
       </div>
 
       {/* Progress Summary */}
