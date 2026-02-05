@@ -252,10 +252,18 @@ function DynamicShiftSummary() {
               style={{ width: questTotal === 0 ? '0%' : `${questCompletionRate}%` }}
             />
           </div>
-          {/* Bottleneck message when no quests */}
+          {/* CTA when no quests - direct to Plan page */}
           {questTotal === 0 && (
-            <div className="text-xs text-muted-foreground italic">
-              {t('cockpit.quest.noQuestsBottleneck')}
+            <div className="text-center py-2">
+              <div className="text-xs text-muted-foreground mb-2">
+                {t('cockpit.quest.noQuestsBottleneck')}
+              </div>
+              <Link href={`/stores/${storeId}/os/plan`}>
+                <Button variant="default" size="sm" className="gap-2">
+                  <Play className="h-4 w-4" />
+                  {t('cockpit.generateTodayPlan')}
+                </Button>
+              </Link>
             </div>
           )}
           {/* Open Ops Monitor button */}

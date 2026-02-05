@@ -99,13 +99,13 @@ const kosSection: NavSection = {
       icon: <DollarSign className="h-5 w-5" />,
     },
     {
-      labelKey: 'nav.taskStudio',
-      path: '/os/task-studio',
+      labelKey: 'nav.taskCatalog',
+      path: '/os/task-catalog',
       icon: <Layers className="h-5 w-5" />,
     },
     {
-      labelKey: 'nav.planBuilder',
-      path: '/os/plan-builder',
+      labelKey: 'nav.plan',
+      path: '/os/plan',
       icon: <CalendarCheck className="h-5 w-5" />,
     },
     {
