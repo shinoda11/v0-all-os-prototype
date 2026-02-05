@@ -340,19 +340,19 @@ export default function MyScorePage() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <CheckCircle className="h-4 w-4 text-emerald-600" />
-                      <span className="text-sm">{t('earnings.pointsFromQuests')}</span>
+                      <span className="text-sm">{t('earnings.questsDone')}</span>
                     </div>
-                    <span className="font-bold tabular-nums">{todayEarnings.pointsFromQuests} pt</span>
-                  </div>
-                  <div className="flex items-center justify-between pt-1">
-                    <span className="text-sm font-bold">{t('earnings.totalPoints')}</span>
-                    <span className="font-bold tabular-nums text-blue-700">{todayEarnings.totalPoints ?? 0} pt</span>
+                    <span className="font-bold tabular-nums">{todayEarnings.questCountDone ?? 0}</span>
                   </div>
                   {myShare && (
-                    <div className="text-xs text-muted-foreground text-right">
-                      {t('earnings.sharePercent')}: {myShare.sharePercentage}%
+                    <div className="flex items-center justify-between pt-1">
+                      <span className="text-sm font-bold">{t('earnings.yourShare')}</span>
+                      <span className="font-bold tabular-nums text-blue-700">{myShare.sharePercentage}%</span>
                     </div>
                   )}
+                  <div className="text-xs text-muted-foreground text-right">
+                    {t('earnings.starBasedDistribution')}
+                  </div>
                 </div>
                 
                 {/* Projected Bonus */}
