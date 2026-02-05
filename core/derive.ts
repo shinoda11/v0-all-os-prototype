@@ -2857,15 +2857,12 @@ export interface TodayEarnings {
   // Base Pay
   hourlyWage: number;
   basePay: number | null;
-  // Quest XP
+  // Quest stats
   questsCompleted: number;
   questXP: number; // Only from eligible quests (excludes unapproved ad-hoc)
-  adHocQuestCount: number; // Count of unapproved ad-hoc quests (0 points)
+  questCountDone: number; // Total quests completed (for eligibility)
+  adHocQuestCount: number; // Count of unapproved ad-hoc quests
   qualityNgCount: number;
-  // Points
-  pointsFromHours: number | null;
-  pointsFromQuests: number;
-  totalPoints: number | null;
   // Status
   status: 'working' | 'checked-out' | 'not-tracked';
 }
@@ -3041,19 +3038,8 @@ export const deriveTodayEarnings = (
   // Quality NG count (applies to all quests, not just eligible ones)
   const qualityNgCount = completedQuests.filter(q => q.qualityStatus === 'ng').length;
   
-  // Calculate points
-  const { points } = INCENTIVE_POLICY;
-  const pointsFromHours = netHoursWorked !== null ? Math.round(netHoursWorked * points.perHour) : null;
-  const pointsFromQuests = questXP * points.perQuestXP;
-  
-  // Apply quality penalty if there are NG quests
-  let totalPoints: number | null = null;
-  if (pointsFromHours !== null) {
-    totalPoints = pointsFromHours + pointsFromQuests;
-    if (qualityNgCount > 0) {
-      totalPoints = Math.round(totalPoints * INCENTIVE_POLICY.qualityPenalty.ngMultiplier);
-    }
-  }
+  // Quest count done (for eligibility check in star-based distribution)
+  const questCountDone = completedQuests.length;
   
   return {
     staffId,
@@ -3066,11 +3052,9 @@ export const deriveTodayEarnings = (
     basePay,
     questsCompleted,
     questXP,
+    questCountDone,
     adHocQuestCount,
     qualityNgCount,
-    pointsFromHours,
-    pointsFromQuests,
-    totalPoints,
     status: !hasLaborData ? 'not-tracked' : isCheckedOut ? 'checked-out' : 'working',
   };
 };

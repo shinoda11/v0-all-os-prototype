@@ -328,15 +328,8 @@ export default function MyScorePage() {
                   <span className="font-bold tabular-nums">{formatCurrency(todayEarnings.basePay)}</span>
                 </div>
                 
-                {/* Points Breakdown */}
+                {/* Incentive Share */}
                 <div className="border-t border-emerald-200 pt-3 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Target className="h-4 w-4 text-blue-600" />
-                      <span className="text-sm">{t('earnings.pointsFromHours')}</span>
-                    </div>
-                    <span className="font-bold tabular-nums">{todayEarnings.pointsFromHours ?? 0} pt</span>
-                  </div>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <CheckCircle className="h-4 w-4 text-emerald-600" />
