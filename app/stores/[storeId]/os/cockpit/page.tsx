@@ -54,7 +54,6 @@ import {
   Gift,
   ExternalLink,
   ClipboardList,
-  Bell,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
