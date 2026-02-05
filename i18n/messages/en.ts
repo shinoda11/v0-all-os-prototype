@@ -625,6 +625,22 @@ export const en = {
   'timeclock.persons': '',
   'timeclock.hours': 'hrs',
   
+  // Time Clock Summary (Manager)
+  'nav.timeclockSummary': 'Time Clock Summary',
+  'timeclockSummary.title': 'Time Clock Summary',
+  'timeclockSummary.onDuty': 'On Duty',
+  'timeclockSummary.onBreak': 'On Break',
+  'timeclockSummary.total': 'total',
+  'timeclockSummary.actualHours': 'Actual Hours',
+  'timeclockSummary.planned': 'Planned',
+  'timeclockSummary.overtime': 'Overtime',
+  'timeclockSummary.staffStatus': 'Staff Status',
+  'timeclockSummary.name': 'Name',
+  'timeclockSummary.role': 'Role',
+  'timeclockSummary.stars': 'Stars',
+  'timeclockSummary.status': 'Status',
+  'timeclockSummary.hoursWorked': 'Hours Worked',
+  
   // Earnings (Staff View)
   'earnings.title': 'Earnings',
   'earnings.hoursWorked': 'Hours Worked',

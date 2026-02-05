@@ -108,6 +108,11 @@ const kosSection: NavSection = {
       path: '/os/plan-builder',
       icon: <CalendarCheck className="h-5 w-5" />,
     },
+    {
+      labelKey: 'nav.timeclockSummary',
+      path: '/os/timeclock-summary',
+      icon: <Clock className="h-5 w-5" />,
+    },
   ],
 };
 
