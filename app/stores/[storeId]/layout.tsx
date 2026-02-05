@@ -1,6 +1,6 @@
 'use client';
 
-// Store layout with view mode handling
+// Store layout - handles store context and view mode mismatch banner
 import React, { useLayoutEffect, useEffect, useRef, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useStore } from '@/state/store';
