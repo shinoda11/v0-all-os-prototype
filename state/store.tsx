@@ -6,7 +6,7 @@
 // ============================================================
 
 import React, { createContext, useContext, useReducer, useEffect, useCallback, useRef, useMemo } from 'react';
-import { AppState, AppAction, DomainEvent, Proposal, TimeBand, Incident, IncidentStatus, AgentId, EvidenceItem, Hypothesis, RecommendationDraft, TaskCard, TaskCategory } from '@/core/types';
+import { AppState, AppAction, DomainEvent, Proposal, TimeBand, Incident, IncidentStatus, AgentId, EvidenceItem, Hypothesis, RecommendationDraft, TaskCard, TaskCategory, BoxTemplate } from '@/core/types';
 import { appReducer, initialState } from './reducer';
 import { loadMockData, loadSampleEvents } from '@/data/mock';
 import { generateProposals } from '@/core/proposals';
@@ -78,6 +78,10 @@ interface StoreContextValue {
     addTaskCategory: (category: TaskCategory) => void;
     updateTaskCategory: (category: TaskCategory) => void;
     deleteTaskCategory: (categoryId: string) => void;
+    // Box Templates
+    addBoxTemplate: (boxTemplate: BoxTemplate) => void;
+    updateBoxTemplate: (boxTemplate: BoxTemplate) => void;
+    deleteBoxTemplate: (boxTemplateId: string) => void;
     // Order Interrupt (POS urgent orders)
     createOrderQuest: (order: { orderId: string; menuItemName: string; quantity: number; slaMinutes?: number }) => string;
     completeOrderQuest: (orderId: string) => void;
@@ -529,6 +533,22 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     deleteTaskCategory: (categoryId: string) => {
       dispatch({ type: 'DELETE_TASK_CATEGORY', categoryId });
       publishStateUpdate('state:updated', 'task-category-deleted', ['taskCategories']);
+    },
+
+    // Box Templates
+    addBoxTemplate: (boxTemplate: BoxTemplate) => {
+      dispatch({ type: 'ADD_BOX_TEMPLATE', boxTemplate });
+      publishStateUpdate('state:updated', 'box-template-added', ['boxTemplates']);
+    },
+
+    updateBoxTemplate: (boxTemplate: BoxTemplate) => {
+      dispatch({ type: 'UPDATE_BOX_TEMPLATE', boxTemplate });
+      publishStateUpdate('state:updated', 'box-template-updated', ['boxTemplates']);
+    },
+
+    deleteBoxTemplate: (boxTemplateId: string) => {
+      dispatch({ type: 'DELETE_BOX_TEMPLATE', boxTemplateId });
+      publishStateUpdate('state:updated', 'box-template-deleted', ['boxTemplates']);
     },
 
     // Order Interrupt - Create urgent order quest

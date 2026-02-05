@@ -45,7 +45,8 @@ import {
   CheckCircle,
   AlertCircle,
 } from 'lucide-react';
-import type { TaskCard, TaskCategory, TaskRole, StarRequirement, QuantityMode, QualityCheck, TimeBand, DecisionEvent } from '@/core/types';
+import type { TaskCard, TaskCategory, TaskRole, StarRequirement, QuantityMode, QualityCheck, TimeBand, DecisionEvent, BoxTemplate, BoxRule } from '@/core/types';
+import { Package } from 'lucide-react';
 
 // Initial sample data - 20 tasks across different categories
 const INITIAL_CATEGORIES: TaskCategory[] = [
@@ -89,6 +90,19 @@ const INITIAL_TASKS: TaskCard[] = [
   { id: 'task-18', categoryId: 'cat-3-2', name: '刺身盛り合わせ仕込み', role: 'kitchen', starRequirement: 3, standardMinutes: 35, quantityMode: 'byForecast', baseQuantity: 8, coefficient: 0.015, qualityCheck: 'photo', xpReward: 60, enabled: true },
   { id: 'task-19', categoryId: 'cat-3-2', name: 'ドリンク準備強化', role: 'floor', starRequirement: 1, standardMinutes: 15, quantityMode: 'fixed', baseQuantity: 1, coefficient: 1.0, qualityCheck: 'none', xpReward: 15, enabled: true },
   { id: 'task-20', categoryId: 'cat-3-2', name: '予約席セッティング', role: 'floor', starRequirement: 2, standardMinutes: 10, quantityMode: 'fixed', baseQuantity: 1, coefficient: 1.0, qualityCheck: 'photo', xpReward: 15, enabled: true },
+];
+
+// Initial Box Templates - 6 boxes for different time bands and sales ranges
+const INITIAL_BOX_TEMPLATES: BoxTemplate[] = [
+  // Lunch boxes
+  { id: 'box-1', name: 'ランチ基本', timeBand: 'lunch', taskCardIds: ['task-5', 'task-6', 'task-7', 'task-10', 'task-11', 'task-12'], boxRule: { type: 'always' }, enabled: true, description: 'ランチタイム基本準備' },
+  { id: 'box-2', name: 'ランチ繁忙対応', timeBand: 'lunch', taskCardIds: ['task-15', 'task-16', 'task-17'], boxRule: { type: 'salesRange', minSales: 150000 }, enabled: true, description: '予測売上15万円以上時の追加タスク' },
+  // Idle boxes  
+  { id: 'box-3', name: 'アイドル仕込み', timeBand: 'idle', taskCardIds: ['task-1', 'task-2', 'task-3', 'task-4', 'task-8', 'task-9'], boxRule: { type: 'always' }, enabled: true, description: 'アイドル時間の仕込み作業' },
+  // Dinner boxes
+  { id: 'box-4', name: 'ディナー基本', timeBand: 'dinner', taskCardIds: ['task-10', 'task-11', 'task-12', 'task-13', 'task-14'], boxRule: { type: 'always' }, enabled: true, description: 'ディナータイム基本準備' },
+  { id: 'box-5', name: 'ディナー繁忙対応', timeBand: 'dinner', taskCardIds: ['task-18', 'task-19', 'task-20'], boxRule: { type: 'salesRange', minSales: 250000 }, enabled: true, description: '予測売上25万円以上時の追加タスク' },
+  { id: 'box-6', name: 'ディナー高売上対応', timeBand: 'dinner', taskCardIds: ['task-2', 'task-8', 'task-18', 'task-19'], boxRule: { type: 'salesRange', minSales: 350000 }, enabled: true, description: '予測売上35万円以上時の特別対応' },
 ];
 
 // Role display names
@@ -342,8 +356,16 @@ export function TaskStudio() {
     return state.taskCards?.length ? state.taskCards : INITIAL_TASKS;
   });
 
+  const [boxTemplates, setBoxTemplates] = useState<BoxTemplate[]>(() => {
+    return state.boxTemplates?.length ? state.boxTemplates : INITIAL_BOX_TEMPLATES;
+  });
+
   // Active tab
-  const [activeTab, setActiveTab] = useState<'tasks' | 'simulation'>('tasks');
+  const [activeTab, setActiveTab] = useState<'tasks' | 'boxes' | 'simulation'>('tasks');
+
+  // Box editing state
+  const [editingBox, setEditingBox] = useState<BoxTemplate | null>(null);
+  const [isBoxDrawerOpen, setIsBoxDrawerOpen] = useState(false);
 
   // Task List UI State
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
@@ -493,6 +515,57 @@ export function TaskStudio() {
     setEditingTask(null);
   };
 
+  // Box Handlers
+  const handleEditBox = (box: BoxTemplate) => {
+    setEditingBox({ ...box });
+    setIsBoxDrawerOpen(true);
+  };
+
+  const handleCreateBox = () => {
+    const newBox: BoxTemplate = {
+      id: `box-${Date.now()}`,
+      name: '新規ボックス',
+      timeBand: 'lunch',
+      taskCardIds: [],
+      boxRule: { type: 'always' },
+      enabled: true,
+      description: '',
+    };
+    setEditingBox(newBox);
+    setIsBoxDrawerOpen(true);
+  };
+
+  const handleSaveBox = () => {
+    if (!editingBox) return;
+    
+    const exists = boxTemplates.find((b) => b.id === editingBox.id);
+    if (exists) {
+      setBoxTemplates(boxTemplates.map((b) => (b.id === editingBox.id ? editingBox : b)));
+      actions.updateBoxTemplate(editingBox);
+    } else {
+      setBoxTemplates([...boxTemplates, editingBox]);
+      actions.addBoxTemplate(editingBox);
+    }
+    setIsBoxDrawerOpen(false);
+    setEditingBox(null);
+  };
+
+  const handleDeleteBox = () => {
+    if (!editingBox) return;
+    setBoxTemplates(boxTemplates.filter((b) => b.id !== editingBox.id));
+    actions.deleteBoxTemplate(editingBox.id);
+    setIsBoxDrawerOpen(false);
+    setEditingBox(null);
+  };
+
+  const handleToggleTaskInBox = (taskId: string) => {
+    if (!editingBox) return;
+    const taskIds = editingBox.taskCardIds.includes(taskId)
+      ? editingBox.taskCardIds.filter((id) => id !== taskId)
+      : [...editingBox.taskCardIds, taskId];
+    setEditingBox({ ...editingBox, taskCardIds: taskIds });
+  };
+
   // Calculate quantity based on mode
   const calculateQuantity = (task: TaskCard, timeBand: TimeBand): number => {
     switch (task.quantityMode) {
@@ -637,12 +710,16 @@ export function TaskStudio() {
   return (
     <div className="flex flex-col min-h-[600px] h-full">
       {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'tasks' | 'simulation')} className="flex-1 flex flex-col">
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'tasks' | 'boxes' | 'simulation')} className="flex-1 flex flex-col">
         <div className="border-b px-4">
           <TabsList className="h-12">
             <TabsTrigger value="tasks" className="gap-2">
               <FileText className="h-4 w-4" />
               {t('taskStudio.taskList')}
+            </TabsTrigger>
+            <TabsTrigger value="boxes" className="gap-2">
+              <Package className="h-4 w-4" />
+              {t('taskStudio.boxes')}
             </TabsTrigger>
             <TabsTrigger value="simulation" className="gap-2">
               <Play className="h-4 w-4" />
@@ -762,6 +839,75 @@ export function TaskStudio() {
                   {t('taskStudio.noTasks')}
                 </div>
               )}
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* Boxes Tab */}
+        <TabsContent value="boxes" className="flex-1 m-0 p-4 overflow-y-auto data-[state=inactive]:hidden">
+          <div className="max-w-6xl mx-auto space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold">{t('taskStudio.boxes')}</h2>
+                <p className="text-sm text-muted-foreground">{t('taskStudio.boxesDescription')}</p>
+              </div>
+              <Button onClick={handleCreateBox}>
+                <Plus className="h-4 w-4 mr-2" />
+                {t('taskStudio.addBox')}
+              </Button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {boxTemplates.map((box) => {
+                const boxTasks = tasks.filter((t) => box.taskCardIds.includes(t.id));
+                return (
+                  <Card 
+                    key={box.id} 
+                    className={cn('cursor-pointer hover:shadow-md transition-shadow', !box.enabled && 'opacity-50')}
+                    onClick={() => handleEditBox(box)}
+                  >
+                    <CardHeader className="pb-2">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-base flex items-center gap-2">
+                          <Package className="h-4 w-4" />
+                          {box.name}
+                        </CardTitle>
+                        <Badge variant="outline">{TIME_BAND_LABELS[box.timeBand]}</Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      {box.description && (
+                        <p className="text-xs text-muted-foreground">{box.description}</p>
+                      )}
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary" className="text-xs">
+                          {boxTasks.length} {t('taskStudio.tasksCount')}
+                        </Badge>
+                        {box.boxRule.type === 'salesRange' && box.boxRule.minSales && (
+                          <Badge variant="outline" className="text-xs">
+                            {(box.boxRule.minSales / 10000).toFixed(0)}万円+
+                          </Badge>
+                        )}
+                        {box.boxRule.type === 'always' && (
+                          <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
+                            {t('taskStudio.alwaysActive')}
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap gap-1 pt-2">
+                        {boxTasks.slice(0, 3).map((task) => (
+                          <span key={task.id} className="text-xs bg-muted px-2 py-0.5 rounded truncate max-w-24">
+                            {task.name}
+                          </span>
+                        ))}
+                        {boxTasks.length > 3 && (
+                          <span className="text-xs text-muted-foreground">+{boxTasks.length - 3}</span>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           </div>
         </TabsContent>
@@ -1092,6 +1238,152 @@ export function TaskStudio() {
               {t('common.cancel')}
             </Button>
             <Button onClick={handleSaveTask}>
+              {t('common.save')}
+            </Button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
+
+      {/* Box Edit Drawer */}
+      <Sheet open={isBoxDrawerOpen} onOpenChange={setIsBoxDrawerOpen}>
+        <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>
+              {editingBox && boxTemplates.find((b) => b.id === editingBox.id)
+                ? t('taskStudio.editBox')
+                : t('taskStudio.addBox')}
+            </SheetTitle>
+            <SheetDescription>{t('taskStudio.boxEditDescription')}</SheetDescription>
+          </SheetHeader>
+
+          {editingBox && (
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>{t('taskStudio.boxName')}</Label>
+                <Input
+                  value={editingBox.name}
+                  onChange={(e) => setEditingBox({ ...editingBox, name: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>{t('taskStudio.timeBand')}</Label>
+                <Select
+                  value={editingBox.timeBand}
+                  onValueChange={(v) => setEditingBox({ ...editingBox, timeBand: v as TimeBand })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(['lunch', 'idle', 'dinner'] as TimeBand[]).map((band) => (
+                      <SelectItem key={band} value={band}>{TIME_BAND_LABELS[band]}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>{t('taskStudio.boxRule')}</Label>
+                <Select
+                  value={editingBox.boxRule.type}
+                  onValueChange={(v) => setEditingBox({ 
+                    ...editingBox, 
+                    boxRule: v === 'always' ? { type: 'always' } : { type: 'salesRange', minSales: 100000 }
+                  })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="always">{t('taskStudio.alwaysActive')}</SelectItem>
+                    <SelectItem value="salesRange">{t('taskStudio.salesRange')}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {editingBox.boxRule.type === 'salesRange' && (
+                <div className="space-y-2">
+                  <Label>{t('taskStudio.minSales')}</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    step={10000}
+                    value={editingBox.boxRule.minSales || 0}
+                    onChange={(e) => setEditingBox({ 
+                      ...editingBox, 
+                      boxRule: { ...editingBox.boxRule, minSales: Number(e.target.value) }
+                    })}
+                  />
+                  <p className="text-xs text-muted-foreground">{t('taskStudio.minSalesDescription')}</p>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <Label>{t('taskStudio.boxDescription')}</Label>
+                <Textarea
+                  value={editingBox.description || ''}
+                  onChange={(e) => setEditingBox({ ...editingBox, description: e.target.value })}
+                  placeholder={t('taskStudio.boxDescriptionPlaceholder')}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>{t('taskStudio.selectTasks')}</Label>
+                <p className="text-xs text-muted-foreground">{t('taskStudio.selectTasksDescription')}</p>
+                <div className="border rounded-lg max-h-64 overflow-y-auto p-2 space-y-1">
+                  {tasks.filter(t => t.enabled).map((task) => {
+                    const isSelected = editingBox.taskCardIds.includes(task.id);
+                    const category = getCategoryById(task.categoryId);
+                    return (
+                      <div
+                        key={task.id}
+                        onClick={() => handleToggleTaskInBox(task.id)}
+                        className={cn(
+                          'flex items-center gap-2 p-2 rounded cursor-pointer transition-colors',
+                          isSelected ? 'bg-primary/10 border border-primary/30' : 'hover:bg-muted'
+                        )}
+                      >
+                        <Checkbox checked={isSelected} />
+                        <div className="flex-1 min-w-0">
+                          <span className="text-sm font-medium truncate block">{task.name}</span>
+                          {category && (
+                            <span className="text-xs text-muted-foreground">{category.name}</span>
+                          )}
+                        </div>
+                        <Badge variant="outline" className={cn('text-xs shrink-0', ROLE_COLORS[task.role])}>
+                          {ROLE_LABELS[task.role]}
+                        </Badge>
+                      </div>
+                    );
+                  })}
+                </div>
+                <p className="text-xs text-muted-foreground text-right">
+                  {editingBox.taskCardIds.length} {t('taskStudio.tasksSelected')}
+                </p>
+              </div>
+
+              <div className="flex items-center justify-between py-2">
+                <Label>{t('taskStudio.enabled')}</Label>
+                <Checkbox
+                  checked={editingBox.enabled}
+                  onCheckedChange={(checked) => setEditingBox({ ...editingBox, enabled: !!checked })}
+                />
+              </div>
+            </div>
+          )}
+
+          <SheetFooter className="flex gap-2 pt-4">
+            {editingBox && boxTemplates.find((b) => b.id === editingBox.id) && (
+              <Button variant="destructive" onClick={handleDeleteBox} className="mr-auto">
+                <Trash2 className="h-4 w-4 mr-2" />
+                {t('common.delete')}
+              </Button>
+            )}
+            <Button variant="outline" onClick={() => setIsBoxDrawerOpen(false)}>
+              {t('common.cancel')}
+            </Button>
+            <Button onClick={handleSaveBox}>
               {t('common.save')}
             </Button>
           </SheetFooter>

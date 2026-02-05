@@ -640,6 +640,23 @@ export interface TaskCategory {
   parentId?: string;
 }
 
+// Box Template - groups tasks into deployable boxes based on time/sales
+export interface BoxRule {
+  type: 'salesRange' | 'always';
+  minSales?: number;
+  maxSales?: number;
+}
+
+export interface BoxTemplate {
+  id: string;
+  name: string;
+  timeBand: TimeBand;
+  taskCardIds: string[];
+  boxRule: BoxRule;
+  enabled: boolean;
+  description?: string;
+}
+
 // ------------------------------------------------------------
 // Application State
 // ------------------------------------------------------------
@@ -655,6 +672,7 @@ export interface AppState {
   // Task Studio
   taskCards: TaskCard[];
   taskCategories: TaskCategory[];
+  boxTemplates: BoxTemplate[];
 
   // Event log (single source of truth)
   events: DomainEvent[];
@@ -709,6 +727,9 @@ export type AppAction =
   | { type: 'ADD_TASK_CATEGORY'; category: TaskCategory }
   | { type: 'UPDATE_TASK_CATEGORY'; category: TaskCategory }
   | { type: 'DELETE_TASK_CATEGORY'; categoryId: string }
+  | { type: 'ADD_BOX_TEMPLATE'; boxTemplate: BoxTemplate }
+  | { type: 'UPDATE_BOX_TEMPLATE'; boxTemplate: BoxTemplate }
+  | { type: 'DELETE_BOX_TEMPLATE'; boxTemplateId: string }
   // Replay actions
   | { type: 'REPLAY_START'; events: DomainEvent[] }
   | { type: 'REPLAY_STEP' }

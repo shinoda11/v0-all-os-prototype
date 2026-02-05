@@ -401,7 +401,7 @@ export const ja = {
   'ask.completion.conclusionLow': '本日のチームスコアは{score}点、タ��ク完了率は{rate}%で改善が必要です。',
   'ask.completion.conclusionGood': '本日のチームスコアは{score}点、タスク完了率は{rate}%で順調です。',
   'ask.completion.teamScore': 'チームスコア',
-  'ask.completion.questCompletion': 'クエスト完�����率',
+  'ask.completion.questCompletion': 'クエスト完�������率',
   'ask.completion.taskScore': 'タスク得点',
   'ask.completion.timeScore': '時間得点',
   'ask.completion.bottlenecks': 'ボトルネック',
@@ -947,6 +947,24 @@ export const ja = {
   'taskStudio.roles': 'ロール数',
   'taskStudio.unassignedWarning': '未割当のクエストがあります',
   'taskStudio.unassignedDescription': 'Ops Monitorで手動割当するか、スタッフが自分で取得できます',
+  // Box Templates
+  'taskStudio.boxes': 'ボックス',
+  'taskStudio.boxesDescription': 'タイムバンドと売上レンジに応じてタスクをグループ化',
+  'taskStudio.addBox': 'ボックス追加',
+  'taskStudio.editBox': 'ボックス編集',
+  'taskStudio.boxEditDescription': 'ボックスの詳細を編集します',
+  'taskStudio.boxName': 'ボックス名',
+  'taskStudio.timeBand': 'タイムバンド',
+  'taskStudio.boxRule': 'ルール',
+  'taskStudio.alwaysActive': '常時適用',
+  'taskStudio.salesRange': '売上レンジ',
+  'taskStudio.minSales': '最低売上（円）',
+  'taskStudio.minSalesDescription': 'この売上以上の場合にボックスが適用されます',
+  'taskStudio.boxDescription': '説明',
+  'taskStudio.boxDescriptionPlaceholder': 'ボックスの説明を入力...',
+  'taskStudio.selectTasks': '含めるタスク',
+  'taskStudio.selectTasksDescription': 'このボックスに含めるタスクを選択',
+  'taskStudio.tasksSelected': '件選択中',
 } as const;
 
 export type MessageKey = keyof typeof ja;
