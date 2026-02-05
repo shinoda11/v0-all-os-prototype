@@ -540,6 +540,15 @@ export default function CockpitPage() {
     'sales', 'labor', 'prep', 'delivery', 'decision', 'cockpit-sales', 'cockpit-operations'
   ]);
 
+  // Early return if store not loaded yet
+  if (!currentStore) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-muted-foreground">{t('common.loading')}</div>
+      </div>
+    );
+  }
+
   // Get current data from state
   const metrics = selectCockpitMetrics(state, timeBand);
   const exceptions = selectExceptions(state, timeBand);
@@ -590,10 +599,6 @@ export default function CockpitPage() {
     return { message: t('cockpit.incentive.empty'), type: 'neutral' as const };
   };
   const incentiveCTA = getIncentiveCTA();
-
-  if (!currentStore) {
-    return <div className="p-4">Loading...</div>;
-  }
 
   return (
     <div className="space-y-6">
