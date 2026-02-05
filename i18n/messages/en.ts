@@ -761,6 +761,31 @@ export const en = {
   'teamPerformance.empty.noQuests': 'No quest data available for this period',
   'teamPerformance.empty.noQuality': 'Quality tracking not enabled',
   
+  // Weekly Efficiency Summary
+  'teamPerformance.efficiency.title': 'Weekly Efficiency Summary',
+  'teamPerformance.efficiency.totalSales': 'Total Sales',
+  'teamPerformance.efficiency.totalLaborHours': 'Total Labor Hours',
+  'teamPerformance.efficiency.salesPerLaborHour': 'Sales per Labor Hour',
+  'teamPerformance.efficiency.laborRate': 'Labor Rate',
+  'teamPerformance.efficiency.laborRateNote': 'Labor Cost / Sales',
+  'teamPerformance.efficiency.insight': 'Higher ★3 staff mix correlates with 15% productivity improvement',
+  'teamPerformance.efficiency.reviewWeek': 'Review this week',
+  
+  // Bottlenecks
+  'teamPerformance.bottlenecks.title': 'Bottlenecks',
+  'teamPerformance.bottlenecks.delayedQuests': 'Delayed Quests',
+  'teamPerformance.bottlenecks.of': 'of',
+  'teamPerformance.bottlenecks.totalQuests': 'total quests',
+  'teamPerformance.bottlenecks.topBoxes': 'Top 3 Bottleneck Boxes',
+  'teamPerformance.bottlenecks.delays': 'delays',
+  
+  // Top Contributors & Needs Support
+  'teamPerformance.topContributors.title': 'Top Contributors',
+  'teamPerformance.needsSupport.title': 'Needs Support',
+  'teamPerformance.needsSupport.highDelay': 'High delay',
+  'teamPerformance.needsSupport.overtime': 'Overtime',
+  'teamPerformance.needsSupport.none': 'No staff flagged for support',
+  
   // Awards
   'awards.title': 'Awards',
   'awards.subtitle': 'Recognition & Achievements',

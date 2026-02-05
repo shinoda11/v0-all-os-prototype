@@ -402,7 +402,7 @@ export const ja = {
   'ask.taskDelay.causeOverloaded': 'タスク量が多すぎる',
   'ask.taskDelay.causeNoBreak': '休憩が取れていない',
   'ask.taskDelay.causeTooManyWIP': '同時進行タスクが多い',
-  'ask.taskDelay.causeEstimation': '見積り時間が短すぎる',
+  'ask.taskDelay.causeEstimation': '見積り��間が短すぎる',
   'ask.taskDelay.proposalTitle': 'タスク優先度の見直し',
   'ask.taskDelay.proposalDesc': '遅延タスクの優先度を再検討し、WIPを削減する',
   'ask.labor.tasks': '���',
@@ -714,7 +714,7 @@ export const ja = {
   'teamPerformance.snapshot.noData': 'データなし',
   // Skill Mix Coverage
   'teamPerformance.skillMix.title': 'スキルミックス',
-  'teamPerformance.skillMix.starMix': '星ミックス',
+  'teamPerformance.skillMix.starMix': '星ミック��',
   'teamPerformance.skillMix.roleMix': '役割構成',
   'teamPerformance.skillMix.peakCoverage': 'ピーク対応',
   'teamPerformance.skillMix.peakGood': '良好',
@@ -760,6 +760,31 @@ export const ja = {
   'teamPerformance.empty.noLabor': 'この期間の勤怠データがありません',
   'teamPerformance.empty.noQuests': 'この期間のクエストデータがありません',
   'teamPerformance.empty.noQuality': '品質トラッキングが有効ではありません',
+  
+  // Weekly Efficiency Summary
+  'teamPerformance.efficiency.title': '週次効率サマリー',
+  'teamPerformance.efficiency.totalSales': '売上合計',
+  'teamPerformance.efficiency.totalLaborHours': '労働時間合計',
+  'teamPerformance.efficiency.salesPerLaborHour': '労働時間あたり売上',
+  'teamPerformance.efficiency.laborRate': '人件費率',
+  'teamPerformance.efficiency.laborRateNote': '人件費÷売上',
+  'teamPerformance.efficiency.insight': '★3スタッフの比率が高い日は生産性が15%向上する傾向があります',
+  'teamPerformance.efficiency.reviewWeek': '週次レビューを見る',
+  
+  // Bottlenecks
+  'teamPerformance.bottlenecks.title': 'ボトルネック',
+  'teamPerformance.bottlenecks.delayedQuests': '遅延クエスト',
+  'teamPerformance.bottlenecks.of': '/',
+  'teamPerformance.bottlenecks.totalQuests': 'クエスト中',
+  'teamPerformance.bottlenecks.topBoxes': 'ボトルネック上位3ボックス',
+  'teamPerformance.bottlenecks.delays': '遅延',
+  
+  // Top Contributors & Needs Support
+  'teamPerformance.topContributors.title': 'トップ貢献者',
+  'teamPerformance.needsSupport.title': 'サポートが必要',
+  'teamPerformance.needsSupport.highDelay': '遅延率',
+  'teamPerformance.needsSupport.overtime': '残業',
+  'teamPerformance.needsSupport.none': '問題のあるスタッフはいません',
   
   // Awards
   'awards.title': 'アワード',

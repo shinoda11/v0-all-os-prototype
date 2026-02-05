@@ -46,7 +46,11 @@ import {
   Lightbulb,
   UserPlus,
   Info,
+  DollarSign,
+  Package,
+  ExternalLink,
 } from 'lucide-react';
+import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import type { Period, IndividualPerformance, CoachingAction, PromotionCandidate } from '@/core/derive';
 import type { TimeBand } from '@/core/types';
@@ -277,9 +281,10 @@ function StaffDetailDrawer({
 }
 
 export default function TeamPerformancePage() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const { state } = useStore();
   const currentStore = selectCurrentStore(state);
+  const storeId = currentStore?.id ?? '1';
   
   const [period, setPeriod] = useState<Period>('today');
   const [timeBand, setTimeBand] = useState<TimeBand>('all');
@@ -407,6 +412,222 @@ export default function TeamPerformancePage() {
           />
         </div>
         
+        {/* Weekly Efficiency Summary (mock data for 7-day period) */}
+        {period === '7d' && (
+          <Card className="border-blue-200 bg-blue-50/30">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <DollarSign className="h-5 w-5 text-blue-600" />
+                  {t('teamPerformance.efficiency.title')}
+                </CardTitle>
+                <Link href={`/stores/${storeId}/os/weekly-review`}>
+                  <Button variant="outline" size="sm" className="gap-2">
+                    <ExternalLink className="h-4 w-4" />
+                    {t('teamPerformance.efficiency.reviewWeek')}
+                  </Button>
+                </Link>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4 md:grid-cols-4">
+                <div className="p-3 rounded-lg bg-white border">
+                  <div className="text-sm text-muted-foreground">{t('teamPerformance.efficiency.totalSales')}</div>
+                  <div className="text-2xl font-bold text-blue-700">
+                    {locale === 'ja' ? '¥2,450,000' : '$24,500'}
+                  </div>
+                </div>
+                <div className="p-3 rounded-lg bg-white border">
+                  <div className="text-sm text-muted-foreground">{t('teamPerformance.efficiency.totalLaborHours')}</div>
+                  <div className="text-2xl font-bold">168h</div>
+                </div>
+                <div className="p-3 rounded-lg bg-white border">
+                  <div className="text-sm text-muted-foreground">{t('teamPerformance.efficiency.salesPerLaborHour')}</div>
+                  <div className="text-2xl font-bold text-emerald-600">
+                    {locale === 'ja' ? '¥14,583' : '$145.83'}
+                  </div>
+                </div>
+                <div className="p-3 rounded-lg bg-white border">
+                  <div className="text-sm text-muted-foreground">{t('teamPerformance.efficiency.laborRate')}</div>
+                  <div className="text-2xl font-bold text-amber-600">28.5%</div>
+                  <div className="text-xs text-muted-foreground">{t('teamPerformance.efficiency.laborRateNote')}</div>
+                </div>
+              </div>
+              <div className="mt-3 p-2 rounded bg-blue-100 text-sm text-blue-800 flex items-center gap-2">
+                <Lightbulb className="h-4 w-4" />
+                {t('teamPerformance.efficiency.insight')}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Bottlenecks Section */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              {t('teamPerformance.bottlenecks.title')}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 md:grid-cols-2">
+              {/* Delayed Quests Count */}
+              <div className="p-4 rounded-lg border bg-amber-50/50 border-amber-200">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm text-muted-foreground">{t('teamPerformance.bottlenecks.delayedQuests')}</span>
+                  <Badge variant="outline" className={cn(
+                    teamSnapshot.delayRate !== null && teamSnapshot.delayRate > 20 
+                      ? 'bg-red-100 text-red-800 border-red-200' 
+                      : 'bg-amber-100 text-amber-800 border-amber-200'
+                  )}>
+                    {teamSnapshot.delayRate !== null ? `${teamSnapshot.delayRate}%` : '-'}
+                  </Badge>
+                </div>
+                <div className="text-3xl font-bold text-amber-700">
+                  {teamSnapshot.questCompletion.delayed ?? 0}
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  {t('teamPerformance.bottlenecks.of')} {teamSnapshot.questCompletion.total ?? 0} {t('teamPerformance.bottlenecks.totalQuests')}
+                </div>
+              </div>
+
+              {/* Top 3 Bottleneck Boxes */}
+              <div className="p-4 rounded-lg border">
+                <div className="text-sm text-muted-foreground mb-3">{t('teamPerformance.bottlenecks.topBoxes')}</div>
+                <div className="space-y-2">
+                  {[
+                    { name: 'Grill Station', delayCount: 5, avgDelay: 8 },
+                    { name: 'Prep Kitchen', delayCount: 3, avgDelay: 12 },
+                    { name: 'Dishwash', delayCount: 2, avgDelay: 5 },
+                  ].map((box, idx) => (
+                    <div key={box.name} className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2">
+                        <span className="text-muted-foreground">{idx + 1}.</span>
+                        <Package className="h-4 w-4 text-muted-foreground" />
+                        <span className="font-medium">{box.name}</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-red-600 tabular-nums">{box.delayCount} {t('teamPerformance.bottlenecks.delays')}</span>
+                        <span className="text-muted-foreground tabular-nums">avg +{box.avgDelay}m</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Top Contributors & Needs Support */}
+        <div className="grid gap-4 md:grid-cols-2">
+          {/* Top Contributors */}
+          <Card className="border-emerald-200">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-emerald-700">
+                <TrendingUp className="h-5 w-5" />
+                {t('teamPerformance.topContributors.title')}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {individuals.length > 0 ? (
+                <div className="space-y-3">
+                  {individuals
+                    .filter(ind => ind.questsDone > 0)
+                    .sort((a, b) => b.questsDone - a.questsDone)
+                    .slice(0, 3)
+                    .map((ind, idx) => (
+                      <div key={ind.staffId} className="flex items-center justify-between p-2 rounded-lg bg-emerald-50/50">
+                        <div className="flex items-center gap-3">
+                          <span className="text-lg font-bold text-emerald-600">{idx + 1}</span>
+                          <div>
+                            <div className="font-medium">{ind.name}</div>
+                            <div className="flex items-center gap-1">
+                              <StarRating level={ind.starLevel} />
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="font-bold text-emerald-700">{ind.questsDone} quests</div>
+                          <div className="text-xs text-muted-foreground">Score: {ind.score}</div>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              ) : (
+                <div className="text-center py-4 text-muted-foreground">
+                  {t('teamPerformance.snapshot.noData')}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Needs Support */}
+          <Card className="border-amber-200">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-amber-700">
+                <AlertTriangle className="h-5 w-5" />
+                {t('teamPerformance.needsSupport.title')}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {individuals.length > 0 ? (
+                <div className="space-y-3">
+                  {individuals
+                    .filter(ind => 
+                      (ind.delayRate !== null && ind.delayRate > 30) ||
+                      ind.qualityNgCount > 0 ||
+                      (ind.hoursWorked !== null && ind.hoursWorked > 8)
+                    )
+                    .slice(0, 3)
+                    .map((ind) => (
+                      <div key={ind.staffId} className="p-2 rounded-lg bg-amber-50/50 border border-amber-200">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{ind.name}</span>
+                            <StarRating level={ind.starLevel} />
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap gap-2 mt-1">
+                          {ind.delayRate !== null && ind.delayRate > 30 && (
+                            <Badge variant="outline" className="bg-red-100 text-red-800 border-red-200 text-xs">
+                              <Timer className="h-3 w-3 mr-1" />
+                              {t('teamPerformance.needsSupport.highDelay')} {ind.delayRate}%
+                            </Badge>
+                          )}
+                          {ind.qualityNgCount > 0 && (
+                            <Badge variant="outline" className="bg-red-100 text-red-800 border-red-200 text-xs">
+                              <XCircle className="h-3 w-3 mr-1" />
+                              {ind.qualityNgCount} NG
+                            </Badge>
+                          )}
+                          {ind.hoursWorked !== null && ind.hoursWorked > 8 && (
+                            <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-200 text-xs">
+                              <Clock className="h-3 w-3 mr-1" />
+                              {t('teamPerformance.needsSupport.overtime')} {(ind.hoursWorked - 8).toFixed(1)}h
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  {individuals.filter(ind => 
+                    (ind.delayRate !== null && ind.delayRate > 30) ||
+                    ind.qualityNgCount > 0 ||
+                    (ind.hoursWorked !== null && ind.hoursWorked > 8)
+                  ).length === 0 && (
+                    <div className="text-center py-4 text-muted-foreground">
+                      {t('teamPerformance.needsSupport.none')}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-4 text-muted-foreground">
+                  {t('teamPerformance.snapshot.noData')}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
         {/* Skill Mix Coverage */}
         <Card>
           <CardHeader>
