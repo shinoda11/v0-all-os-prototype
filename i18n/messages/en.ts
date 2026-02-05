@@ -841,6 +841,34 @@ export const en = {
   'awards.status.noWinner': 'No Winner',
   'awards.status.notTracked': 'Not Tracked',
   
+  // Awards Tabs
+  'awards.manage.tab': 'Select Awards',
+  'awards.view.tab': 'Dashboard',
+  'awards.period.label': 'Period',
+  
+  // Awards Manage (Manager Selection)
+  'awards.manage.title': 'Weekly Awards Selection',
+  'awards.manage.subtitle': 'Select one winner for each award category',
+  'awards.manage.timeMaster': 'Time Master',
+  'awards.manage.timeMasterDesc': 'Completed quests within target time',
+  'awards.manage.questFinisher': 'Quest Finisher',
+  'awards.manage.questFinisherDesc': 'Completed the most quests this week',
+  'awards.manage.teamSaverDesc': 'Helped teammates when needed',
+  'awards.manage.qualityKeeper': 'Quality Keeper',
+  'awards.manage.qualityKeeperDesc': 'Maintained quality standards',
+  'awards.manage.score': 'Score',
+  'awards.manage.selected': 'Selected',
+  'awards.manage.reasonLabel': 'Selection reason (optional)',
+  'awards.manage.reasonPlaceholder': 'Add a brief comment...',
+  'awards.manage.publish': 'Publish Awards',
+  'awards.manage.published': 'Published',
+  'awards.manage.publishedMessage': 'Awards have been published',
+  'awards.manage.publishedNote': 'Staff will be notified',
+  'awards.manage.previewTitle': 'Announcement Preview',
+  'awards.manage.previewSubtitle': 'The following awards will be announced',
+  'awards.manage.cancel': 'Cancel',
+  'awards.manage.confirmPublish': 'Confirm & Publish',
+  
   // Incentive Pool & Dashboard
   'incentive.title': 'Incentive Pool',
   'incentive.subtitle': 'Performance Bonus Distribution',
