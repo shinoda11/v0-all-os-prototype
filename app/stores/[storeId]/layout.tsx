@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useLayoutEffect, useRef } from 'react';
+import React, { useLayoutEffect, useEffect, useRef, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useStore } from '@/state/store';
 import { AppShell } from '@/components/AppShell';
@@ -19,6 +19,7 @@ export default function StoreLayout({ children }: StoreLayoutProps) {
   const { actions } = useStore();
   const actionsRef = useRef(actions);
   actionsRef.current = actions;
+  const [isValidStore, setIsValidStore] = useState(true);
 
   // Sync route param to context - use useLayoutEffect for synchronous update
   useLayoutEffect(() => {
@@ -26,9 +27,18 @@ export default function StoreLayout({ children }: StoreLayoutProps) {
   }, [storeId]);
 
   // Validate storeId and redirect if invalid
-  if (!VALID_STORE_IDS.includes(storeId)) {
-    router.replace('/stores/1/os/cockpit');
+  useEffect(() => {
+    if (!VALID_STORE_IDS.includes(storeId)) {
+      setIsValidStore(false);
+      router.replace('/stores/1/os/cockpit');
+    } else {
+      setIsValidStore(true);
+    }
+  }, [storeId, router]);
+
+  if (!isValidStore) {
     return null;
   }
+  
   return <AppShell storeId={storeId}>{children}</AppShell>;
 }
