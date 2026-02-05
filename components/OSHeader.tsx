@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -55,8 +56,17 @@ export function OSHeader({
     }
   };
 
+  // Use stable initial date to avoid hydration mismatch
+  const [mounted, setMounted] = useState(false);
+  const [currentTime, setCurrentTime] = useState<Date | null>(null);
+  
+  useEffect(() => {
+    setMounted(true);
+    setCurrentTime(new Date());
+  }, []);
+
   // Get current business date (today for now)
-  const today = new Date();
+  const today = mounted ? new Date() : new Date('2024-01-01'); // Stable initial value
   const businessDate = formatDate(today, {
     year: 'numeric',
     month: 'long',
@@ -64,9 +74,8 @@ export function OSHeader({
     weekday: 'short',
   });
 
-  // Mock last updated time (would come from state in real app)
-  const lastUpdated = new Date();
-  const lastUpdatedStr = formatTime(lastUpdated);
+  // Last updated time - only show on client to avoid hydration mismatch
+  const lastUpdatedStr = mounted && currentTime ? formatTime(currentTime) : '--:--';
 
   const shortName = currentStore?.name.replace('Aburi TORA 熟成鮨と炙り鮨 ', '') ?? '';
 
