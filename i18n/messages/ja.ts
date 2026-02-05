@@ -280,7 +280,7 @@ export const ja = {
   'laborWeekly.weeklyLaborCost': '週間人件費',
   'laborWeekly.laborRate': '人件費率',
   'laborWeekly.weeklyHours': '週間人時',
-  'laborWeekly.activeStaff': '稼働���タッフ',
+  'laborWeekly.activeStaff': '稼働����タッフ',
   'laborWeekly.target': '目標',
   'laborWeekly.notCalculated': '未計算',
   'laborWeekly.dailyBreakdown': '日別実績',
@@ -401,7 +401,7 @@ export const ja = {
   'ask.completion.conclusionLow': '本日のチームスコアは{score}点、タ��ク完了率は{rate}%で改善が必要です。',
   'ask.completion.conclusionGood': '本日のチームスコアは{score}点、タスク完了率は{rate}%で順調です。',
   'ask.completion.teamScore': 'チームスコア',
-  'ask.completion.questCompletion': 'クエスト完���������率',
+  'ask.completion.questCompletion': 'クエス���完���������率',
   'ask.completion.taskScore': 'タスク得点',
   'ask.completion.timeScore': '時間得点',
   'ask.completion.bottlenecks': 'ボトルネック',
@@ -586,6 +586,17 @@ export const ja = {
   'quests.delayReason.unexpectedOrder': '想定外の注文',
   'quests.delayReason.other': 'その他',
   'quests.delayReason.none': 'なし',
+  
+  // Order Interrupt
+  'quests.simulateOrder': 'POS注文シミュレート',
+  'quests.orderInterrupt.title': '緊急注文',
+  'quests.orderInterrupt.description': 'POSから緊急注文が入りました',
+  'quests.orderInterrupt.currentTask': '現在のタスク:',
+  'quests.orderInterrupt.willPause': 'このタスクは一時停止されます',
+  'quests.orderInterrupt.later': '後で',
+  'quests.orderInterrupt.pauseAndStart': '停止して対応',
+  'quests.orderInterrupt.startNow': '今すぐ対応',
+  'quests.resumePrompt.title': '一時停止中のタスクがあります',
   
   // Time Clock
   'timeclock.title': 'Time Clock',
@@ -876,7 +887,7 @@ export const ja = {
   'weeklyReview.chronicDelay': '遅延常習クエスト',
   'weeklyReview.chronicDelay.desc': '{count}回遅延、平均+{minutes}分',
   'weeklyReview.hrProposals': 'HR提案 (最大5件)',
-  'weeklyReview.noHrProposals': 'HR課題は検出されま���んでした',
+  'weeklyReview.noHrProposals': 'HR課題は検���されま���んでした',
   
   // Sidebar Navigation
   'nav.kos': 'KOS',

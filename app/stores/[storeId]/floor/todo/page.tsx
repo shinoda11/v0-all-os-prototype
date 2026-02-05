@@ -49,6 +49,8 @@ import {
   Target,
   AlertCircle,
   RotateCcw,
+  Bell,
+  ChefHat,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -618,6 +620,118 @@ function ProgressSummary({
   );
 }
 
+// Order Interrupt Modal
+interface OrderInterruptModalProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  orderQuest: DecisionEvent | null;
+  currentQuest: DecisionEvent | null;
+  onAccept: () => void;
+}
+
+function OrderInterruptModal({ open, onOpenChange, orderQuest, currentQuest, onAccept }: OrderInterruptModalProps) {
+  const { t } = useI18n();
+  
+  if (!orderQuest) return null;
+
+  // Calculate SLA timer
+  const deadline = orderQuest.deadline ? new Date(orderQuest.deadline) : null;
+  const remainingMs = deadline ? deadline.getTime() - Date.now() : 0;
+  const remainingSeconds = Math.max(0, Math.floor(remainingMs / 1000));
+  const remainingMinutes = Math.floor(remainingSeconds / 60);
+  const remainingSecs = remainingSeconds % 60;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-red-600">
+            <Bell className="h-5 w-5 animate-pulse" />
+            {t('quests.orderInterrupt.title')}
+          </DialogTitle>
+          <DialogDescription>{t('quests.orderInterrupt.description')}</DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 py-4">
+          {/* Order details */}
+          <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+            <div className="flex items-center gap-3 mb-2">
+              <ChefHat className="h-6 w-6 text-red-600" />
+              <span className="font-bold text-lg">{orderQuest.title.replace('[ORDER] ', '')}</span>
+            </div>
+            <p className="text-sm text-muted-foreground">{orderQuest.description}</p>
+            
+            {/* SLA Timer */}
+            <div className="mt-3 flex items-center gap-2">
+              <Timer className="h-4 w-4 text-red-600" />
+              <span className={cn(
+                'font-bold tabular-nums',
+                remainingSeconds < 60 ? 'text-red-600' : 'text-amber-600'
+              )}>
+                SLA: {remainingMinutes}:{String(remainingSecs).padStart(2, '0')}
+              </span>
+            </div>
+          </div>
+
+          {/* Current task info */}
+          {currentQuest && (
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm">
+              <p className="font-medium text-amber-800">{t('quests.orderInterrupt.currentTask')}</p>
+              <p className="text-amber-700">{currentQuest.title}</p>
+              <p className="text-xs text-amber-600 mt-1">{t('quests.orderInterrupt.willPause')}</p>
+            </div>
+          )}
+        </div>
+
+        <DialogFooter className="flex gap-2">
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            {t('quests.orderInterrupt.later')}
+          </Button>
+          <Button onClick={onAccept} className="bg-red-600 hover:bg-red-700 gap-2">
+            <Play className="h-4 w-4" />
+            {currentQuest ? t('quests.orderInterrupt.pauseAndStart') : t('quests.orderInterrupt.startNow')}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Resume Prompt after Order completion
+interface ResumePromptProps {
+  pausedQuest: DecisionEvent | null;
+  onResume: () => void;
+  onDismiss: () => void;
+}
+
+function ResumePrompt({ pausedQuest, onResume, onDismiss }: ResumePromptProps) {
+  const { t } = useI18n();
+  
+  if (!pausedQuest) return null;
+
+  return (
+    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom">
+      <Card className="border-amber-300 bg-amber-50 shadow-lg">
+        <CardContent className="p-4 flex items-center gap-4">
+          <RotateCcw className="h-5 w-5 text-amber-600" />
+          <div className="flex-1">
+            <p className="font-medium text-amber-800">{t('quests.resumePrompt.title')}</p>
+            <p className="text-sm text-amber-700">{pausedQuest.title}</p>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="ghost" size="sm" onClick={onDismiss}>
+              {t('common.dismiss')}
+            </Button>
+            <Button size="sm" className="bg-amber-600 hover:bg-amber-700" onClick={onResume}>
+              {t('quests.resume')}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 // Main Page Component
 export default function TodayQuestsPage() {
   const { t, locale } = useI18n();
@@ -626,9 +740,16 @@ export default function TodayQuestsPage() {
   const currentStore = selectCurrentStore(state);
   const [completingQuest, setCompletingQuest] = useState<DecisionEvent | null>(null);
   const [inProgressStartTime, setInProgressStartTime] = useState<string | null>(null);
+  
+  // Order interrupt state
+  const [pendingOrderQuest, setPendingOrderQuest] = useState<DecisionEvent | null>(null);
+  const [showOrderInterrupt, setShowOrderInterrupt] = useState(false);
+  const [showResumePrompt, setShowResumePrompt] = useState(false);
+  const [lastPausedQuest, setLastPausedQuest] = useState<DecisionEvent | null>(null);
+  const processedOrdersRef = useRef<Set<string>>(new Set());
 
   // Subscribe to state updates
-  useStateSubscription(['todo', 'decision', 'prep']);
+  useStateSubscription(['todo', 'decision', 'prep', 'order']);
 
   // Get quests - filter by current user's assigned quests or role
   const allActiveTodos = selectActiveTodos(state, undefined);
@@ -657,11 +778,19 @@ export default function TodayQuestsPage() {
     [allCompletedTodos, myStaff?.id, myRoleId]
   );
 
-  // Categorize quests
-  const waitingQuests = useMemo(() => 
-    activeTodos.filter((t) => t.action === 'pending' || t.action === 'approved'),
+  // Categorize quests - Order quests at the top
+  const orderQuests = useMemo(() =>
+    activeTodos.filter((t) => t.title.startsWith('[ORDER]') && (t.action === 'pending' || t.action === 'approved')),
     [activeTodos]
   );
+  
+  const regularWaitingQuests = useMemo(() => 
+    activeTodos.filter((t) => !t.title.startsWith('[ORDER]') && (t.action === 'pending' || t.action === 'approved')),
+    [activeTodos]
+  );
+  
+  // Combined waiting: orders first, then regular
+  const waitingQuests = useMemo(() => [...orderQuests, ...regularWaitingQuests], [orderQuests, regularWaitingQuests]);
   
   const inProgressQuests = useMemo(() => 
     activeTodos.filter((t) => t.action === 'started'),
@@ -681,6 +810,53 @@ export default function TodayQuestsPage() {
   // Check if user already has a task in progress (1 task constraint)
   // Paused tasks don't block starting new tasks
   const hasTaskInProgress = inProgressQuests.length > 0;
+  const currentInProgressQuest = inProgressQuests[0] || null;
+
+  // Detect new urgent order quests and show interrupt modal
+  useEffect(() => {
+    if (orderQuests.length > 0) {
+      const newOrder = orderQuests.find((q) => !processedOrdersRef.current.has(q.id));
+      if (newOrder) {
+        processedOrdersRef.current.add(newOrder.id);
+        setPendingOrderQuest(newOrder);
+        setShowOrderInterrupt(true);
+      }
+    }
+  }, [orderQuests]);
+
+  // Handle order interrupt acceptance
+  const handleAcceptOrderInterrupt = useCallback(() => {
+    if (!pendingOrderQuest) return;
+    
+    // If there's a task in progress, pause it first
+    if (currentInProgressQuest) {
+      const proposal = proposalFromDecision(currentInProgressQuest);
+      actions.pauseDecision(proposal);
+      setLastPausedQuest(currentInProgressQuest);
+    }
+    
+    // Start the order quest
+    const orderProposal = proposalFromDecision(pendingOrderQuest);
+    actions.startDecision(orderProposal);
+    
+    setShowOrderInterrupt(false);
+    setPendingOrderQuest(null);
+  }, [pendingOrderQuest, currentInProgressQuest, actions]);
+
+  // Demo: Simulate POS order
+  const handleSimulateOrder = () => {
+    const orderId = `order-${Date.now()}`;
+    const menuItems = ['サーモン握り', 'マグロ丼', 'えび天ぷら', 'うな重', 'カツ丼'];
+    const menuItem = menuItems[Math.floor(Math.random() * menuItems.length)];
+    const quantity = Math.floor(Math.random() * 3) + 1;
+    
+    actions.createOrderQuest({
+      orderId,
+      menuItemName: menuItem,
+      quantity,
+      slaMinutes: 3,
+    });
+  };
 
   const getRoleNames = (roleIds: string[]) =>
     roleIds.map((roleId) => state.roles.find((r) => r.id === roleId)?.name).filter(Boolean) as string[];
@@ -746,8 +922,30 @@ export default function TodayQuestsPage() {
       );
     }
 
+    // If completing an order quest and there's a paused task, show resume prompt
+    const wasOrderQuest = completingQuest.title.startsWith('[ORDER]');
+    
     setCompletingQuest(null);
     setInProgressStartTime(null);
+    
+    if (wasOrderQuest && lastPausedQuest) {
+      setShowResumePrompt(true);
+    }
+  };
+
+  // Handle resume from prompt
+  const handleResumeFromPrompt = () => {
+    if (lastPausedQuest) {
+      const proposal = proposalFromDecision(lastPausedQuest);
+      actions.resumeDecision(proposal);
+      setLastPausedQuest(null);
+    }
+    setShowResumePrompt(false);
+  };
+
+  const handleDismissResumePrompt = () => {
+    setShowResumePrompt(false);
+    setLastPausedQuest(null);
   };
 
   // Calculate elapsed minutes for modal
@@ -765,10 +963,21 @@ export default function TodayQuestsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title={t('quests.title')}
-        subtitle={`${currentStore.name} - ${new Date().toLocaleDateString(locale === 'ja' ? 'ja-JP' : 'en-US', { month: 'long', day: 'numeric' })}`}
-      />
+      <div className="flex items-center justify-between">
+        <PageHeader
+          title={t('quests.title')}
+          subtitle={`${currentStore.name} - ${new Date().toLocaleDateString(locale === 'ja' ? 'ja-JP' : 'en-US', { month: 'long', day: 'numeric' })}`}
+        />
+        {/* Demo: Simulate POS Order */}
+        <Button 
+          variant="outline" 
+          onClick={handleSimulateOrder}
+          className="gap-2 border-red-200 text-red-600 hover:bg-red-50"
+        >
+          <Bell className="h-4 w-4" />
+          {t('quests.simulateOrder')}
+        </Button>
+      </div>
 
       {/* Progress Summary */}
 <ProgressSummary
@@ -879,6 +1088,24 @@ export default function TodayQuestsPage() {
         onSubmit={handleCompleteSubmit}
         elapsedMinutes={getElapsedMinutes()}
       />
+
+      {/* Order Interrupt Modal */}
+      <OrderInterruptModal
+        open={showOrderInterrupt}
+        onOpenChange={setShowOrderInterrupt}
+        orderQuest={pendingOrderQuest}
+        currentQuest={currentInProgressQuest}
+        onAccept={handleAcceptOrderInterrupt}
+      />
+
+      {/* Resume Prompt */}
+      {showResumePrompt && (
+        <ResumePrompt
+          pausedQuest={lastPausedQuest}
+          onResume={handleResumeFromPrompt}
+          onDismiss={handleDismissResumePrompt}
+        />
+      )}
     </div>
   );
 }

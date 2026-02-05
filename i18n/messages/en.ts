@@ -587,6 +587,17 @@ export const en = {
   'quests.delayReason.other': 'Other',
   'quests.delayReason.none': 'None',
   
+  // Order Interrupt
+  'quests.simulateOrder': 'Simulate POS Order',
+  'quests.orderInterrupt.title': 'Urgent Order',
+  'quests.orderInterrupt.description': 'An urgent order has arrived from POS',
+  'quests.orderInterrupt.currentTask': 'Current task:',
+  'quests.orderInterrupt.willPause': 'This task will be paused',
+  'quests.orderInterrupt.later': 'Later',
+  'quests.orderInterrupt.pauseAndStart': 'Pause & Handle',
+  'quests.orderInterrupt.startNow': 'Handle Now',
+  'quests.resumePrompt.title': 'You have a paused task',
+  
   // Time Clock
   'timeclock.title': 'Time Clock',
   'timeclock.subtitle': 'Attendance',
