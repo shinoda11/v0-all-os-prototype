@@ -236,10 +236,10 @@ export default function WeeklyReviewPage() {
   
   const laborMetrics = selectWeeklyLaborMetrics(state, selectedWeek);
   const teamScore = selectTeamDailyScore(state, selectedWeek);
-  const { weekSummary } = laborMetrics;
+  const weekSummary = laborMetrics?.weekSummary;
   
   // Use task completion rate from weekly metrics
-  const taskCompletionRate = weekSummary.questCompletionRate;
+  const taskCompletionRate = weekSummary?.questCompletionRate ?? 0;
   
   const proposals = useMemo(() => 
     generateWeeklyProposals(laborMetrics, teamScore.total, taskCompletionRate),
@@ -284,7 +284,7 @@ export default function WeeklyReviewPage() {
                 ))}
               </SelectContent>
             </Select>
-            <FreshnessBadge lastUpdate={laborMetrics.lastUpdate} />
+            <FreshnessBadge lastUpdate={laborMetrics?.lastUpdate} />
           </div>
         </div>
         
@@ -488,7 +488,7 @@ export default function WeeklyReviewPage() {
           </Card>
           
           {/* Winning Mix Day */}
-          <Card className={laborMetrics.winningMix ? 'border-emerald-200 bg-emerald-50/50' : ''}>
+          <Card className={laborMetrics?.winningMix ? 'border-emerald-200 bg-emerald-50/50' : ''}>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm flex items-center gap-2">
                 <Trophy className="h-4 w-4" />
@@ -496,7 +496,7 @@ export default function WeeklyReviewPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {laborMetrics.winningMix ? (
+              {laborMetrics?.winningMix ? (
                 <>
                   <div className="flex items-center gap-2">
                     <span className="text-3xl font-bold tabular-nums text-emerald-600">
@@ -707,7 +707,7 @@ export default function WeeklyReviewPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {laborMetrics.dailyRows.map((row) => (
+                  {(laborMetrics?.dailyRows ?? []).map((row) => (
                     <TableRow key={row.date} className={cn(
                       row.dayScore !== null && row.dayScore < 70 && 'bg-red-50',
                       row.overtimeFlag && 'bg-amber-50/50'
@@ -787,13 +787,13 @@ export default function WeeklyReviewPage() {
                 <CardTitle>{t('weeklyReview.hrProposals')}</CardTitle>
               </div>
               <Badge variant="outline">
-                {(laborMetrics.winningMix ? 1 : 0) + (laborMetrics.weakTimeBands?.length ?? 0) + (laborMetrics.chronicDelayQuests?.length ?? 0)}
+                {(laborMetrics?.winningMix ? 1 : 0) + (laborMetrics?.weakTimeBands?.length ?? 0) + (laborMetrics?.chronicDelayQuests?.length ?? 0)}
               </Badge>
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
             {/* Winning Mix */}
-            {laborMetrics.winningMix && (
+            {laborMetrics?.winningMix && (
               <div className="p-4 rounded border border-emerald-200 bg-emerald-50">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 space-y-2">
@@ -838,7 +838,7 @@ export default function WeeklyReviewPage() {
             )}
             
             {/* Weak Time Bands */}
-            {laborMetrics.weakTimeBands.slice(0, 3).map((weak, idx) => (
+            {(laborMetrics?.weakTimeBands ?? []).slice(0, 3).map((weak, idx) => (
               <div key={`weak-${idx}`} className="p-4 rounded border border-amber-200 bg-amber-50">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 space-y-2">
@@ -872,7 +872,7 @@ export default function WeeklyReviewPage() {
             ))}
             
             {/* Chronic Delay Quests */}
-            {laborMetrics.chronicDelayQuests.slice(0, 2).map((quest, idx) => (
+            {(laborMetrics?.chronicDelayQuests ?? []).slice(0, 2).map((quest, idx) => (
               <div key={`delay-${idx}`} className="p-4 rounded border border-red-200 bg-red-50">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 space-y-2">
@@ -902,7 +902,7 @@ export default function WeeklyReviewPage() {
               </div>
             ))}
             
-            {!laborMetrics.winningMix && laborMetrics.weakTimeBands.length === 0 && laborMetrics.chronicDelayQuests.length === 0 && (
+            {!laborMetrics?.winningMix && (laborMetrics?.weakTimeBands?.length ?? 0) === 0 && (laborMetrics?.chronicDelayQuests?.length ?? 0) === 0 && (
               <div className="text-center py-8 text-muted-foreground">
                 {t('weeklyReview.noHrProposals')}
               </div>
