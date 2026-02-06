@@ -577,11 +577,24 @@ export const deriveActiveTodos = (
   );
 
   // Filter by role if specified
-  if (roleId) {
-    return activeTodos.filter((e) => e.distributedToRoles.includes(roleId));
-  }
+  const filtered = roleId
+    ? activeTodos.filter((e) => e.distributedToRoles.includes(roleId))
+    : activeTodos;
 
-  return activeTodos;
+  // Sort: isPeak quests first (urgent interrupts), then by priority, then by timestamp
+  const priorityOrder: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 };
+  return filtered.sort((a, b) => {
+    // isPeak always comes first
+    const aPeak = a.isPeak ? 1 : 0;
+    const bPeak = b.isPeak ? 1 : 0;
+    if (aPeak !== bPeak) return bPeak - aPeak;
+    // Then by priority
+    const aPri = priorityOrder[a.priority] ?? 0;
+    const bPri = priorityOrder[b.priority] ?? 0;
+    if (aPri !== bPri) return bPri - aPri;
+    // Then by timestamp (newest first)
+    return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+  });
 };
 
 export const deriveCompletedTodos = (

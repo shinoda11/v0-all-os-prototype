@@ -159,7 +159,8 @@ function QuestCard({ quest, status, roleNames, onStart, onPause, onResume, onCom
     <div
       className={cn(
         'p-4 rounded-lg border transition-all',
-        status === 'waiting' && 'bg-card border-border hover:border-primary/50',
+        status === 'waiting' && quest.isPeak && 'bg-red-50 border-red-400 ring-1 ring-red-200',
+        status === 'waiting' && !quest.isPeak && 'bg-card border-border hover:border-primary/50',
         status === 'in_progress' && 'bg-primary/5 border-primary',
         status === 'paused' && 'bg-amber-50 border-amber-300',
         status === 'done' && 'bg-muted/50 border-muted',
@@ -175,6 +176,11 @@ function QuestCard({ quest, status, roleNames, onStart, onPause, onResume, onCom
     )}>
     {quest.title}
     </h3>
+    {quest.isPeak && (
+    <Badge variant="outline" className="bg-red-100 text-red-700 border-red-300 text-xs font-bold">
+      PEAK
+    </Badge>
+    )}
     {status === 'paused' && (
     <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-300 text-xs">
       {t('quests.paused')}
@@ -778,19 +784,25 @@ export default function TodayQuestsPage() {
     [allCompletedTodos, myStaff?.id, myRoleId]
   );
 
-  // Categorize quests - Order quests at the top
-  const orderQuests = useMemo(() =>
-    activeTodos.filter((t) => t.title.startsWith('[ORDER]') && (t.action === 'pending' || t.action === 'approved')),
+  // Categorize quests - Peak (isPeak) and [ORDER] quests at the top
+  const peakQuests = useMemo(() =>
+    activeTodos.filter((t) =>
+      (t.isPeak || t.title.startsWith('[ORDER]')) &&
+      (t.action === 'pending' || t.action === 'approved')
+    ),
     [activeTodos]
   );
   
   const regularWaitingQuests = useMemo(() => 
-    activeTodos.filter((t) => !t.title.startsWith('[ORDER]') && (t.action === 'pending' || t.action === 'approved')),
+    activeTodos.filter((t) =>
+      !t.isPeak && !t.title.startsWith('[ORDER]') &&
+      (t.action === 'pending' || t.action === 'approved')
+    ),
     [activeTodos]
   );
   
-  // Combined waiting: orders first, then regular
-  const waitingQuests = useMemo(() => [...orderQuests, ...regularWaitingQuests], [orderQuests, regularWaitingQuests]);
+  // Combined waiting: peak first (already sorted by deriveActiveTodos), then regular
+  const waitingQuests = useMemo(() => [...peakQuests, ...regularWaitingQuests], [peakQuests, regularWaitingQuests]);
   
   const inProgressQuests = useMemo(() => 
     activeTodos.filter((t) => t.action === 'started'),
@@ -812,17 +824,17 @@ export default function TodayQuestsPage() {
   const hasTaskInProgress = inProgressQuests.length > 0;
   const currentInProgressQuest = inProgressQuests[0] || null;
 
-  // Detect new urgent order quests and show interrupt modal
+  // Detect new peak/order quests and show interrupt modal
   useEffect(() => {
-    if (orderQuests.length > 0) {
-      const newOrder = orderQuests.find((q) => !processedOrdersRef.current.has(q.id));
-      if (newOrder) {
-        processedOrdersRef.current.add(newOrder.id);
-        setPendingOrderQuest(newOrder);
+    if (peakQuests.length > 0) {
+      const newPeak = peakQuests.find((q) => !processedOrdersRef.current.has(q.id));
+      if (newPeak) {
+        processedOrdersRef.current.add(newPeak.id);
+        setPendingOrderQuest(newPeak);
         setShowOrderInterrupt(true);
       }
     }
-  }, [orderQuests]);
+  }, [peakQuests]);
 
   // Handle order interrupt acceptance
   const handleAcceptOrderInterrupt = useCallback(() => {
@@ -843,19 +855,39 @@ export default function TodayQuestsPage() {
     setPendingOrderQuest(null);
   }, [pendingOrderQuest, currentInProgressQuest, actions]);
 
-  // Demo: Simulate POS order
+  // Peak task card (from seed data)
+  const peakTaskCard = state.taskCards.find((tc) => tc.isPeak);
+
+  // Demo: Simulate POS order as a peak DecisionEvent with refId
   const handleSimulateOrder = () => {
-    const orderId = `order-${Date.now()}`;
-    const menuItems = ['サーモン握り', 'マグロ丼', 'えび天ぷら', 'うな重', 'カツ丼'];
-    const menuItem = menuItems[Math.floor(Math.random() * menuItems.length)];
-    const quantity = Math.floor(Math.random() * 3) + 1;
-    
-    actions.createOrderQuest({
-      orderId,
-      menuItemName: menuItem,
-      quantity,
-      slaMinutes: 3,
-    });
+    if (!peakTaskCard) return;
+    const storeId = state.selectedStoreId || '1';
+    const now = new Date().toISOString();
+    const questId = `peak-${peakTaskCard.id}-${Date.now()}`;
+    const slaMinutes = peakTaskCard.standardMinutes || 3;
+    const deadline = new Date(Date.now() + slaMinutes * 60 * 1000).toISOString();
+
+    const peakEvent: DecisionEvent = {
+      id: questId,
+      type: 'decision',
+      storeId,
+      timestamp: now,
+      timeBand: 'lunch' as TimeBand,
+      proposalId: questId,
+      action: 'pending',
+      title: peakTaskCard.name,
+      description: `POS注文: ${peakTaskCard.name} (SLA ${slaMinutes}分)`,
+      distributedToRoles: [peakTaskCard.role],
+      priority: 'critical',
+      deadline,
+      estimatedMinutes: slaMinutes,
+      source: 'system',
+      refId: peakTaskCard.id,
+      targetValue: peakTaskCard.baseQuantity,
+      isPeak: true,
+    };
+
+    actions.addEvent(peakEvent);
   };
 
   const getRoleNames = (roleIds: string[]) =>
@@ -931,8 +963,8 @@ export default function TodayQuestsPage() {
       );
     }
 
-    // If completing an order quest and there's a paused task, show resume prompt
-    const wasOrderQuest = completingQuest.title.startsWith('[ORDER]');
+    // If completing a peak/order quest and there's a paused task, show resume prompt
+    const wasOrderQuest = completingQuest.isPeak || completingQuest.title.startsWith('[ORDER]');
     
     setCompletingQuest(null);
     setInProgressStartTime(null);
@@ -977,15 +1009,17 @@ export default function TodayQuestsPage() {
           title={t('quests.title')}
           subtitle={`${currentStore.name} - ${new Date().toLocaleDateString(locale === 'ja' ? 'ja-JP' : 'en-US', { month: 'long', day: 'numeric' })}`}
         />
-        {/* Demo: Simulate POS Order */}
-        <Button 
-          variant="outline" 
-          onClick={handleSimulateOrder}
-          className="gap-2 border-red-200 text-red-600 hover:bg-red-50"
-        >
-          <Bell className="h-4 w-4" />
-          {t('quests.simulateOrder')}
-        </Button>
+        {/* Demo: Simulate POS Order (peak task) - staff view only */}
+        {peakTaskCard && (
+          <Button 
+            variant="outline" 
+            onClick={handleSimulateOrder}
+            className="gap-2 border-red-200 text-red-600 hover:bg-red-50"
+          >
+            <Bell className="h-4 w-4" />
+            {t('quests.simulateOrder')}
+          </Button>
+        )}
       </div>
 
       {/* Progress Summary */}

@@ -221,6 +221,14 @@ export function createDemoTaskCards(): TaskCard[] {
       quantityMode: 'byOrders', baseQuantity: 1, coefficient: 1,
       qualityCheck: 'none', xpReward: 35, enabled: true 
     },
+    // Peak task (urgent POS order interrupt)
+    {
+      id: 'task-peak-1', categoryId: 'cat-service', name: 'Order: Salmon Nigiri x 4',
+      role: 'kitchen', starRequirement: 1, standardMinutes: 3,
+      quantityMode: 'fixed', baseQuantity: 4, coefficient: 1,
+      qualityCheck: 'none', xpReward: 40, enabled: true,
+      isPeak: true,
+    },
   ];
 }
 
@@ -277,7 +285,8 @@ export function createTodayPlanFromTemplates(
   date: string
 ): DomainEvent[] {
   const questEvents: DomainEvent[] = [];
-  const enabledTasks = taskCards.filter(t => t.enabled);
+  // Exclude peak tasks from the daily plan (they are created on-demand via Simulate Order)
+  const enabledTasks = taskCards.filter(t => t.enabled && !t.isPeak);
   
   for (const task of enabledTasks) {
     // Create a pending decision event for each task card
