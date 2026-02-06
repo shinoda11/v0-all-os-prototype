@@ -43,7 +43,18 @@ interface StoreContextValue {
     startDecision: (proposal: Proposal, actor?: { assigneeId?: string; assigneeName?: string }) => void;
     pauseDecision: (proposal: Proposal, reason?: string) => void;
     resumeDecision: (proposal: Proposal, actor?: { assigneeId?: string; assigneeName?: string }) => void;
-    completeDecision: (proposal: Proposal, actor?: { assigneeId?: string; assigneeName?: string }) => void;
+    completeDecision: (
+      proposal: Proposal,
+      actor?: { assigneeId?: string; assigneeName?: string },
+      completionData?: {
+        sourceQuest?: DecisionEvent;
+        actualMinutes?: number;
+        actualQuantity?: number;
+        delayReason?: string;
+        qualityStatus?: 'ok' | 'ng';
+        qualityNote?: string;
+      }
+    ) => void;
     updateProposal: (proposal: Proposal) => void;
     addProposal: (proposal: Proposal) => void;
     // Replay
@@ -367,30 +378,73 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       publishStateUpdate('decision:changed', 'started', ['decision', 'todo']);
     },
 
-    // Complete decision - marks todo as done and records prep event if applicable
-    completeDecision: (proposal: Proposal, actor?: { assigneeId?: string; assigneeName?: string }) => {
+    // Complete decision - single entry point for all task completions.
+    // Generates the 'completed' DecisionEvent, carries over sourceQuest
+    // fields (isPeak, refId, etc.), stamps completion data, and triggers
+    // prep completion when applicable.
+    completeDecision: (
+      proposal: Proposal,
+      actor?: { assigneeId?: string; assigneeName?: string },
+      completionData?: {
+        sourceQuest?: DecisionEvent;
+        actualMinutes?: number;
+        actualQuantity?: number;
+        delayReason?: string;
+        qualityStatus?: 'ok' | 'ng';
+        qualityNote?: string;
+      }
+    ) => {
       const storeId = storeIdRef.current;
       if (!storeId) return;
       
-      // Create the completion decision event
+      // Create the base completion decision event via commands layer
       const completionEvent = commands.completeDecision(storeId, proposal, actor);
+
       // Ensure assignee is always set on completion
       if (!completionEvent.assigneeId && actor?.assigneeId) {
         completionEvent.assigneeId = actor.assigneeId;
         completionEvent.assigneeName = actor.assigneeName;
       }
+
+      // Carry over quest-instance fields from the source quest
+      // (these aren't on Proposal, so they'd be lost without this)
+      const src = completionData?.sourceQuest;
+      if (src) {
+        completionEvent.isPeak = src.isPeak;
+        completionEvent.refId = src.refId;
+        completionEvent.targetValue = src.targetValue;
+        completionEvent.estimatedMinutes = src.estimatedMinutes;
+        completionEvent.quantity = src.quantity;
+        completionEvent.targetPrepItemIds = src.targetPrepItemIds;
+        completionEvent.targetMenuIds = src.targetMenuIds;
+        // Preserve assignee from the in-progress event if actor didn't override
+        if (!completionEvent.assigneeId && src.assigneeId) {
+          completionEvent.assigneeId = src.assigneeId;
+          completionEvent.assigneeName = src.assigneeName;
+        }
+      }
+
+      // Stamp completion details
+      if (completionData) {
+        completionEvent.actualMinutes = completionData.actualMinutes;
+        completionEvent.actualQuantity = completionData.actualQuantity;
+        completionEvent.delayReason = completionData.delayReason;
+        completionEvent.qualityStatus = completionData.qualityStatus;
+        completionEvent.qualityNote = completionData.qualityNote;
+      }
+
       dispatch({ type: 'ADD_EVENT', event: completionEvent });
       
       // If proposal has prep items, record prep completion events
-      // This closes the loop and updates cockpit metrics
-      if (proposal.targetPrepItemIds && proposal.targetPrepItemIds.length > 0) {
-        for (const prepItemId of proposal.targetPrepItemIds) {
+      const prepItemIds = completionEvent.targetPrepItemIds ?? proposal.targetPrepItemIds;
+      if (prepItemIds && prepItemIds.length > 0) {
+        for (const prepItemId of prepItemIds) {
           const prepEvent = commands.completePrep(
             storeId,
             prepItemId,
-            proposal.quantity || 1,
-            undefined, // staffId
-            completionEvent.id // link to decision
+            completionData?.actualQuantity ?? proposal.quantity || 1,
+            actor?.assigneeId,
+            completionEvent.id
           );
           dispatch({ type: 'ADD_EVENT', event: prepEvent });
         }

@@ -938,30 +938,16 @@ export default function TodayQuestsPage() {
   }) => {
     if (!completingQuest) return;
 
-    const completedEvent: DecisionEvent = {
-      ...completingQuest,
-      id: `${completingQuest.proposalId}-completed-${Date.now()}`,
-      action: 'completed',
-      timestamp: new Date().toISOString(),
-      // Ensure assignee is set: keep existing, or claim by current user
-      assigneeId: completingQuest.assigneeId || actorInfo.assigneeId,
-      assigneeName: completingQuest.assigneeName || actorInfo.assigneeName,
-      actualQuantity: data.actualQuantity,
+    // Single entry point: all completion goes through actions.completeDecision
+    const proposal = proposalFromDecision(completingQuest);
+    actions.completeDecision(proposal, actorInfo, {
+      sourceQuest: completingQuest,
       actualMinutes: data.actualMinutes,
+      actualQuantity: data.actualQuantity,
       delayReason: data.delayReason,
       qualityStatus: data.qualityStatus,
       qualityNote: data.qualityNote,
-    };
-    actions.addEvent(completedEvent);
-
-    if (completingQuest.targetPrepItemIds && completingQuest.targetPrepItemIds.length > 0) {
-      actions.completePrep(
-        completingQuest.targetPrepItemIds[0],
-        data.actualQuantity ?? completingQuest.quantity ?? 0,
-        myStaff?.id,
-        completingQuest.proposalId
-      );
-    }
+    });
 
     // If completing a peak/order quest and there's a paused task, show resume prompt
     const wasOrderQuest = completingQuest.isPeak || completingQuest.title.startsWith('[ORDER]');
