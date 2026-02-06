@@ -16,6 +16,7 @@ import {
 import { Store, Menu, User, ChevronDown, Briefcase, Users, Check } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { cn } from '@/lib/utils';
 import type { UserRole } from '@/core/types';
 
 interface HeaderBarProps {
@@ -88,44 +89,52 @@ export function HeaderBar({ storeId, onMenuClick }: HeaderBarProps) {
           </div>
         )}
         
-        {/* View Switcher - Only for Manager+ */}
-        {canSwitchView && viewModeLoaded && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-2">
-                {viewMode === 'manager' ? (
-                  <Briefcase className="h-4 w-4" />
-                ) : (
-                  <Users className="h-4 w-4" />
-                )}
-                <span className="hidden sm:inline">
-                  {viewMode === 'manager' ? 'Manager' : 'Staff'}
-                </span>
-                <ChevronDown className="h-3 w-3" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>View Mode</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={() => handleViewSwitch('manager')}
-                className="gap-2"
-              >
+        {/* View Switcher - Only for Manager+
+             Always render the DropdownMenu shell so Radix id generation
+             stays consistent between SSR and client (prevents hydration mismatch).
+             Hide visually until viewModeLoaded is true. */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              className={cn(
+                'gap-2',
+                (!canSwitchView || !viewModeLoaded) && 'hidden'
+              )}
+            >
+              {viewMode === 'manager' ? (
                 <Briefcase className="h-4 w-4" />
-                Manager View
-                {viewMode === 'manager' && <Check className="h-4 w-4 ml-auto" />}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => handleViewSwitch('staff')}
-                className="gap-2"
-              >
+              ) : (
                 <Users className="h-4 w-4" />
-                Staff View
-                {viewMode === 'staff' && <Check className="h-4 w-4 ml-auto" />}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
+              )}
+              <span className="hidden sm:inline">
+                {viewMode === 'manager' ? 'Manager' : 'Staff'}
+              </span>
+              <ChevronDown className="h-3 w-3" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuLabel>View Mode</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={() => handleViewSwitch('manager')}
+              className="gap-2"
+            >
+              <Briefcase className="h-4 w-4" />
+              Manager View
+              {viewMode === 'manager' && <Check className="h-4 w-4 ml-auto" />}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => handleViewSwitch('staff')}
+              className="gap-2"
+            >
+              <Users className="h-4 w-4" />
+              Staff View
+              {viewMode === 'staff' && <Check className="h-4 w-4 ml-auto" />}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
 
         {/* Mock User Switcher (for testing) */}
         <DropdownMenu>
