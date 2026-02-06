@@ -38,7 +38,7 @@ const ROLE_COLORS: Record<UserRole, string> = {
 
 export function HeaderBar({ storeId, onMenuClick }: HeaderBarProps) {
   const { state } = useStore();
-  const { currentUser, setMockUser, canSwitchView } = useAuth();
+  const { currentUser, isHydrated, setMockUser, canSwitchView } = useAuth();
   const [viewMode, setViewMode, viewModeLoaded] = useViewMode();
   const router = useRouter();
   const currentStore = state.stores.find((s) => s.id === storeId);
@@ -136,15 +136,23 @@ export function HeaderBar({ storeId, onMenuClick }: HeaderBarProps) {
           </DropdownMenuContent>
         </DropdownMenu>
 
-        {/* Mock User Switcher (for testing) */}
+        {/* Mock User Switcher (for testing)
+             Guard name/badge with isHydrated so SSR and first client render
+             always show the same default text, avoiding hydration mismatch. */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="sm" className="gap-2">
               <User className="h-4 w-4" />
-              <span className="hidden sm:inline">{currentUser.name}</span>
-              <Badge variant="outline" className={ROLE_COLORS[currentUser.role]}>
-                {ROLE_LABELS[currentUser.role]}
-              </Badge>
+              {isHydrated ? (
+                <>
+                  <span className="hidden sm:inline">{currentUser.name}</span>
+                  <Badge variant="outline" className={ROLE_COLORS[currentUser.role]}>
+                    {ROLE_LABELS[currentUser.role]}
+                  </Badge>
+                </>
+              ) : (
+                <span className="hidden sm:inline text-muted-foreground">...</span>
+              )}
               <ChevronDown className="h-3 w-3" />
             </Button>
           </DropdownMenuTrigger>

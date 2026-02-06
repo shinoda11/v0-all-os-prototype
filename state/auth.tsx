@@ -44,6 +44,7 @@ const MOCK_USERS: Record<string, CurrentUser> = {
 
 interface AuthContextValue {
   currentUser: CurrentUser;
+  isHydrated: boolean;
   setMockUser: (role: UserRole) => void;
   canAccessManagerView: boolean;
   canAccessStaffView: boolean;
@@ -75,6 +76,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
   const [currentUser, setCurrentUser] = useState<CurrentUser>(
     MOCK_USERS[defaultRole]
   );
+  const [isHydrated, setIsHydrated] = useState(false);
 
   // Hydrate from localStorage after mount (client-only)
   useEffect(() => {
@@ -82,10 +84,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
     const savedViewMode = localStorage.getItem(VIEW_MODE_STORAGE_KEY);
 
     if (savedRole && MOCK_USERS[savedRole]) {
-      // Only update state if it differs from the SSR default
-      if (MOCK_USERS[savedRole].id !== currentUser.id) {
-        setCurrentUser(MOCK_USERS[savedRole]);
-      }
+      setCurrentUser(MOCK_USERS[savedRole]);
 
       // Ensure view mode is set based on role if not already set
       if (!savedViewMode) {
@@ -98,6 +97,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
       const defaultViewMode = (defaultRole === 'manager' || defaultRole === 'owner' || defaultRole === 'sv') ? 'manager' : 'staff';
       localStorage.setItem(VIEW_MODE_STORAGE_KEY, defaultViewMode);
     }
+    setIsHydrated(true);
   }, []);
 
   const setMockUser = useCallback((role: UserRole) => {
@@ -126,6 +126,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
   return (
     <AuthContext.Provider value={{
       currentUser,
+      isHydrated,
       setMockUser,
       canAccessManagerView,
       canAccessStaffView,
