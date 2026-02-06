@@ -222,46 +222,55 @@ export const markDeliveryArrived = (
 // Decision Commands
 // ------------------------------------------------------------
 
+export interface DecisionActorInfo {
+  assigneeId?: string;
+  assigneeName?: string;
+}
+
 export const createDecision = (
   storeId: string,
   proposal: Proposal,
-  action: DecisionEvent['action']
-  ): DecisionEvent => {
+  action: DecisionEvent['action'],
+  actor?: DecisionActorInfo
+): DecisionEvent => {
   const timestamp = now();
   const hour = new Date(timestamp).getHours();
   return {
-  id: generateId(),
-  type: 'decision',
-  storeId,
-  timestamp,
-  timeBand: proposal.timeBand ?? getTimeBandFromHour(hour),
-  proposalId: proposal.id,
-  action,
-  title: proposal.title,
-  description: proposal.description,
-  distributedToRoles: proposal.distributedToRoles,
-  targetMenuIds: proposal.targetMenuIds,
-  targetPrepItemIds: proposal.targetPrepItemIds,
-  quantity: proposal.quantity,
-  deadline: proposal.deadline,
-  priority: proposal.priority,
-  // Source tracking for incentive abuse prevention
-  source: proposal.source ?? 'system', // Default to system for auto-generated
-  managerApprovedForPoints: proposal.managerApprovedForPoints,
+    id: generateId(),
+    type: 'decision',
+    storeId,
+    timestamp,
+    timeBand: proposal.timeBand ?? getTimeBandFromHour(hour),
+    proposalId: proposal.id,
+    action,
+    title: proposal.title,
+    description: proposal.description,
+    distributedToRoles: proposal.distributedToRoles,
+    targetMenuIds: proposal.targetMenuIds,
+    targetPrepItemIds: proposal.targetPrepItemIds,
+    quantity: proposal.quantity,
+    deadline: proposal.deadline,
+    priority: proposal.priority,
+    // Assignee tracking: prefer existing proposal-level assignee, then actor
+    assigneeId: actor?.assigneeId,
+    assigneeName: actor?.assigneeName,
+    // Source tracking for incentive abuse prevention
+    source: proposal.source ?? 'system',
+    managerApprovedForPoints: proposal.managerApprovedForPoints,
   };
-  };
+};
 
-export const approveProposal = (storeId: string, proposal: Proposal): DecisionEvent =>
-  createDecision(storeId, proposal, 'approved');
+export const approveProposal = (storeId: string, proposal: Proposal, actor?: DecisionActorInfo): DecisionEvent =>
+  createDecision(storeId, proposal, 'approved', actor);
 
 export const rejectProposal = (storeId: string, proposal: Proposal): DecisionEvent =>
   createDecision(storeId, proposal, 'rejected');
 
-export const startDecision = (storeId: string, proposal: Proposal): DecisionEvent =>
-  createDecision(storeId, proposal, 'started');
+export const startDecision = (storeId: string, proposal: Proposal, actor?: DecisionActorInfo): DecisionEvent =>
+  createDecision(storeId, proposal, 'started', actor);
 
-export const completeDecision = (storeId: string, proposal: Proposal): DecisionEvent =>
-  createDecision(storeId, proposal, 'completed');
+export const completeDecision = (storeId: string, proposal: Proposal, actor?: DecisionActorInfo): DecisionEvent =>
+  createDecision(storeId, proposal, 'completed', actor);
 
 // ------------------------------------------------------------
 // Forecast Commands

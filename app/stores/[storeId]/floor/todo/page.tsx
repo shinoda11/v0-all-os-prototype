@@ -835,9 +835,9 @@ export default function TodayQuestsPage() {
       setLastPausedQuest(currentInProgressQuest);
     }
     
-    // Start the order quest
+    // Start the order quest with current user as assignee
     const orderProposal = proposalFromDecision(pendingOrderQuest);
-    actions.startDecision(orderProposal);
+    actions.startDecision(orderProposal, actorInfo);
     
     setShowOrderInterrupt(false);
     setPendingOrderQuest(null);
@@ -861,15 +861,21 @@ export default function TodayQuestsPage() {
   const getRoleNames = (roleIds: string[]) =>
     roleIds.map((roleId) => state.roles.find((r) => r.id === roleId)?.name).filter(Boolean) as string[];
 
+  // Actor info for assignee tracking
+  const actorInfo = useMemo(() => ({
+    assigneeId: myStaff?.id,
+    assigneeName: myStaff?.name ?? currentUser.name,
+  }), [myStaff?.id, myStaff?.name, currentUser.name]);
+
   const handleStart = (quest: DecisionEvent) => {
     // Single-task constraint: don't allow starting if another task is in progress
     if (hasTaskInProgress) return;
     
     const proposal = proposalFromDecision(quest);
-    actions.startDecision(proposal);
+    actions.startDecision(proposal, actorInfo);
     
     if (quest.targetPrepItemIds && quest.targetPrepItemIds.length > 0) {
-      actions.startPrep(quest.targetPrepItemIds[0], quest.quantity || 1, undefined, quest.proposalId);
+      actions.startPrep(quest.targetPrepItemIds[0], quest.quantity || 1, myStaff?.id, quest.proposalId);
     }
   };
 
@@ -883,7 +889,7 @@ export default function TodayQuestsPage() {
     if (hasTaskInProgress) return;
     
     const proposal = proposalFromDecision(quest);
-    actions.resumeDecision(proposal);
+    actions.resumeDecision(proposal, actorInfo);
   };
 
   const handleCompleteClick = (quest: DecisionEvent) => {
@@ -905,6 +911,9 @@ export default function TodayQuestsPage() {
       id: `${completingQuest.proposalId}-completed-${Date.now()}`,
       action: 'completed',
       timestamp: new Date().toISOString(),
+      // Ensure assignee is set: keep existing, or claim by current user
+      assigneeId: completingQuest.assigneeId || actorInfo.assigneeId,
+      assigneeName: completingQuest.assigneeName || actorInfo.assigneeName,
       actualQuantity: data.actualQuantity,
       actualMinutes: data.actualMinutes,
       delayReason: data.delayReason,
@@ -917,7 +926,7 @@ export default function TodayQuestsPage() {
       actions.completePrep(
         completingQuest.targetPrepItemIds[0],
         data.actualQuantity ?? completingQuest.quantity ?? 0,
-        undefined,
+        myStaff?.id,
         completingQuest.proposalId
       );
     }
@@ -937,7 +946,7 @@ export default function TodayQuestsPage() {
   const handleResumeFromPrompt = () => {
     if (lastPausedQuest) {
       const proposal = proposalFromDecision(lastPausedQuest);
-      actions.resumeDecision(proposal);
+      actions.resumeDecision(proposal, actorInfo);
       setLastPausedQuest(null);
     }
     setShowResumePrompt(false);

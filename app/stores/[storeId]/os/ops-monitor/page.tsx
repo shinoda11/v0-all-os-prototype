@@ -215,7 +215,7 @@ function OpsQuestCard({ quest, status, staffMap, onReassign }: OpsQuestCardProps
       {/* Completion results */}
       {status === 'completed' && quest.actualMinutes && (
         <div className="text-xs text-muted-foreground mb-2">
-          実績: {quest.actualMinutes}min
+          実��: {quest.actualMinutes}min
           {quest.qualityStatus && (
             <Badge 
               variant="outline" 
@@ -757,17 +757,19 @@ export default function OpsMonitorPage() {
 
   const totalQuests = notStartedQuests.length + inProgressQuests.length + delayedQuests.length + doneQuests.length;
 
-  // Handle reassign
+  // Handle reassign - creates a new decision event with updated assignee
+  // This uses addEvent + the same proposalId so derive functions pick up
+  // the latest assignee via last-write-wins pattern.
   const handleReassign = (questId: string, newAssigneeId: string) => {
     const newStaff = staffMap.get(newAssigneeId);
     if (!newStaff) return;
     
-    // Find the quest and create an updated event
+    // Find the quest
     const quest = [...activeTodos, ...completedTodos].find((q) => q.id === questId);
     if (!quest) return;
     
-    // Create a new event with updated assignee
-    const updatedEvent: DecisionEvent = {
+    // Create a new event with updated assignee (preserves current action state)
+    const reassignedEvent: DecisionEvent = {
       ...quest,
       id: `${quest.proposalId}-reassigned-${Date.now()}`,
       timestamp: new Date().toISOString(),
@@ -775,7 +777,7 @@ export default function OpsMonitorPage() {
       assigneeName: newStaff.name,
     };
     
-    actions.addEvent(updatedEvent);
+    actions.addEvent(reassignedEvent);
   };
 
   if (!currentStore) {

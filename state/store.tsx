@@ -40,10 +40,10 @@ interface StoreContextValue {
     // Decision
     approveProposal: (proposal: Proposal) => void;
     rejectProposal: (proposal: Proposal) => void;
-    startDecision: (proposal: Proposal) => void;
+    startDecision: (proposal: Proposal, actor?: { assigneeId?: string; assigneeName?: string }) => void;
     pauseDecision: (proposal: Proposal, reason?: string) => void;
-    resumeDecision: (proposal: Proposal) => void;
-    completeDecision: (proposal: Proposal) => void;
+    resumeDecision: (proposal: Proposal, actor?: { assigneeId?: string; assigneeName?: string }) => void;
+    completeDecision: (proposal: Proposal, actor?: { assigneeId?: string; assigneeName?: string }) => void;
     updateProposal: (proposal: Proposal) => void;
     addProposal: (proposal: Proposal) => void;
     // Replay
@@ -319,10 +319,15 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       publishStateUpdate('decision:changed', 'rejected', ['decision', 'cockpit-exceptions']);
     },
 
-    startDecision: (proposal: Proposal) => {
+    startDecision: (proposal: Proposal, actor?: { assigneeId?: string; assigneeName?: string }) => {
       const storeId = storeIdRef.current;
       if (!storeId) return;
-      const event = commands.startDecision(storeId, proposal);
+      const event = commands.startDecision(storeId, proposal, actor);
+      // If proposal already has no assignee, claim it with actor (self-claim)
+      if (!event.assigneeId && actor?.assigneeId) {
+        event.assigneeId = actor.assigneeId;
+        event.assigneeName = actor.assigneeName;
+      }
       dispatch({ type: 'ADD_EVENT', event });
       publishStateUpdate('decision:changed', 'started', ['decision', 'todo']);
     },
@@ -349,22 +354,31 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       publishStateUpdate('decision:changed', 'paused', ['decision', 'todo']);
     },
 
-    resumeDecision: (proposal: Proposal) => {
+    resumeDecision: (proposal: Proposal, actor?: { assigneeId?: string; assigneeName?: string }) => {
       const storeId = storeIdRef.current;
       if (!storeId) return;
       // Resume is essentially a new start event
-      const event = commands.startDecision(storeId, proposal);
+      const event = commands.startDecision(storeId, proposal, actor);
+      if (!event.assigneeId && actor?.assigneeId) {
+        event.assigneeId = actor.assigneeId;
+        event.assigneeName = actor.assigneeName;
+      }
       dispatch({ type: 'ADD_EVENT', event });
       publishStateUpdate('decision:changed', 'started', ['decision', 'todo']);
     },
 
     // Complete decision - marks todo as done and records prep event if applicable
-    completeDecision: (proposal: Proposal) => {
+    completeDecision: (proposal: Proposal, actor?: { assigneeId?: string; assigneeName?: string }) => {
       const storeId = storeIdRef.current;
       if (!storeId) return;
       
       // Create the completion decision event
-      const completionEvent = commands.completeDecision(storeId, proposal);
+      const completionEvent = commands.completeDecision(storeId, proposal, actor);
+      // Ensure assignee is always set on completion
+      if (!completionEvent.assigneeId && actor?.assigneeId) {
+        completionEvent.assigneeId = actor.assigneeId;
+        completionEvent.assigneeName = actor.assigneeName;
+      }
       dispatch({ type: 'ADD_EVENT', event: completionEvent });
       
       // If proposal has prep items, record prep completion events
