@@ -157,6 +157,11 @@ export interface DecisionEvent extends BaseEvent {
   // Pause tracking
   pausedAt?: string;
   pauseReason?: string;
+  // Task Card linking (refId-based, replaces title matching)
+  refId?: string; // taskCardId from Task Catalog
+  targetValue?: number; // calculated quantity for this quest instance
+  // Peak task flag (urgent POS order interrupts)
+  isPeak?: boolean;
 }
 
 export interface ForecastEvent extends BaseEvent {
@@ -631,6 +636,7 @@ export interface TaskCard {
   qualityCheck: QualityCheck;
   xpReward: number;
   enabled: boolean;
+  isPeak?: boolean; // true = peak/interrupt task (e.g. urgent POS orders)
   notes?: string;
 }
 

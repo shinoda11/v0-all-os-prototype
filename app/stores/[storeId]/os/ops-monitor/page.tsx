@@ -215,7 +215,7 @@ function OpsQuestCard({ quest, status, staffMap, onReassign }: OpsQuestCardProps
       {/* Completion results */}
       {status === 'completed' && quest.actualMinutes && (
         <div className="text-xs text-muted-foreground mb-2">
-          実績: {quest.actualMinutes}min
+          実��: {quest.actualMinutes}min
           {quest.qualityStatus && (
             <Badge 
               variant="outline" 
@@ -429,15 +429,16 @@ interface BoxStatsProps {
 function BoxStatsCard({ box, tasks, allQuests }: BoxStatsProps) {
   const { t } = useI18n();
   
-  // Find quests that might be related to this box's tasks
-  const boxTaskNames = tasks
-    .filter((task) => box.taskCardIds.includes(task.id))
-    .map((task) => task.name);
-  
-  // Match quests by task name (simplified matching)
-  const relatedQuests = allQuests.filter((q) => 
-    boxTaskNames.some((name) => q.title.includes(name) || q.description?.includes(name))
-  );
+  // Find quests related to this box's tasks via refId (falls back to title match)
+  const boxTaskIds = new Set(box.taskCardIds);
+  const relatedQuests = allQuests.filter((q) => {
+    if (q.refId) return boxTaskIds.has(q.refId);
+    // Fallback: title matching for legacy quests without refId
+    const boxTaskNames = tasks
+      .filter((task) => boxTaskIds.has(task.id))
+      .map((task) => task.name);
+    return boxTaskNames.some((name) => q.title.includes(name));
+  });
   
   const completedQuests = relatedQuests.filter((q) => q.action === 'completed');
   const totalTasks = box.taskCardIds.length;
@@ -757,17 +758,19 @@ export default function OpsMonitorPage() {
 
   const totalQuests = notStartedQuests.length + inProgressQuests.length + delayedQuests.length + doneQuests.length;
 
-  // Handle reassign
+  // Handle reassign - creates a new decision event with updated assignee
+  // This uses addEvent + the same proposalId so derive functions pick up
+  // the latest assignee via last-write-wins pattern.
   const handleReassign = (questId: string, newAssigneeId: string) => {
     const newStaff = staffMap.get(newAssigneeId);
     if (!newStaff) return;
     
-    // Find the quest and create an updated event
+    // Find the quest
     const quest = [...activeTodos, ...completedTodos].find((q) => q.id === questId);
     if (!quest) return;
     
-    // Create a new event with updated assignee
-    const updatedEvent: DecisionEvent = {
+    // Create a new event with updated assignee (preserves current action state)
+    const reassignedEvent: DecisionEvent = {
       ...quest,
       id: `${quest.proposalId}-reassigned-${Date.now()}`,
       timestamp: new Date().toISOString(),
@@ -775,7 +778,7 @@ export default function OpsMonitorPage() {
       assigneeName: newStaff.name,
     };
     
-    actions.addEvent(updatedEvent);
+    actions.addEvent(reassignedEvent);
   };
 
   if (!currentStore) {

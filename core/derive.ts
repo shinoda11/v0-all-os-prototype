@@ -577,11 +577,24 @@ export const deriveActiveTodos = (
   );
 
   // Filter by role if specified
-  if (roleId) {
-    return activeTodos.filter((e) => e.distributedToRoles.includes(roleId));
-  }
+  const filtered = roleId
+    ? activeTodos.filter((e) => e.distributedToRoles.includes(roleId))
+    : activeTodos;
 
-  return activeTodos;
+  // Sort: isPeak quests first (urgent interrupts), then by priority, then by timestamp
+  const priorityOrder: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 };
+  return filtered.sort((a, b) => {
+    // isPeak always comes first
+    const aPeak = a.isPeak ? 1 : 0;
+    const bPeak = b.isPeak ? 1 : 0;
+    if (aPeak !== bPeak) return bPeak - aPeak;
+    // Then by priority
+    const aPri = priorityOrder[a.priority] ?? 0;
+    const bPri = priorityOrder[b.priority] ?? 0;
+    if (aPri !== bPri) return bPri - aPri;
+    // Then by timestamp (newest first)
+    return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+  });
 };
 
 export const deriveCompletedTodos = (
@@ -1004,12 +1017,10 @@ export const deriveDailyScore = (
   }
   
   // Filter quests for this staff if specified
+  // Only count quests explicitly assigned to this staff (assigneeId match)
   const relevantQuests = Array.from(questStates.values()).filter(q => {
     if (!staffId) return true;
-    // Check if quest was assigned to this staff's role
-    const staffMember = staff.find(s => s.id === staffId);
-    if (!staffMember) return false;
-    return q.distributedToRoles.includes(staffMember.roleId);
+    return q.assigneeId === staffId;
   });
   
   // ============================================================
@@ -2572,13 +2583,9 @@ export const deriveTeamPerformanceMetrics = (
       hoursWorked = Math.round(totalMinutes / 6) / 10; // Round to 1 decimal
     }
     
-    // Calculate quest performance
-    const staffQuests = completedQuests.filter(
-      q => q.assigneeId === s.id || q.distributedToRoles.includes(s.roleId)
-    );
-    const staffAllQuests = allQuests.filter(
-      q => q.assigneeId === s.id || q.distributedToRoles.includes(s.roleId)
-    );
+    // Calculate quest performance - only count quests assigned to this staff
+    const staffQuests = completedQuests.filter(q => q.assigneeId === s.id);
+    const staffAllQuests = allQuests.filter(q => q.assigneeId === s.id);
     
     const questsDone = staffQuests.length;
     const questsTotal = staffAllQuests.length;
@@ -3002,10 +3009,12 @@ export const deriveTodayEarnings = (
   const basePay = netHoursWorked !== null ? Math.round(netHoursWorked * hourlyWage) : null;
   
   // Filter decision events (quests) for this staff on this date
+  // Only count quests explicitly assigned to this staff (assigneeId match)
+  // Do NOT use distributedToRoles for individual earnings - that was "everyone gets credit" behaviour
   const decisionEvents = (filterByType(events, 'decision') as DecisionEvent[])
     .filter(e => 
       e.timestamp.startsWith(dateStr) && 
-      (e.assigneeId === staffId || e.distributedToRoles.includes(staffMember.roleId))
+      e.assigneeId === staffId
     );
   
   // Get completed quests
@@ -3390,10 +3399,8 @@ export const deriveAwards = (
       hoursWorked = Math.round(totalMinutes / 6) / 10;
     }
     
-    // Calculate quest performance
-    const staffQuests = completedQuests.filter(
-      q => q.assigneeId === s.id || q.distributedToRoles.includes(s.roleId)
-    );
+    // Calculate quest performance - only count quests assigned to this staff
+    const staffQuests = completedQuests.filter(q => q.assigneeId === s.id);
     
     const questsDone = staffQuests.length;
     

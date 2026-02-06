@@ -66,12 +66,12 @@ const StarDisplay = ({ level }: { level: number }) => (
 export function PlanBuilder() {
   const { state, actions } = useStore();
   const { t, locale } = useI18n();
-  const currentStore = state.stores.find((s) => s.id === `store-${state.currentStoreId}`);
+  const storeId = state.selectedStoreId || '1';
 
   // Get data from state
   const taskCards = state.taskCards?.length ? state.taskCards : [];
   const boxTemplates = state.boxTemplates?.length ? state.boxTemplates : [];
-  const staff = state.staff?.filter((s) => s.storeId === `store-${state.currentStoreId}`) || [];
+  const staff = state.staff?.filter((s) => s.storeId === storeId) || [];
 
   // Step state
   const [currentStep, setCurrentStep] = useState<Step>('forecast');
@@ -172,11 +172,14 @@ export function PlanBuilder() {
     });
   };
 
-  // Generate Today Quests
+  // Generate Today Quests - creates pending DecisionEvents linked via refId
   const handleGenerate = () => {
     const now = new Date().toISOString();
-    const storeId = currentStore?.id || 'store-1';
+    const storeId = state.selectedStoreId || '1';
     const today = new Date().toISOString().split('T')[0];
+
+    // Track seen taskIds to avoid duplicate quests for the same task across boxes
+    const seenTaskIds = new Set<string>();
 
     selectedBoxIds.forEach((boxId) => {
       const box = boxTemplates.find((b) => b.id === boxId);
@@ -186,13 +189,16 @@ export function PlanBuilder() {
       const assignedStaff = staff.find((s) => s.id === assignedStaffId);
 
       box.taskCardIds.forEach((taskId) => {
+        if (seenTaskIds.has(taskId)) return; // skip duplicates
+        seenTaskIds.add(taskId);
+
         const task = taskCards.find((t) => t.id === taskId);
         if (!task || !task.enabled) return;
 
-        // Calculate quantity
+        // Calculate quantity based on mode
         let quantity = task.baseQuantity;
         if (task.quantityMode === 'byForecast') {
-          quantity = task.baseQuantity + Math.round(task.coefficient * forecastSales);
+          quantity = task.baseQuantity + Math.round(task.coefficient * (forecastSales / 10000));
         } else if (task.quantityMode === 'byOrders') {
           const estimatedOrders = Math.round(forecastSales / 1500);
           quantity = task.baseQuantity + Math.round(task.coefficient * estimatedOrders);
@@ -207,21 +213,22 @@ export function PlanBuilder() {
           storeId,
           timestamp: now,
           timeBand: box.timeBand,
-          proposalId: questId,
-          action: 'approved',
+          proposalId: `plan-${taskId}-${today}`,
+          action: 'pending',
           title: task.name,
           description: `${task.name} - 数量: ${quantity}`,
           distributedToRoles: [task.role],
-          assignedStaffId: assignedStaffId,
-          assignedStaffName: assignedStaff?.name,
+          // Assignee from Prompt6 pattern
+          assigneeId: assignedStaffId || undefined,
+          assigneeName: assignedStaff?.name || undefined,
           priority: task.starRequirement >= 3 ? 'high' : task.starRequirement >= 2 ? 'medium' : 'low',
           deadline,
           estimatedMinutes: task.standardMinutes,
-          xpReward: task.xpReward,
-          source: 'plan-builder',
-          taskCardId: task.id,
-          boxTemplateId: box.id,
           quantity,
+          source: 'system',
+          // refId-based linking (replaces title matching)
+          refId: task.id,
+          targetValue: quantity,
         };
 
         actions.addEvent(questEvent);
