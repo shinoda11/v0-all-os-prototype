@@ -19,6 +19,7 @@ import {
   FileWarning,
   Users,
   ClipboardList,
+  BookOpen,
   Trophy,
   CalendarCheck,
 } from 'lucide-react';
@@ -65,6 +66,11 @@ const kosSection: NavSection = {
       labelKey: 'nav.dailyPlan',
       path: '/os/plan-builder',
       icon: <CalendarCheck className="h-5 w-5" />,
+    },
+    {
+      labelKey: 'nav.taskCatalog',
+      path: '/os/task-catalog',
+      icon: <BookOpen className="h-5 w-5" />,
     },
     {
       labelKey: 'nav.opsMonitor',

@@ -994,6 +994,7 @@ export const en = {
   'nav.incidentsDesc': 'Rare Events',
   'nav.cockpit': 'Cockpit',
   'nav.dailyPlan': 'Plan Builder',
+  'nav.taskCatalog': 'Task Catalog',
   'nav.opsMonitor': 'Ops Monitor',
   'nav.liveStaff': 'Live Staff',
   'nav.weeklyReview': 'Weekly Review',
