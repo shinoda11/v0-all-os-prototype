@@ -22,6 +22,8 @@ import {
   BookOpen,
   Trophy,
   CalendarCheck,
+  Settings2,
+  Wrench,
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -50,6 +52,31 @@ interface NavSection {
  * Ops OS (Staff): Today Quests, Time Clock, My Score
  */
 
+// Setup section - Task/Plan configuration (Manager+)
+const setupSection: NavSection = {
+  titleKey: 'nav.setup',
+  descriptionKey: 'nav.setupDesc',
+  requiredRole: 'manager',
+  viewMode: 'manager',
+  items: [
+    {
+      labelKey: 'nav.taskCatalog',
+      path: '/os/task-catalog',
+      icon: <BookOpen className="h-5 w-5" />,
+    },
+    {
+      labelKey: 'nav.taskStudio',
+      path: '/os/task-studio',
+      icon: <Wrench className="h-5 w-5" />,
+    },
+    {
+      labelKey: 'nav.dailyPlan',
+      path: '/os/plan-builder',
+      icon: <CalendarCheck className="h-5 w-5" />,
+    },
+  ],
+};
+
 // KOS section - 店長・経営向け (Manager+)
 const kosSection: NavSection = {
   titleKey: 'nav.kos',
@@ -61,16 +88,6 @@ const kosSection: NavSection = {
       labelKey: 'nav.cockpit',
       path: '/os/cockpit',
       icon: <Gauge className="h-5 w-5" />,
-    },
-    {
-      labelKey: 'nav.dailyPlan',
-      path: '/os/plan-builder',
-      icon: <CalendarCheck className="h-5 w-5" />,
-    },
-    {
-      labelKey: 'nav.taskCatalog',
-      path: '/os/task-catalog',
-      icon: <BookOpen className="h-5 w-5" />,
     },
     {
       labelKey: 'nav.opsMonitor',
@@ -130,7 +147,7 @@ const opsOsSection: NavSection = {
   ],
 };
 
-const navSections: NavSection[] = [kosSection, opsOsSection];
+const navSections: NavSection[] = [setupSection, kosSection, opsOsSection];
 
 interface NavGroupProps {
   item: NavItem;

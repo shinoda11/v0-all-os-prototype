@@ -91,6 +91,16 @@ export const en = {
   'cockpit.activeIncidents': 'Active Incidents',
   'cockpit.viewIncidents': 'View Incidents',
   'cockpit.critical': 'Critical',
+  'cockpit.buildPlan': 'Build Today\'s Plan',
+  'cockpit.buildPlanDesc': 'Set forecast, select boxes, and assign staff in Plan Builder',
+  'cockpit.buildPlanAction': 'Open Plan Builder',
+  'cockpit.generatePlan': 'Generate Plan',
+  'cockpit.noQuests': 'No quests yet',
+  'cockpit.questsCompleted': 'completed',
+  'cockpit.questProgress': 'Quest Progress',
+  'cockpit.quests': 'Quests',
+  'cockpit.staff': 'Staff',
+  'cockpit.progress': 'Progress',
 
   // Shift Summary
   'shift.title': "Today's Shift Summary",
@@ -986,6 +996,8 @@ export const en = {
   'weeklyReview.noHrProposals': 'No HR issues detected',
   
   // Sidebar Navigation
+  'nav.setup': 'Setup',
+  'nav.setupDesc': 'Plan & Task Config',
   'nav.kos': 'KOS',
   'nav.kosDesc': 'Manager',
   'nav.opsOs': 'Ops OS',
@@ -995,6 +1007,7 @@ export const en = {
   'nav.cockpit': 'Cockpit',
   'nav.dailyPlan': 'Plan Builder',
   'nav.taskCatalog': 'Task Catalog',
+  'nav.taskStudio': 'Task Studio',
   'nav.opsMonitor': 'Ops Monitor',
   'nav.liveStaff': 'Live Staff',
   'nav.weeklyReview': 'Weekly Review',
@@ -1126,6 +1139,8 @@ export const en = {
   'planBuilder.cannotGenerate': 'Cannot generate: some boxes are unassigned',
   'planBuilder.generate': 'Generate Today Quests',
   'planBuilder.generateSuccess': 'Today Quests generated successfully',
+  'planBuilder.startExecution': 'Start Execution in Staff View',
+  'planBuilder.buildAnother': 'Build Another Plan',
 
   // Task Catalog
   'taskCatalog.title': 'Task Catalog',
