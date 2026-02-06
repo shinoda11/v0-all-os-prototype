@@ -34,8 +34,8 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import type { TimeBand, BoxTemplate, TaskCard, Staff, DecisionEvent } from '@/core/types';
-import { CalendarDays } from 'lucide-react';
+import type { TimeBand, BoxTemplate, TaskCard, Staff, DecisionEvent, LaborSlot } from '@/core/types';
+import { CalendarDays, Plus, Trash2 } from 'lucide-react';
 
 // Step type
 type Step = 'forecast' | 'boxes' | 'assignment' | 'projection';
@@ -96,8 +96,8 @@ export function PlanBuilder() {
   // Step 2: Box selection state
   const [selectedBoxIds, setSelectedBoxIds] = useState<string[]>([]);
 
-  // Step 3: Assignment state - boxId -> staffId mapping
-  const [assignments, setAssignments] = useState<Record<string, string>>({});
+  // Step 3: ShiftSlot state - skill requirement placeholders (Draft stage)
+  const [laborSlots, setLaborSlots] = useState<LaborSlot[]>([]);
 
   // Calculate recommended boxes based on forecast
   const recommendedBoxes = useMemo(() => {
@@ -147,7 +147,9 @@ export function PlanBuilder() {
     });
 
     const requiredHours = totalMinutes / 60;
-    const scheduledHours = staff.length * 6; // Mock: assume 6 hours average
+    const scheduledHours = laborSlots.length > 0
+      ? laborSlots.reduce((sum, s) => sum + s.plannedHours, 0)
+      : staff.length * 6; // Fallback if no slots defined
     const hourlyWage = 1200; // Mock hourly wage
     const laborCost = scheduledHours * hourlyWage;
 
@@ -161,23 +163,68 @@ export function PlanBuilder() {
     };
   }, [selectedTasks, forecastSales, staff.length]);
 
-  // Check if all boxes are assigned
-  const unassignedBoxes = useMemo(() => {
-    return selectedBoxIds.filter((boxId) => !assignments[boxId]);
-  }, [selectedBoxIds, assignments]);
-
-  const canGenerate = unassignedBoxes.length === 0 && selectedBoxIds.length > 0;
-
-  // Get eligible staff for a box based on tasks' roles and star requirements
-  const getEligibleStaff = (box: BoxTemplate): Staff[] => {
-    const boxTasks = taskCards.filter((t) => box.taskCardIds.includes(t.id));
-    const requiredRoles = new Set(boxTasks.map((t) => t.role));
-    const minStar = Math.max(...boxTasks.map((t) => t.starRequirement));
-
-    return staff.filter((s) => {
-      const staffStar = s.starLevel || 1;
-      return staffStar >= minStar;
+  // Derive required roles from selected boxes
+  const requiredRoles = useMemo(() => {
+    const rolesSet = new Map<string, { role: string; minStar: number; totalMinutes: number }>();
+    selectedBoxIds.forEach((boxId) => {
+      const box = boxTemplates.find((b) => b.id === boxId);
+      if (!box) return;
+      const boxTasks = taskCards.filter((t) => box.taskCardIds.includes(t.id));
+      boxTasks.forEach((task) => {
+        const existing = rolesSet.get(task.role);
+        if (existing) {
+          existing.minStar = Math.max(existing.minStar, task.starRequirement);
+          existing.totalMinutes += task.standardMinutes;
+        } else {
+          rolesSet.set(task.role, { role: task.role, minStar: task.starRequirement, totalMinutes: task.standardMinutes });
+        }
+      });
     });
+    return Array.from(rolesSet.values());
+  }, [selectedBoxIds, boxTemplates, taskCards]);
+
+  // Auto-generate slots when moving to assignment step
+  const handleMoveToAssignment = () => {
+    // Only auto-generate if no slots yet
+    if (laborSlots.length === 0) {
+      const newSlots: LaborSlot[] = requiredRoles.map((req, idx) => ({
+        id: `slot-${planDate}-${req.role}-${idx}`,
+        timeBand: 'all' as TimeBand,
+        role: req.role,
+        starLevel: (req.minStar || 1) as 1 | 2 | 3,
+        plannedHours: Math.max(1, Math.ceil(req.totalMinutes / 60)),
+      }));
+      setLaborSlots(newSlots);
+    }
+    setCurrentStep('assignment');
+  };
+
+  // Check if at least one slot exists for required roles
+  const coveredRoles = useMemo(() => {
+    const slotRoles = new Set(laborSlots.map((s) => s.role));
+    return requiredRoles.every((r) => slotRoles.has(r.role));
+  }, [laborSlots, requiredRoles]);
+
+  const canGenerate = coveredRoles && selectedBoxIds.length > 0 && laborSlots.length > 0;
+
+  // Slot management helpers
+  const addSlot = () => {
+    const newSlot: LaborSlot = {
+      id: `slot-${planDate}-${Date.now()}`,
+      timeBand: 'all',
+      role: requiredRoles[0]?.role || 'kitchen',
+      starLevel: 1,
+      plannedHours: 4,
+    };
+    setLaborSlots([...laborSlots, newSlot]);
+  };
+
+  const updateSlot = (slotId: string, updates: Partial<LaborSlot>) => {
+    setLaborSlots(laborSlots.map((s) => s.id === slotId ? { ...s, ...updates } : s));
+  };
+
+  const removeSlot = (slotId: string) => {
+    setLaborSlots(laborSlots.filter((s) => s.id !== slotId));
   };
 
   // Generate Today Quests - creates pending DecisionEvents linked via refId
@@ -189,12 +236,15 @@ export function PlanBuilder() {
     // Track seen taskIds to avoid duplicate quests for the same task across boxes
     const seenTaskIds = new Set<string>();
 
+    // Build role -> slot lookup for slotId stamping
+    const slotsByRole = new Map<string, LaborSlot>();
+    laborSlots.forEach((slot) => {
+      if (!slotsByRole.has(slot.role)) slotsByRole.set(slot.role, slot);
+    });
+
     selectedBoxIds.forEach((boxId) => {
       const box = boxTemplates.find((b) => b.id === boxId);
       if (!box) return;
-
-      const assignedStaffId = assignments[boxId];
-      const assignedStaff = staff.find((s) => s.id === assignedStaffId);
 
       box.taskCardIds.forEach((taskId) => {
         if (seenTaskIds.has(taskId)) return; // skip duplicates
@@ -226,9 +276,8 @@ export function PlanBuilder() {
           title: task.name,
           description: `${task.name} - 数量: ${quantity}`,
           distributedToRoles: [task.role],
-          // Assignee from Prompt6 pattern
-          assigneeId: assignedStaffId || undefined,
-          assigneeName: assignedStaff?.name || undefined,
+          // Draft stage: no staff assigned, only slot linkage
+          slotId: slotsByRole.get(task.role)?.id,
           priority: task.starRequirement >= 3 ? 'high' : task.starRequirement >= 2 ? 'medium' : 'low',
           deadline,
           estimatedMinutes: task.standardMinutes,
@@ -243,6 +292,19 @@ export function PlanBuilder() {
 
         actions.addEvent(questEvent);
       });
+    });
+
+    // Persist the DayPlan (draft with slots) so the Confirmed page can access it
+    actions.upsertDayPlan({
+      date: planDate,
+      storeId,
+      status: 'draft',
+      forecastSales,
+      targetSales,
+      timeBandSplit,
+      selectedBoxIds,
+      laborSlots,
+      updatedAt: new Date().toISOString(),
     });
 
     // Mark as generated - show CTA to start execution
@@ -519,7 +581,7 @@ export function PlanBuilder() {
                   <Button variant="outline" onClick={() => setCurrentStep('forecast')}>
                     {t('planBuilder.back')}
                   </Button>
-                  <Button onClick={() => setCurrentStep('assignment')} disabled={selectedBoxIds.length === 0}>
+                  <Button onClick={handleMoveToAssignment} disabled={selectedBoxIds.length === 0}>
                     {t('planBuilder.next')}
                     <ChevronRight className="h-4 w-4 ml-2" />
                   </Button>
@@ -528,84 +590,120 @@ export function PlanBuilder() {
             </Card>
           )}
 
-          {/* Step 3: Assignment */}
+          {/* Step 3: Slot Definition (Draft) */}
           {currentStep === 'assignment' && (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Users className="h-5 w-5" />
-                  {t('planBuilder.assignment')}
+                  {t('planBuilder.slotDefinition')}
                 </CardTitle>
-                <CardDescription>{t('planBuilder.assignmentDesc')}</CardDescription>
+                <CardDescription>{t('planBuilder.slotDefinitionDesc')}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {unassignedBoxes.length > 0 && (
+                {/* Info banner */}
+                <div className="flex items-center gap-2 p-3 bg-blue-50 text-blue-700 rounded-lg">
+                  <AlertCircle className="h-4 w-4" />
+                  <span className="text-sm">{t('planBuilder.slotInfo')}</span>
+                </div>
+
+                {/* Coverage check */}
+                {!coveredRoles && (
                   <div className="flex items-center gap-2 p-3 bg-red-50 text-red-700 rounded-lg">
                     <AlertCircle className="h-4 w-4" />
-                    <span className="text-sm">
-                      {unassignedBoxes.length}{t('planBuilder.unassignedWarning')}
-                    </span>
+                    <span className="text-sm">{t('planBuilder.slotMissing')}</span>
                   </div>
                 )}
 
+                {/* Slot list */}
                 <div className="space-y-3">
-                  {selectedBoxIds.map((boxId) => {
-                    const box = boxTemplates.find((b) => b.id === boxId);
-                    if (!box) return null;
-
-                    const eligibleStaff = getEligibleStaff(box);
-                    const isAssigned = !!assignments[boxId];
-                    const boxTasks = taskCards.filter((t) => box.taskCardIds.includes(t.id));
-                    const maxStar = Math.max(...boxTasks.map((t) => t.starRequirement));
-
-                    return (
-                      <div
-                        key={boxId}
-                        className={cn(
-                          'border rounded-lg p-4',
-                          !isAssigned && 'border-red-300 bg-red-50/50'
-                        )}
-                      >
-                        <div className="flex items-center justify-between mb-3">
-                          <div>
-                            <div className="font-medium flex items-center gap-2">
-                              {box.name}
-                              <Badge variant="outline">{TIME_BAND_LABELS[box.timeBand]}</Badge>
-                            </div>
-                            <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
-                              <span>{boxTasks.length}{t('planBuilder.tasksUnit')}</span>
-                              <span>|</span>
-                              <span>{t('planBuilder.requiredStar')}: </span>
-                              <StarDisplay level={maxStar} />
-                            </div>
+                  {laborSlots.map((slot) => (
+                    <div key={slot.id} className="border rounded-lg p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1 grid grid-cols-3 gap-3">
+                          {/* Role */}
+                          <div className="space-y-1">
+                            <Label className="text-xs">{t('planBuilder.slotRole')}</Label>
+                            <Select value={slot.role} onValueChange={(v) => updateSlot(slot.id, { role: v })}>
+                              <SelectTrigger className="h-9">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {Object.entries(ROLE_LABELS).map(([key, label]) => (
+                                  <SelectItem key={key} value={key}>{label}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                           </div>
-                          <Select
-                            value={assignments[boxId] || ''}
-                            onValueChange={(value) => setAssignments({ ...assignments, [boxId]: value })}
-                          >
-                            <SelectTrigger className={cn('w-48', !isAssigned && 'border-red-400')}>
-                              <SelectValue placeholder={t('planBuilder.selectStaff')} />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {eligibleStaff.map((s) => (
-                                <SelectItem key={s.id} value={s.id}>
-                                  <div className="flex items-center gap-2">
-                                    <span>{s.name}</span>
-                                    <StarDisplay level={s.starLevel || 1} />
-                                  </div>
-                                </SelectItem>
-                              ))}
-                              {eligibleStaff.length === 0 && (
-                                <div className="text-xs text-muted-foreground p-2">
-                                  {t('planBuilder.noEligibleStaff')}
-                                </div>
-                              )}
-                            </SelectContent>
-                          </Select>
+
+                          {/* Star Level */}
+                          <div className="space-y-1">
+                            <Label className="text-xs">{t('planBuilder.requiredStar')}</Label>
+                            <Select
+                              value={String(slot.starLevel)}
+                              onValueChange={(v) => updateSlot(slot.id, { starLevel: Number(v) as 1 | 2 | 3 })}
+                            >
+                              <SelectTrigger className="h-9">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="1"><StarDisplay level={1} /> 1</SelectItem>
+                                <SelectItem value="2"><StarDisplay level={2} /> 2</SelectItem>
+                                <SelectItem value="3"><StarDisplay level={3} /> 3</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          {/* Planned Hours */}
+                          <div className="space-y-1">
+                            <Label className="text-xs">{t('planBuilder.slotHours')}</Label>
+                            <Input
+                              type="number"
+                              min={1}
+                              max={12}
+                              value={slot.plannedHours}
+                              onChange={(e) => updateSlot(slot.id, { plannedHours: Number(e.target.value) })}
+                              className="h-9"
+                            />
+                          </div>
                         </div>
+
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeSlot(slot.id)}
+                          className="text-destructive hover:text-destructive mt-5"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
-                    );
-                  })}
+
+                      {/* Role label badge */}
+                      <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
+                        <Badge variant="outline" className="text-xs">
+                          {ROLE_LABELS[slot.role] || slot.role}
+                        </Badge>
+                        <StarDisplay level={slot.starLevel} />
+                        <span>{slot.plannedHours}h</span>
+                        {slot.assignedStaffId && (
+                          <Badge variant="secondary" className="text-xs bg-green-100 text-green-700">
+                            {slot.assignedStaffName}
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Add slot button */}
+                <Button variant="outline" onClick={addSlot} className="w-full gap-2">
+                  <Plus className="h-4 w-4" />
+                  {t('planBuilder.addSlot')}
+                </Button>
+
+                {/* Summary */}
+                <div className="flex items-center justify-between p-3 bg-muted rounded-lg text-sm">
+                  <span>{t('planBuilder.slotSummary')}: {laborSlots.length}{t('planBuilder.slotsUnit')}, {laborSlots.reduce((sum, s) => sum + s.plannedHours, 0)}h</span>
                 </div>
 
                 <div className="flex justify-between">
@@ -705,7 +803,7 @@ export function PlanBuilder() {
                 {!canGenerate && (
                   <div className="flex items-center gap-2 p-3 bg-red-50 text-red-700 rounded-lg">
                     <AlertTriangle className="h-4 w-4" />
-                    <span className="text-sm">{t('planBuilder.cannotGenerate')}</span>
+                    <span className="text-sm">{t('planBuilder.cannotGenerateSlots')}</span>
                   </div>
                 )}
 
@@ -736,15 +834,15 @@ export function PlanBuilder() {
                           setHasGenerated(false);
                           setCurrentStep('forecast');
                           setSelectedBoxIds([]);
-                          setAssignments({});
+                          setLaborSlots([]);
                         }}
                       >
                         {t('planBuilder.buildAnother')}
                       </Button>
-                      <Link href={`/stores/${routeStoreId}/floor/todo`}>
+                      <Link href={`/stores/${routeStoreId}/os/confirm-plan`}>
                         <Button className="gap-2">
                           <ChevronRight className="h-4 w-4" />
-                          {t('planBuilder.startExecution')}
+                          {t('planBuilder.confirmPlan')}
                         </Button>
                       </Link>
                     </div>
