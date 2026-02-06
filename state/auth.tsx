@@ -70,27 +70,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
   children, 
   defaultRole = 'manager' 
 }) => {
-  // Initialize from localStorage if available (client-side only)
-  const [currentUser, setCurrentUser] = useState<CurrentUser>(() => {
-    if (typeof window !== 'undefined') {
-      const savedRole = localStorage.getItem(MOCK_USER_STORAGE_KEY);
-      if (savedRole && MOCK_USERS[savedRole]) {
-        return MOCK_USERS[savedRole];
-      }
-    }
-    return MOCK_USERS[defaultRole];
-  });
-  
-  // Sync state with localStorage on mount and ensure view mode matches role
+  // Always start with the defaultRole so SSR and the first client render match.
+  // localStorage is read only inside useEffect to avoid hydration mismatches.
+  const [currentUser, setCurrentUser] = useState<CurrentUser>(
+    MOCK_USERS[defaultRole]
+  );
+
+  // Hydrate from localStorage after mount (client-only)
   useEffect(() => {
     const savedRole = localStorage.getItem(MOCK_USER_STORAGE_KEY);
     const savedViewMode = localStorage.getItem(VIEW_MODE_STORAGE_KEY);
-    
+
     if (savedRole && MOCK_USERS[savedRole]) {
+      // Only update state if it differs from the SSR default
       if (MOCK_USERS[savedRole].id !== currentUser.id) {
         setCurrentUser(MOCK_USERS[savedRole]);
       }
-      
+
       // Ensure view mode is set based on role if not already set
       if (!savedViewMode) {
         const defaultViewMode = (savedRole === 'manager' || savedRole === 'owner' || savedRole === 'sv') ? 'manager' : 'staff';
