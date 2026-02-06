@@ -364,7 +364,7 @@ export const en = {
   'replay.progress': 'Progress',
 
   // Language
-  'language.japanese': '日本語',
+  'language.japanese': '日��語',
   'language.english': 'English',
 
   // Demand Drop
@@ -1096,6 +1096,8 @@ export const en = {
   'planBuilder.step2': 'Boxes',
   'planBuilder.step3': 'Assignment',
   'planBuilder.step4': 'Projection',
+  'planBuilder.planDate': 'Plan Date',
+  'planBuilder.futureDate': 'This plan is for a future date. Quests will not appear in Floor "Today Quests" until that day.',
   'planBuilder.forecastTarget': 'Forecast & Target',
   'planBuilder.forecastTargetDesc': 'Enter forecast and target sales for today',
   'planBuilder.forecastSales': 'Forecast Sales',

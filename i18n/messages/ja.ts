@@ -420,7 +420,7 @@ export const ja = {
   'ask.taskDelay.causeTooManyWIP': '同時進行タスクが多い',
   'ask.taskDelay.causeEstimation': '見積り�����間が短すぎる',
   'ask.taskDelay.proposalTitle': 'タスク優先度の見直し',
-  'ask.taskDelay.proposalDesc': '遅延タスクの優先度を再検討し、WIPを削減する',
+  'ask.taskDelay.proposalDesc': '遅延タスクの優先度を再検討し���WIPを削減する',
   'ask.labor.tasks': '���',
   // Low completion responses
   'ask.completion.conclusionLow': '本日のチームスコアは{score}点、タ��ク完了率は{rate}%で改善が必要です。',
@@ -866,7 +866,7 @@ export const ja = {
   
   // Awards Manage (Manager Selection)
   'awards.manage.title': '週次アワード選定',
-  'awards.manage.subtitle': '各カテゴリから1名ずつ受賞者を選んでください',
+  'awards.manage.subtitle': '各カテゴリから1名ずつ���賞者を選んでください',
   'awards.manage.timeMaster': 'タイムマスター',
   'awards.manage.timeMasterDesc': '目標時間内にクエストを完了したスタッフ',
   'awards.manage.questFinisher': 'クエストフィニッシャー',
@@ -1096,6 +1096,8 @@ export const ja = {
   'planBuilder.step2': 'ボックス選択',
   'planBuilder.step3': '割当',
   'planBuilder.step4': '着地見込み',
+  'planBuilder.planDate': '計画日',
+  'planBuilder.futureDate': 'この計画は未来日です。Floor画面の「Today Quests」には当日まで表示されません。',
   'planBuilder.forecastTarget': '予測売上と目標',
   'planBuilder.forecastTargetDesc': '当日の予測売上と目標売上を入力してください',
   'planBuilder.forecastSales': '予測売上（円��',

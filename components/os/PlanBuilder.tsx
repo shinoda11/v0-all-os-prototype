@@ -35,6 +35,7 @@ import {
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import type { TimeBand, BoxTemplate, TaskCard, Staff, DecisionEvent } from '@/core/types';
+import { CalendarDays } from 'lucide-react';
 
 // Step type
 type Step = 'forecast' | 'boxes' | 'assignment' | 'projection';
@@ -72,6 +73,8 @@ export function PlanBuilder() {
   const routeStoreId = params?.storeId as string;
   const storeId = state.selectedStoreId || '1';
   const [hasGenerated, setHasGenerated] = useState(false);
+  // Plan Date: defaults to today
+  const [planDate, setPlanDate] = useState(() => new Date().toISOString().slice(0, 10));
 
   // Get data from state
   const taskCards = state.taskCards?.length ? state.taskCards : [];
@@ -181,7 +184,7 @@ export function PlanBuilder() {
   const handleGenerate = () => {
     const now = new Date().toISOString();
     const storeId = state.selectedStoreId || '1';
-    const today = new Date().toISOString().split('T')[0];
+    const today = planDate; // Use selected plan date
 
     // Track seen taskIds to avoid duplicate quests for the same task across boxes
     const seenTaskIds = new Set<string>();
@@ -234,6 +237,8 @@ export function PlanBuilder() {
           // refId-based linking (replaces title matching)
           refId: task.id,
           targetValue: quantity,
+          // Business date for day-based filtering
+          businessDate: planDate,
         };
 
         actions.addEvent(questEvent);
@@ -331,6 +336,25 @@ export function PlanBuilder() {
                 <CardDescription>{t('planBuilder.forecastTargetDesc')}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
+                {/* Plan Date picker */}
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <CalendarDays className="h-4 w-4" />
+                    {t('planBuilder.planDate')}
+                  </Label>
+                  <Input
+                    type="date"
+                    value={planDate}
+                    onChange={(e) => setPlanDate(e.target.value)}
+                    className="max-w-[220px]"
+                  />
+                  {planDate !== new Date().toISOString().slice(0, 10) && (
+                    <p className="text-xs text-amber-600 font-medium">
+                      {t('planBuilder.futureDate')}
+                    </p>
+                  )}
+                </div>
+
                 <div className="grid grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <Label>{t('planBuilder.forecastSales')}</Label>

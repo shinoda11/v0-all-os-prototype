@@ -554,11 +554,20 @@ export const deriveCockpitMetrics = (
 // Decision/ToDo Derivation
 // ------------------------------------------------------------
 
+/**
+ * Resolve the business date for a DecisionEvent.
+ * Prefers the explicit `businessDate` field; falls back to the date
+ * portion of `timestamp` for legacy events that don't carry one.
+ */
+const resolveBusinessDate = (e: DecisionEvent): string =>
+  e.businessDate ?? e.timestamp.slice(0, 10);
+
 export const deriveActiveTodos = (
   events: DomainEvent[],
   storeId: string,
   roleId?: string
 ): DecisionEvent[] => {
+  const today = new Date().toISOString().slice(0, 10);
   const decisionEvents = filterByType(events, 'decision') as DecisionEvent[];
   
   // Get the latest status for each proposal
@@ -572,8 +581,11 @@ export const deriveActiveTodos = (
   }
 
   // Filter to pending/approved/started/paused decisions (active todos)
+  // AND only show quests whose businessDate matches today
   const activeTodos = Array.from(proposalStatuses.values()).filter(
-    (e) => e.action === 'pending' || e.action === 'approved' || e.action === 'started' || e.action === 'paused'
+    (e) =>
+      (e.action === 'pending' || e.action === 'approved' || e.action === 'started' || e.action === 'paused') &&
+      resolveBusinessDate(e) === today
   );
 
   // Filter by role if specified
@@ -601,6 +613,7 @@ export const deriveCompletedTodos = (
   events: DomainEvent[],
   storeId: string
 ): DecisionEvent[] => {
+  const today = new Date().toISOString().slice(0, 10);
   const decisionEvents = filterByType(events, 'decision') as DecisionEvent[];
   
   const proposalStatuses = new Map<string, DecisionEvent>();
@@ -612,7 +625,10 @@ export const deriveCompletedTodos = (
     proposalStatuses.set(event.proposalId, event);
   }
 
-  return Array.from(proposalStatuses.values()).filter((e) => e.action === 'completed');
+  // Only show completed quests whose businessDate matches today
+  return Array.from(proposalStatuses.values()).filter(
+    (e) => e.action === 'completed' && resolveBusinessDate(e) === today
+  );
 };
 
 // ------------------------------------------------------------

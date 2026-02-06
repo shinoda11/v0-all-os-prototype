@@ -139,6 +139,10 @@ export interface DecisionEvent extends BaseEvent {
   priority: 'low' | 'medium' | 'high' | 'critical';
   estimatedMinutes?: number;
   linkedExceptionId?: string;
+  // Business date: the day this quest is planned for (YYYY-MM-DD).
+  // When set, Floor Today Quests only shows quests whose businessDate === today.
+  // Legacy events without businessDate fall back to timestamp date.
+  businessDate?: string;
   // Assignee tracking
   assigneeId?: string; // Staff ID of assigned person
   assigneeName?: string; // Staff name for display

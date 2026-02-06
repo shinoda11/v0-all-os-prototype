@@ -421,6 +421,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         completionEvent.quantity = src.quantity;
         completionEvent.targetPrepItemIds = src.targetPrepItemIds;
         completionEvent.targetMenuIds = src.targetMenuIds;
+        completionEvent.businessDate = src.businessDate;
         // Preserve assignee from the in-progress event if actor didn't override
         if (!completionEvent.assigneeId && src.assigneeId) {
           completionEvent.assigneeId = src.assigneeId;
@@ -729,6 +730,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             source: 'system',
             refId: task.id,
             targetValue: quantity,
+            businessDate: date,
           };
 
           dispatch({ type: 'ADD_EVENT', event: questEvent });
