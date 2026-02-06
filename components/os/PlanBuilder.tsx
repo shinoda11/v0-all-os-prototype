@@ -285,6 +285,9 @@ export function PlanBuilder() {
     );
   };
 
+  // Empty state: no task cards or no box templates
+  const hasNoData = taskCards.length === 0 || boxTemplates.length === 0;
+
   return (
     <div className="flex flex-col h-full">
       <div className="p-6 border-b">
@@ -294,6 +297,27 @@ export function PlanBuilder() {
 
       <div className="flex-1 p-6 overflow-y-auto">
         <div className="max-w-4xl mx-auto">
+          {hasNoData ? (
+            <Card>
+              <CardContent className="py-16 text-center space-y-4">
+                <Package className="h-12 w-12 mx-auto text-muted-foreground/50" />
+                <div>
+                  <h3 className="text-lg font-medium">{t('plan.noTemplates')}</h3>
+                  <p className="text-sm text-muted-foreground mt-1">{t('plan.noTemplatesDesc')}</p>
+                </div>
+                <div className="flex items-center justify-center gap-3">
+                  <Button variant="outline" onClick={() => actions.seedDemoData()}>
+                    {t('taskCatalog.loadDemo')}
+                  </Button>
+                  <span className="text-sm text-muted-foreground">{t('common.or')}</span>
+                  <Link href={`/stores/${routeStoreId}/os/task-catalog`}>
+                    <Button>{t('plan.goToTaskCatalog')}</Button>
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+          <>
           <StepIndicator />
 
           {/* Step 1: Forecast & Target */}
@@ -704,6 +728,8 @@ export function PlanBuilder() {
                 )}
               </CardContent>
             </Card>
+          )}
+          </>
           )}
         </div>
       </div>

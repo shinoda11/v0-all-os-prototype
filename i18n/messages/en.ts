@@ -20,6 +20,7 @@ export const en = {
   'common.none': 'None',
   'common.yes': 'Yes',
   'common.no': 'No',
+  'common.or': 'or',
 
   // Time bands
   'timeband.all': 'All Day',
@@ -1160,6 +1161,7 @@ export const en = {
   'taskCatalog.templates': 'Templates',
   'taskCatalog.noTemplates': 'No templates yet',
   'taskCatalog.createFirst': 'Create your first template',
+  'taskCatalog.loadDemo': 'Load demo dataset',
   'taskCatalog.confirmDelete': 'Delete this template?',
 
   // Plan (Today Plan)

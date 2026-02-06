@@ -331,11 +331,17 @@ export default function TaskCatalogPage() {
         </CardHeader>
         <CardContent>
           {filteredTasks.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <p>{t('taskCatalog.noTemplates')}</p>
-              <Button variant="link" onClick={handleNewTemplate}>
-                {t('taskCatalog.createFirst')}
-              </Button>
+            <div className="text-center py-12 text-muted-foreground space-y-4">
+              <p className="text-lg">{t('taskCatalog.noTemplates')}</p>
+              <div className="flex items-center justify-center gap-3">
+                <Button variant="outline" onClick={() => { actions.seedDemoData(); }}>
+                  {t('taskCatalog.loadDemo')}
+                </Button>
+                <span className="text-sm">{t('common.or')}</span>
+                <Button onClick={handleNewTemplate}>
+                  {t('taskCatalog.createFirst')}
+                </Button>
+              </div>
             </div>
           ) : (
             <Table>

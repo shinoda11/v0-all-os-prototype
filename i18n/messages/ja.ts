@@ -20,6 +20,7 @@ export const ja = {
   'common.none': 'なし',
   'common.yes': 'はい',
   'common.no': 'いいえ',
+  'common.or': 'または',
 
   // Time bands
   'timeband.all': '全日',
@@ -196,7 +197,7 @@ export const ja = {
   'briefing.currentStatus': '現在のステータス',
   'briefing.initialTodos': '初期ToDo（次の2時間）',
   'briefing.items': '件',
-  'briefing.noTodos': '初期ToDoは���りません',
+  'briefing.noTodos': '初期ToDoは�����りません',
   'briefing.operationMode': '運用モード選択',
   'briefing.modeSales': '売上優先',
   'briefing.modeSalesDesc': '機会損失を最小化',
@@ -702,7 +703,7 @@ export const ja = {
   'opsMonitor.bottlenecks': 'ボトルネック上位3',
   'opsMonitor.bottleneck.delayed': '遅延クエスト',
   'opsMonitor.bottleneck.notStarted': '未着手',
-  'opsMonitor.noBottlenecks': 'ボトルネックは検出さ���ませんでした',
+  'opsMonitor.noBottlenecks': 'ボトルネック���検出さ���ませんでした',
   'opsMonitor.summary': 'クエスト概況',
   'opsMonitor.boxPerformance': 'ボックス別パフォーマンス',
   'opsMonitor.staffPerformance': '個人別パフォーマンス',
@@ -1032,7 +1033,7 @@ export const ja = {
   'taskStudio.taskList': 'タスク一覧',
   'taskStudio.addTask': 'タスク追加',
   'taskStudio.editTask': 'タスク編集',
-  'taskStudio.editDescription': 'タスクの詳細を編集します',
+  'taskStudio.editDescription': 'タ��クの詳細を編集します',
   'taskStudio.searchPlaceholder': 'タスクを検索...',
   'taskStudio.role': 'ロール',
   'taskStudio.star': 'スター',
@@ -1160,6 +1161,7 @@ export const ja = {
   'taskCatalog.templates': 'テンプレート',
   'taskCatalog.noTemplates': 'テンプレートがありません',
   'taskCatalog.createFirst': '最初のテンプレートを作成',
+  'taskCatalog.loadDemo': 'デモデータを読み込む',
   'taskCatalog.confirmDelete': 'このテンプレートを削除しますか？',
 
   // Plan (Today Plan)
