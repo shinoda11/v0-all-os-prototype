@@ -32,6 +32,8 @@ import {
   AlertTriangle,
   Zap,
 } from 'lucide-react';
+import Link from 'next/link';
+import { useParams } from 'next/navigation';
 import type { TimeBand, BoxTemplate, TaskCard, Staff, DecisionEvent } from '@/core/types';
 
 // Step type
@@ -66,7 +68,10 @@ const StarDisplay = ({ level }: { level: number }) => (
 export function PlanBuilder() {
   const { state, actions } = useStore();
   const { t, locale } = useI18n();
+  const params = useParams();
+  const routeStoreId = params?.storeId as string;
   const storeId = state.selectedStoreId || '1';
+  const [hasGenerated, setHasGenerated] = useState(false);
 
   // Get data from state
   const taskCards = state.taskCards?.length ? state.taskCards : [];
@@ -235,11 +240,8 @@ export function PlanBuilder() {
       });
     });
 
-    // Reset and show success
-    alert(t('planBuilder.generateSuccess'));
-    setCurrentStep('forecast');
-    setSelectedBoxIds([]);
-    setAssignments({});
+    // Mark as generated - show CTA to start execution
+    setHasGenerated(true);
   };
 
   // Step indicator component
@@ -659,19 +661,47 @@ export function PlanBuilder() {
                   </div>
                 )}
 
-                <div className="flex justify-between">
-                  <Button variant="outline" onClick={() => setCurrentStep('assignment')}>
-                    {t('planBuilder.back')}
-                  </Button>
-                  <Button
-                    onClick={handleGenerate}
-                    disabled={!canGenerate}
-                    className="bg-green-600 hover:bg-green-700"
-                  >
-                    <Play className="h-4 w-4 mr-2" />
-                    {t('planBuilder.generate')}
-                  </Button>
-                </div>
+                {!hasGenerated ? (
+                  <div className="flex justify-between">
+                    <Button variant="outline" onClick={() => setCurrentStep('assignment')}>
+                      {t('planBuilder.back')}
+                    </Button>
+                    <Button
+                      onClick={handleGenerate}
+                      disabled={!canGenerate}
+                      className="bg-green-600 hover:bg-green-700"
+                    >
+                      <Play className="h-4 w-4 mr-2" />
+                      {t('planBuilder.generate')}
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 p-3 rounded-lg bg-green-50 text-green-700 border border-green-200">
+                      <CheckCircle className="h-5 w-5" />
+                      <span className="font-medium">{t('planBuilder.generateSuccess')}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setHasGenerated(false);
+                          setCurrentStep('forecast');
+                          setSelectedBoxIds([]);
+                          setAssignments({});
+                        }}
+                      >
+                        {t('planBuilder.buildAnother')}
+                      </Button>
+                      <Link href={`/stores/${routeStoreId}/floor/todo`}>
+                        <Button className="gap-2">
+                          <ChevronRight className="h-4 w-4" />
+                          {t('planBuilder.startExecution')}
+                        </Button>
+                      </Link>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}

@@ -98,8 +98,8 @@ function generateWeeklyProposals(
         description: `★3スタッフの配置が目標比${Math.round((1 - star3Ratio / TARGETS.star3Ratio) * 100)}%不足。ピーク帯のサービス品質に影響します。`,
         impact: 'サービス品質、顧客満足度',
         priority: 'high',
-        actionLabel: 'シフト調整',
-        actionHref: '/management/shifts',
+        actionLabel: 'スタッフ確認',
+        actionHref: '/os/live-staff',
       });
     }
     
@@ -111,8 +111,8 @@ function generateWeeklyProposals(
         description: '中堅層が不足しています。★1→★2への育成を加速させましょう。',
         impact: '長期的な人材構成',
         priority: 'medium',
-        actionLabel: '育成計画',
-        actionHref: '/management/training',
+        actionLabel: 'チーム確認',
+        actionHref: '/os/team-performance',
       });
     }
   }
@@ -133,7 +133,7 @@ function generateWeeklyProposals(
       impact: `週間利益: 約¥${Math.round(lowProductivityDays.length * 5000).toLocaleString()}相当`,
       priority: 'high',
       actionLabel: '人員配置見直し',
-      actionHref: '/management/labor-plan',
+      actionHref: '/os/plan-builder',
     });
   }
   
@@ -162,8 +162,8 @@ function generateWeeklyProposals(
       description: `${overtimeDays.map(d => d.dayLabel).join('・')}曜に残業が発生。計画の見直しを検討してください。`,
       impact: '人件費、スタッフ疲労',
       priority: 'medium',
-      actionLabel: '労務計画',
-      actionHref: '/management/labor-plan',
+      actionLabel: '計画見直し',
+      actionHref: '/os/plan-builder',
     });
   }
   
@@ -175,8 +175,8 @@ function generateWeeklyProposals(
     description: 'ランチ後(13:30-14:00)に休憩が集中していないか確認。ディナー準備に影響する可能性があります。',
     impact: 'ディナー仕込み開始時刻',
     priority: 'low',
-    actionLabel: '休憩計画',
-    actionHref: '/management/breaks',
+    actionLabel: 'スタッフ状況',
+    actionHref: '/os/live-staff',
   });
   
   return proposals.slice(0, 5);
@@ -664,8 +664,8 @@ export default function WeeklyReviewPage() {
                       </div>
                     </div>
                     
-                    {/* Action CTA - Links to Management */}
-                    <Link href={proposal.actionHref ?? '#'}>
+                    {/* Action CTA */}
+                    <Link href={proposal.actionHref ? `/stores/${store?.id ?? '1'}${proposal.actionHref}` : '#'}>
                       <Button variant="secondary" size="sm" className="shrink-0 gap-1">
                         {proposal.actionLabel}
                         <ExternalLink className="h-3 w-3" />
@@ -827,9 +827,9 @@ export default function WeeklyReviewPage() {
                       </span>
                     </div>
                   </div>
-                  <Link href="/management/shifts">
+                  <Link href={`/stores/${store?.id ?? '1'}/os/live-staff`}>
                     <Button variant="secondary" size="sm" className="shrink-0 gap-1">
-                      シフト参考
+                      スタッフ確認
                       <ExternalLink className="h-3 w-3" />
                     </Button>
                   </Link>
@@ -861,9 +861,9 @@ export default function WeeklyReviewPage() {
                       {weak.issue === 'quest_delay' && t('weeklyReview.weakTimeBand.questDelay').replace('{day}', weak.dayLabel)}
                     </p>
                   </div>
-                  <Link href="/management/labor-plan">
+                  <Link href={`/stores/${store?.id ?? '1'}/os/plan-builder`}>
                     <Button variant="secondary" size="sm" className="shrink-0 gap-1">
-                      人員計画
+                      計画見直し
                       <ExternalLink className="h-3 w-3" />
                     </Button>
                   </Link>
@@ -892,7 +892,7 @@ export default function WeeklyReviewPage() {
                         .replace('{minutes}', String(quest.avgDelayMinutes))}
                     </p>
                   </div>
-                  <Link href="/floor/todo">
+                  <Link href={`/stores/${store?.id ?? '1'}/floor/todo`}>
                     <Button variant="secondary" size="sm" className="shrink-0 gap-1">
                       クエスト確認
                       <ExternalLink className="h-3 w-3" />
@@ -910,11 +910,11 @@ export default function WeeklyReviewPage() {
           </CardContent>
         </Card>
         
-        {/* CTA to Management */}
+        {/* CTA: Back to Cockpit */}
         <div className="flex justify-end">
-          <Link href="/management">
-            <Button className="gap-2">
-              {t('weeklyReview.goToManagement')}
+          <Link href={`/stores/${store?.id ?? '1'}/os/cockpit`}>
+            <Button variant="outline" className="gap-2">
+              {t('cockpit.title')}
               <ExternalLink className="h-4 w-4" />
             </Button>
           </Link>

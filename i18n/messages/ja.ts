@@ -91,6 +91,16 @@ export const ja = {
   'cockpit.activeIncidents': 'アクティブなインシデント',
   'cockpit.viewIncidents': 'インシデントを見る',
   'cockpit.critical': '重大',
+  'cockpit.buildPlan': '本日のプランを作成',
+  'cockpit.buildPlanDesc': 'Plan Builder で売上予測・ボックス選択・スタッフ配置を設定します',
+  'cockpit.buildPlanAction': 'Plan Builder を開く',
+  'cockpit.generatePlan': 'プランを生成',
+  'cockpit.noQuests': 'まだクエストがありません',
+  'cockpit.questsCompleted': '完了',
+  'cockpit.questProgress': 'クエスト進捗',
+  'cockpit.quests': 'クエスト',
+  'cockpit.staff': 'スタッフ',
+  'cockpit.progress': '進捗',
 
   // Shift Summary
   'shift.title': '本日のシフト概要',
@@ -396,13 +406,13 @@ export const ja = {
   'ask.chip.demandDropReason': '{menu}の出数が落ちた理由は',
   'ask.chip.todayKeyIncidents': '今日の主要な案件は',
   'ask.chip.taskDelayReason': '特定タスクが遅い理由',
-  'ask.chip.lowCompletionReason': '今日��完成度が低い原因',
+  'ask.chip.lowCompletionReason': '今日��完���度が低い原因',
   // Task delay responses
   'ask.taskDelay.conclusionSlow': 'タスクの時間遵守率は{rate}%で、遅延が目立っています。',
   'ask.taskDelay.conclusionGood': 'タスクの時間遵守率は{rate}%で、概ね順調です。',
   'ask.taskDelay.onTimeRate': '時間遵守率',
   'ask.taskDelay.inProgress': '進行中タスク',
-  'ask.taskDelay.completed': '完����タスク',
+  'ask.taskDelay.completed': '������タスク',
   'ask.taskDelay.possibleCauses': '考えられる原因',
   'ask.taskDelay.causeOverloaded': 'タスク量が多すぎる',
   'ask.taskDelay.causeNoBreak': '休憩が取れていない',
@@ -986,6 +996,8 @@ export const ja = {
   'weeklyReview.noHrProposals': 'HR課題は検���されま���んでした',
   
   // Sidebar Navigation
+  'nav.setup': 'Setup',
+  'nav.setupDesc': '計画・タスク設定',
   'nav.kos': 'KOS',
   'nav.kosDesc': 'Manager',
   'nav.opsOs': 'Ops OS',
@@ -995,6 +1007,7 @@ export const ja = {
   'nav.cockpit': 'Cockpit',
   'nav.dailyPlan': 'Plan Builder',
   'nav.taskCatalog': 'Task Catalog',
+  'nav.taskStudio': 'Task Studio',
   'nav.opsMonitor': 'Ops Monitor',
   'nav.liveStaff': 'Live Staff',
   'nav.weeklyReview': 'Weekly Review',
@@ -1126,6 +1139,8 @@ export const ja = {
   'planBuilder.cannotGenerate': '未割当のボッ��スがあるため生成できません',
   'planBuilder.generate': 'Today Quests 生成',
   'planBuilder.generateSuccess': 'Today Questsを生成しました',
+  'planBuilder.startExecution': 'Staff View で実行開始',
+  'planBuilder.buildAnother': '別のプランを作成',
 
   // Task Catalog
   'taskCatalog.title': 'Task Catalog',
