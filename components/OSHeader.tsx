@@ -125,8 +125,8 @@ export function OSHeader({
             <span>{t('os.header.lastUpdated')}: {lastUpdatedStr}</span>
           </div>
           
-          {/* View Switcher - Only for Manager/Owner/SV (not staff) */}
-          {canSwitchView && hasRole('manager') && viewModeLoaded && (
+          {/* View Switcher - deferred to after mount to avoid Radix useId hydration mismatch */}
+          {mounted && canSwitchView && hasRole('manager') && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="default" className="px-3 gap-2">
