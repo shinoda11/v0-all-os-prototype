@@ -12,7 +12,7 @@ const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: 'All Management - 運用OS',
-  description: 'All Management + All OS プロトタイプ - 意思決定の編集・配布・実行・即時反映',
+  description: 'All Management + All OS プロトタイプ - 意思決定の編集・配布・実行・即時反映 ',
   generator: 'v0.app',
   icons: {
     icon: [
