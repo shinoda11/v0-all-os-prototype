@@ -11,22 +11,15 @@ import type { UserRole } from '@/core/types';
 import {
   BarChart3,
   TrendingUp,
-  UtensilsCrossed,
-  ChefHat,
   Gauge,
-  AlertTriangle,
   CheckSquare,
   Clock,
   ChevronDown,
   ChevronRight,
-  Settings,
-  ExternalLink,
   FileWarning,
   Users,
   ClipboardList,
   Trophy,
-  DollarSign,
-  Layers,
   CalendarCheck,
 } from 'lucide-react';
 import { useState } from 'react';
@@ -49,11 +42,11 @@ interface NavSection {
 }
 
 /**
- * Navigation Structure (KOS / Ops OS / Incidents)
+ * Navigation Structure (KOS / Ops OS)
  * 
- * KOS (Manager): Cockpit, Weekly Review, Team Performance, Awards
- * Ops OS (Floor): Today Quests, Time Clock, My Score
- * Incidents: Incident Center (rare events)
+ * KOS (Manager): Cockpit, Daily Plan, Ops Monitor, Live Staff,
+ *   Weekly Review, Team Performance, Awards, Incident Center
+ * Ops OS (Staff): Today Quests, Time Clock, My Score
  */
 
 // KOS section - 店長・経営向け (Manager+)
@@ -69,14 +62,19 @@ const kosSection: NavSection = {
       icon: <Gauge className="h-5 w-5" />,
     },
     {
-      labelKey: 'nav.liveStaff',
-      path: '/os/live-staff',
-      icon: <Users className="h-5 w-5" />,
+      labelKey: 'nav.dailyPlan',
+      path: '/os/plan-builder',
+      icon: <CalendarCheck className="h-5 w-5" />,
     },
     {
       labelKey: 'nav.opsMonitor',
       path: '/os/ops-monitor',
       icon: <ClipboardList className="h-5 w-5" />,
+    },
+    {
+      labelKey: 'nav.liveStaff',
+      path: '/os/live-staff',
+      icon: <Users className="h-5 w-5" />,
     },
     {
       labelKey: 'nav.weeklyReview',
@@ -94,24 +92,9 @@ const kosSection: NavSection = {
       icon: <Trophy className="h-5 w-5" />,
     },
     {
-      labelKey: 'nav.incentives',
-      path: '/os/incentives',
-      icon: <DollarSign className="h-5 w-5" />,
-    },
-    {
-      labelKey: 'nav.taskCatalog',
-      path: '/os/task-catalog',
-      icon: <Layers className="h-5 w-5" />,
-    },
-    {
-      labelKey: 'nav.plan',
-      path: '/os/plan',
-      icon: <CalendarCheck className="h-5 w-5" />,
-    },
-    {
-      labelKey: 'nav.timeclockSummary',
-      path: '/os/timeclock-summary',
-      icon: <Clock className="h-5 w-5" />,
+      labelKey: 'nav.incidentCenter',
+      path: '/os/incidents',
+      icon: <FileWarning className="h-5 w-5" />,
     },
   ],
 };
@@ -141,22 +124,7 @@ const opsOsSection: NavSection = {
   ],
 };
 
-// Incidents section - レアイベント (Manager+)
-const incidentsSection: NavSection = {
-  titleKey: 'nav.incidents',
-  descriptionKey: 'nav.incidentsDesc',
-  requiredRole: 'manager',
-  viewMode: 'manager',
-  items: [
-    {
-      labelKey: 'nav.incidentCenter',
-      path: '/os/incidents',
-      icon: <FileWarning className="h-5 w-5" />,
-    },
-  ],
-};
-
-const navSections: NavSection[] = [kosSection, opsOsSection, incidentsSection];
+const navSections: NavSection[] = [kosSection, opsOsSection];
 
 interface NavGroupProps {
   item: NavItem;
@@ -225,7 +193,7 @@ function NavGroup({ item, pathname, storeId, t }: NavGroupProps) {
             const childHref = buildHref(child.path);
             return (
               <Link
-                key={child.label}
+                key={child.labelKey}
                 href={childHref}
                 className={cn(
                   'flex items-center gap-3 rounded-lg px-4 py-3 text-base transition-colors',

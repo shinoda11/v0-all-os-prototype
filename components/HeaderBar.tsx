@@ -2,6 +2,7 @@
 
 import { useStore } from '@/state/store';
 import { useAuth } from '@/state/auth';
+import { useViewMode, type ViewMode } from '@/core/viewMode';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -12,8 +13,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
-import { Store, Menu, User, ChevronDown } from 'lucide-react';
+import { Store, Menu, User, ChevronDown, Briefcase, Users, Check } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import type { UserRole } from '@/core/types';
 
 interface HeaderBarProps {
@@ -35,11 +37,28 @@ const ROLE_COLORS: Record<UserRole, string> = {
 
 export function HeaderBar({ storeId, onMenuClick }: HeaderBarProps) {
   const { state } = useStore();
-  const { currentUser, setMockUser } = useAuth();
+  const { currentUser, setMockUser, canSwitchView } = useAuth();
+  const [viewMode, setViewMode, viewModeLoaded] = useViewMode();
+  const router = useRouter();
   const currentStore = state.stores.find((s) => s.id === storeId);
 
   // Short name for display
   const shortName = currentStore?.name.replace('Aburi TORA 熟成鮨と炙り鮨 ', '') ?? '';
+
+  // Logo home path based on current viewMode
+  const homePath = viewMode === 'manager'
+    ? `/stores/${storeId}/os/cockpit`
+    : `/stores/${storeId}/floor/todo`;
+
+  // Handle view switch - navigate to the other view's home page
+  const handleViewSwitch = (newMode: ViewMode) => {
+    setViewMode(newMode);
+    if (newMode === 'manager') {
+      router.push(`/stores/${storeId}/os/cockpit`);
+    } else {
+      router.push(`/stores/${storeId}/floor/todo`);
+    }
+  };
 
   return (
     <header className="flex h-14 items-center justify-between border-b border-border bg-background px-4">
@@ -53,7 +72,7 @@ export function HeaderBar({ storeId, onMenuClick }: HeaderBarProps) {
           <Menu className="h-5 w-5" />
           <span className="sr-only">メニューを開く</span>
         </Button>
-        <Link href={`/stores/${storeId}/os/cockpit`} className="flex items-center gap-2">
+        <Link href={homePath} className="flex items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
             <span className="text-sm font-bold text-primary-foreground">AT</span>
           </div>
@@ -69,6 +88,45 @@ export function HeaderBar({ storeId, onMenuClick }: HeaderBarProps) {
           </div>
         )}
         
+        {/* View Switcher - Only for Manager+ */}
+        {canSwitchView && viewModeLoaded && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-2">
+                {viewMode === 'manager' ? (
+                  <Briefcase className="h-4 w-4" />
+                ) : (
+                  <Users className="h-4 w-4" />
+                )}
+                <span className="hidden sm:inline">
+                  {viewMode === 'manager' ? 'Manager' : 'Staff'}
+                </span>
+                <ChevronDown className="h-3 w-3" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>View Mode</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => handleViewSwitch('manager')}
+                className="gap-2"
+              >
+                <Briefcase className="h-4 w-4" />
+                Manager View
+                {viewMode === 'manager' && <Check className="h-4 w-4 ml-auto" />}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => handleViewSwitch('staff')}
+                className="gap-2"
+              >
+                <Users className="h-4 w-4" />
+                Staff View
+                {viewMode === 'staff' && <Check className="h-4 w-4 ml-auto" />}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+
         {/* Mock User Switcher (for testing) */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
