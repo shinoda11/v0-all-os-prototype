@@ -13,7 +13,7 @@ const MOCK_USER_STORAGE_KEY = 'all_os_mock_user_role';
  * Manager+ gets 'manager' view, staff gets 'staff' view.
  */
 function getDefaultViewModeForRole(role: UserRole): ViewMode {
-  return role === 'manager' || role === 'owner' ? 'manager' : 'staff';
+  return role === 'manager' || role === 'owner' || role === 'sv' ? 'manager' : 'staff';
 }
 
 /**

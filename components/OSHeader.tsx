@@ -38,7 +38,7 @@ export function OSHeader({
   const { locale, setLocale, t } = useI18n();
   const { formatDate, formatTime } = useLocaleDateFormat();
   const askPanel = useAskPanel();
-  const { canSwitchView, currentUser } = useAuth();
+  const { canSwitchView, currentUser, hasRole } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
   
@@ -111,8 +111,8 @@ export function OSHeader({
             <span>{t('os.header.lastUpdated')}: {lastUpdatedStr}</span>
           </div>
           
-          {/* View Switcher - Only for Manager+ */}
-          {canSwitchView && viewModeLoaded && (
+          {/* View Switcher - Only for Manager/Owner/SV (not staff) */}
+          {canSwitchView && hasRole('manager') && viewModeLoaded && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="default" className="px-3 gap-2">

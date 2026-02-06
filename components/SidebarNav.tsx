@@ -223,6 +223,20 @@ export function SidebarNav({ storeId }: SidebarNavProps) {
   const { hasRole } = useAuth();
   const [viewMode, , viewModeLoaded] = useViewMode();
 
+  // Show nothing until viewMode is loaded from localStorage to prevent flash
+  if (!viewModeLoaded) {
+    return (
+      <nav className="flex flex-col gap-1 p-2">
+        {/* Skeleton placeholders while loading */}
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="px-4 py-3">
+            <div className="h-4 w-24 animate-pulse rounded bg-muted" />
+          </div>
+        ))}
+      </nav>
+    );
+  }
+
   // Filter sections based on user role AND view mode
   const visibleSections = navSections.filter(section => {
     // Check role requirement
