@@ -442,7 +442,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           const prepEvent = commands.completePrep(
             storeId,
             prepItemId,
-            completionData?.actualQuantity ?? proposal.quantity || 1,
+            completionData?.actualQuantity ?? (proposal.quantity || 1),
             actor?.assigneeId,
             completionEvent.id
           );
