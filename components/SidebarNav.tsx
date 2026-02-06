@@ -70,8 +70,8 @@ const setupSection: NavSection = {
       icon: <Wrench className="h-5 w-5" />,
     },
     {
-      labelKey: 'nav.dailyPlan',
-      path: '/os/plan-builder',
+      labelKey: 'nav.planning',
+      path: '/os/planning',
       icon: <CalendarCheck className="h-5 w-5" />,
     },
   ],

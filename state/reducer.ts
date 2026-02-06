@@ -3,7 +3,7 @@
 // Single reducer for all state mutations
 // ============================================================
 
-import { AppState, AppAction, DomainEvent, Incident, IncidentStatus, AgentId, EvidenceItem, Hypothesis, RecommendationDraft, TaskCard, TaskCategory, BoxTemplate } from '@/core/types';
+import { AppState, AppAction, DomainEvent, Incident, IncidentStatus, AgentId, EvidenceItem, Hypothesis, RecommendationDraft, TaskCard, TaskCategory, BoxTemplate, DayPlan, DayPlanStatus } from '@/core/types';
 
 // Highlight duration in milliseconds
 const HIGHLIGHT_DURATION = 2000;
@@ -40,6 +40,9 @@ export const initialState: AppState = {
   taskCards: [],
   taskCategories: [],
   boxTemplates: [],
+
+  // Day Plans
+  dayPlans: [],
 
   // Event log
   events: [],
@@ -237,6 +240,30 @@ export const appReducer = (state: AppState, action: AppAction): AppState => {
         ...state,
         boxTemplates: (state.boxTemplates || []).filter((b) => b.id !== action.boxTemplateId),
       };
+
+    // Day Plan actions
+    case 'UPSERT_DAY_PLAN': {
+      const existing = (state.dayPlans || []).findIndex(
+        (dp) => dp.date === action.dayPlan.date && dp.storeId === action.dayPlan.storeId
+      );
+      if (existing >= 0) {
+        const updated = [...(state.dayPlans || [])];
+        updated[existing] = action.dayPlan;
+        return { ...state, dayPlans: updated };
+      }
+      return { ...state, dayPlans: [...(state.dayPlans || []), action.dayPlan] };
+    }
+
+    case 'UPDATE_DAY_PLAN_STATUS': {
+      return {
+        ...state,
+        dayPlans: (state.dayPlans || []).map((dp) =>
+          dp.date === action.date && dp.storeId === action.storeId
+            ? { ...dp, status: action.status, updatedAt: new Date().toISOString() }
+            : dp
+        ),
+      };
+    }
 
     case 'REPLAY_START':
       return {

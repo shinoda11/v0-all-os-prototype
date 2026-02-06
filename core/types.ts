@@ -664,6 +664,32 @@ export interface BoxTemplate {
 }
 
 // ------------------------------------------------------------
+// Day Plan Types (Planning Calendar)
+// ------------------------------------------------------------
+
+export type DayPlanStatus = 'draft' | 'review' | 'confirmed' | 'live' | 'closed';
+
+export interface LaborSlot {
+  id: string;
+  timeBand: TimeBand;
+  role: string;        // e.g. 'kitchen', 'floor'
+  starLevel: 1 | 2 | 3;
+  plannedHours: number;
+}
+
+export interface DayPlan {
+  date: string;        // YYYY-MM-DD
+  storeId: string;
+  status: DayPlanStatus;
+  forecastSales: number;
+  targetSales: number;
+  timeBandSplit: { lunch: number; idle: number; dinner: number };
+  selectedBoxIds: string[];
+  laborSlots: LaborSlot[];
+  updatedAt: string;   // ISO 8601
+}
+
+// ------------------------------------------------------------
 // Application State
 // ------------------------------------------------------------
 
@@ -679,6 +705,9 @@ export interface AppState {
   taskCards: TaskCard[];
   taskCategories: TaskCategory[];
   boxTemplates: BoxTemplate[];
+
+  // Day Plans (planning calendar)
+  dayPlans: DayPlan[];
 
   // Event log (single source of truth)
   events: DomainEvent[];
@@ -736,6 +765,9 @@ export type AppAction =
   | { type: 'ADD_BOX_TEMPLATE'; boxTemplate: BoxTemplate }
   | { type: 'UPDATE_BOX_TEMPLATE'; boxTemplate: BoxTemplate }
   | { type: 'DELETE_BOX_TEMPLATE'; boxTemplateId: string }
+  // Day Plan actions
+  | { type: 'UPSERT_DAY_PLAN'; dayPlan: DayPlan }
+  | { type: 'UPDATE_DAY_PLAN_STATUS'; date: string; storeId: string; status: DayPlanStatus }
   // Replay actions
   | { type: 'REPLAY_START'; events: DomainEvent[] }
   | { type: 'REPLAY_STEP' }

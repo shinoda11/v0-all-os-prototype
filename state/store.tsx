@@ -6,7 +6,7 @@
 // ============================================================
 
 import React, { createContext, useContext, useReducer, useEffect, useCallback, useRef, useMemo } from 'react';
-import { AppState, AppAction, DomainEvent, Proposal, TimeBand, Incident, IncidentStatus, AgentId, EvidenceItem, Hypothesis, RecommendationDraft, TaskCard, TaskCategory, BoxTemplate } from '@/core/types';
+import { AppState, AppAction, DomainEvent, Proposal, TimeBand, Incident, IncidentStatus, AgentId, EvidenceItem, Hypothesis, RecommendationDraft, TaskCard, TaskCategory, BoxTemplate, DayPlan, DayPlanStatus, DecisionEvent } from '@/core/types';
 import { appReducer, initialState } from './reducer';
 import { loadMockData, loadSampleEvents } from '@/data/mock';
 import { generateProposals } from '@/core/proposals';
@@ -94,6 +94,10 @@ interface StoreContextValue {
     addBoxTemplate: (boxTemplate: BoxTemplate) => void;
     updateBoxTemplate: (boxTemplate: BoxTemplate) => void;
     deleteBoxTemplate: (boxTemplateId: string) => void;
+    // Day Plan (Planning Calendar)
+    upsertDayPlan: (dayPlan: DayPlan) => void;
+    updateDayPlanStatus: (date: string, status: DayPlanStatus) => void;
+    goLiveDayPlan: (date: string) => void;
     // Order Interrupt (POS urgent orders)
     createOrderQuest: (order: { orderId: string; menuItemName: string; quantity: number; slaMinutes?: number }) => string;
     completeOrderQuest: (orderId: string) => void;
@@ -659,6 +663,81 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     deleteBoxTemplate: (boxTemplateId: string) => {
       dispatch({ type: 'DELETE_BOX_TEMPLATE', boxTemplateId });
       publishStateUpdate('state:updated', 'box-template-deleted', ['boxTemplates']);
+    },
+
+    // Day Plan (Planning Calendar)
+    upsertDayPlan: (dayPlan: DayPlan) => {
+      dispatch({ type: 'UPSERT_DAY_PLAN', dayPlan });
+      publishStateUpdate('state:updated', 'day-plan-upserted', ['dayPlans']);
+    },
+
+    updateDayPlanStatus: (date: string, status: DayPlanStatus) => {
+      const storeId = storeIdRef.current || '1';
+      dispatch({ type: 'UPDATE_DAY_PLAN_STATUS', date, storeId, status });
+      publishStateUpdate('state:updated', 'day-plan-status-updated', ['dayPlans']);
+    },
+
+    // Go Live: generate quests from the day plan's selected boxes
+    goLiveDayPlan: (date: string) => {
+      const storeId = storeIdRef.current || '1';
+      const currentState = stateRef.current;
+      const plan = (currentState.dayPlans || []).find((dp) => dp.date === date && dp.storeId === storeId);
+      if (!plan) return;
+
+      const boxTemplates = currentState.boxTemplates || [];
+      const taskCards = currentState.taskCards || [];
+      const now = new Date().toISOString();
+      const seenTaskIds = new Set<string>();
+
+      plan.selectedBoxIds.forEach((boxId) => {
+        const box = boxTemplates.find((b) => b.id === boxId);
+        if (!box) return;
+
+        box.taskCardIds.forEach((taskId) => {
+          if (seenTaskIds.has(taskId)) return;
+          seenTaskIds.add(taskId);
+
+          const task = taskCards.find((t) => t.id === taskId);
+          if (!task || !task.enabled || task.isPeak) return;
+
+          let quantity = task.baseQuantity;
+          if (task.quantityMode === 'byForecast') {
+            quantity = task.baseQuantity + Math.round(task.coefficient * (plan.forecastSales / 10000));
+          } else if (task.quantityMode === 'byOrders') {
+            const estimatedOrders = Math.round(plan.forecastSales / 1500);
+            quantity = task.baseQuantity + Math.round(task.coefficient * estimatedOrders);
+          }
+
+          const questId = `quest-${boxId}-${taskId}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+          const deadline = new Date(Date.now() + task.standardMinutes * 60 * 1000 * 2).toISOString();
+
+          const questEvent: DecisionEvent = {
+            id: questId,
+            type: 'decision',
+            storeId,
+            timestamp: now,
+            timeBand: box.timeBand,
+            proposalId: `plan-${taskId}-${date}`,
+            action: 'pending',
+            title: task.name,
+            description: `${task.name} - ${quantity}`,
+            distributedToRoles: [task.role],
+            priority: task.starRequirement >= 3 ? 'high' : task.starRequirement >= 2 ? 'medium' : 'low',
+            deadline,
+            estimatedMinutes: task.standardMinutes,
+            quantity,
+            source: 'system',
+            refId: task.id,
+            targetValue: quantity,
+          };
+
+          dispatch({ type: 'ADD_EVENT', event: questEvent });
+        });
+      });
+
+      // Set status to live
+      dispatch({ type: 'UPDATE_DAY_PLAN_STATUS', date, storeId, status: 'live' });
+      publishStateUpdate('decision:changed', 'day-plan-live', ['decision', 'todo', 'dayPlans']);
     },
 
     // Order Interrupt - Create urgent order quest
