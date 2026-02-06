@@ -157,6 +157,9 @@ export interface DecisionEvent extends BaseEvent {
   // Pause tracking
   pausedAt?: string;
   pauseReason?: string;
+  // Task Card linking (refId-based, replaces title matching)
+  refId?: string; // taskCardId from Task Catalog
+  targetValue?: number; // calculated quantity for this quest instance
 }
 
 export interface ForecastEvent extends BaseEvent {

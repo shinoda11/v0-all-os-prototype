@@ -993,7 +993,7 @@ export const en = {
   'nav.incidents': 'Incidents',
   'nav.incidentsDesc': 'Rare Events',
   'nav.cockpit': 'Cockpit',
-  'nav.dailyPlan': 'Daily Plan',
+  'nav.dailyPlan': 'Plan Builder',
   'nav.opsMonitor': 'Ops Monitor',
   'nav.liveStaff': 'Live Staff',
   'nav.weeklyReview': 'Weekly Review',

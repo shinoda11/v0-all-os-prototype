@@ -429,15 +429,16 @@ interface BoxStatsProps {
 function BoxStatsCard({ box, tasks, allQuests }: BoxStatsProps) {
   const { t } = useI18n();
   
-  // Find quests that might be related to this box's tasks
-  const boxTaskNames = tasks
-    .filter((task) => box.taskCardIds.includes(task.id))
-    .map((task) => task.name);
-  
-  // Match quests by task name (simplified matching)
-  const relatedQuests = allQuests.filter((q) => 
-    boxTaskNames.some((name) => q.title.includes(name) || q.description?.includes(name))
-  );
+  // Find quests related to this box's tasks via refId (falls back to title match)
+  const boxTaskIds = new Set(box.taskCardIds);
+  const relatedQuests = allQuests.filter((q) => {
+    if (q.refId) return boxTaskIds.has(q.refId);
+    // Fallback: title matching for legacy quests without refId
+    const boxTaskNames = tasks
+      .filter((task) => boxTaskIds.has(task.id))
+      .map((task) => task.name);
+    return boxTaskNames.some((name) => q.title.includes(name));
+  });
   
   const completedQuests = relatedQuests.filter((q) => q.action === 'completed');
   const totalTasks = box.taskCardIds.length;

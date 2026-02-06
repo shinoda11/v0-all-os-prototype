@@ -686,6 +686,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         staff: demoData.staff ?? mockData.staff,
         taskCategories: demoData.taskCategories ?? mockData.taskCategories ?? [],
         taskCards: demoData.taskCards ?? mockData.taskCards ?? [],
+        boxTemplates: demoData.boxTemplates ?? mockData.boxTemplates ?? [],
         events: [...(mockData.events ?? []), ...(demoData.events ?? [])],
       };
       

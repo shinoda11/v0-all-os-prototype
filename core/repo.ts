@@ -225,6 +225,50 @@ export function createDemoTaskCards(): TaskCard[] {
 }
 
 /**
+ * Create demo box templates
+ */
+export function createDemoBoxTemplates(): BoxTemplate[] {
+  return [
+    {
+      id: 'box-lunch-basic',
+      name: 'ランチ基本セット',
+      timeBand: 'lunch',
+      taskCardIds: ['task-1', 'task-2', 'task-4', 'task-9'],
+      boxRule: { type: 'always' },
+      enabled: true,
+      description: 'ランチ帯の必須タスク（仕込み・清掃・セッティング）',
+    },
+    {
+      id: 'box-lunch-busy',
+      name: 'ランチ繁忙セット',
+      timeBand: 'lunch',
+      taskCardIds: ['task-3', 'task-7', 'task-10'],
+      boxRule: { type: 'salesRange', minSales: 200000 },
+      enabled: true,
+      description: '売上20万円以上のランチ帯追加タスク',
+    },
+    {
+      id: 'box-dinner-basic',
+      name: 'ディナー基本セット',
+      timeBand: 'dinner',
+      taskCardIds: ['task-1', 'task-2', 'task-5', 'task-6'],
+      boxRule: { type: 'always' },
+      enabled: true,
+      description: 'ディナー帯の必須タスク（仕込み・清掃）',
+    },
+    {
+      id: 'box-dinner-busy',
+      name: 'ディナー繁忙セット',
+      timeBand: 'dinner',
+      taskCardIds: ['task-3', 'task-7', 'task-8'],
+      boxRule: { type: 'salesRange', minSales: 250000 },
+      enabled: true,
+      description: '売上25万円以上のディナー帯追加タスク',
+    },
+  ];
+}
+
+/**
  * Create today's quest instances from task cards
  */
 export function createTodayPlanFromTemplates(
@@ -251,6 +295,9 @@ export function createTodayPlanFromTemplates(
       priority: 'medium',
       estimatedMinutes: task.standardMinutes,
       source: 'system',
+      // refId-based linking (replaces title matching)
+      refId: task.id,
+      targetValue: task.baseQuantity,
     };
     questEvents.push(questEvent);
   }
@@ -268,12 +315,14 @@ export function seedDemoData(storeId: string = '1'): Partial<AppState> {
   const staff = createDemoStaff();
   const taskCategories = createDemoCategories();
   const taskCards = createDemoTaskCards();
+  const boxTemplates = createDemoBoxTemplates();
   const todayQuests = createTodayPlanFromTemplates(taskCards, storeId, today);
   
   return {
     staff,
     taskCategories,
     taskCards,
+    boxTemplates,
     events: todayQuests,
   };
 }
