@@ -139,6 +139,10 @@ export interface DecisionEvent extends BaseEvent {
   priority: 'low' | 'medium' | 'high' | 'critical';
   estimatedMinutes?: number;
   linkedExceptionId?: string;
+  // Business date: the day this quest is planned for (YYYY-MM-DD).
+  // When set, Floor Today Quests only shows quests whose businessDate === today.
+  // Legacy events without businessDate fall back to timestamp date.
+  businessDate?: string;
   // Assignee tracking
   assigneeId?: string; // Staff ID of assigned person
   assigneeName?: string; // Staff name for display
@@ -162,6 +166,8 @@ export interface DecisionEvent extends BaseEvent {
   targetValue?: number; // calculated quantity for this quest instance
   // Peak task flag (urgent POS order interrupts)
   isPeak?: boolean;
+  // ShiftSlot linking: which slot (skill-requirement) spawned this quest
+  slotId?: string;
 }
 
 export interface ForecastEvent extends BaseEvent {
@@ -675,6 +681,10 @@ export interface LaborSlot {
   role: string;        // e.g. 'kitchen', 'floor'
   starLevel: 1 | 2 | 3;
   plannedHours: number;
+  // Draft stage: slot is a skill-requirement placeholder (no staff assigned).
+  // Confirmed stage: manager binds a real staff member to the slot.
+  assignedStaffId?: string;
+  assignedStaffName?: string;
 }
 
 export interface DayPlan {
@@ -768,6 +778,8 @@ export type AppAction =
   // Day Plan actions
   | { type: 'UPSERT_DAY_PLAN'; dayPlan: DayPlan }
   | { type: 'UPDATE_DAY_PLAN_STATUS'; date: string; storeId: string; status: DayPlanStatus }
+  // Slot assignment (Confirmed step: bind staff to slot)
+  | { type: 'ASSIGN_SLOT_STAFF'; date: string; storeId: string; slotId: string; staffId: string; staffName: string }
   // Replay actions
   | { type: 'REPLAY_START'; events: DomainEvent[] }
   | { type: 'REPLAY_STEP' }

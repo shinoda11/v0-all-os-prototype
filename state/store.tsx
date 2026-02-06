@@ -97,6 +97,7 @@ interface StoreContextValue {
     // Day Plan (Planning Calendar)
     upsertDayPlan: (dayPlan: DayPlan) => void;
     updateDayPlanStatus: (date: string, status: DayPlanStatus) => void;
+    assignSlotStaff: (date: string, slotId: string, staffId: string, staffName: string) => void;
     goLiveDayPlan: (date: string) => void;
     // Order Interrupt (POS urgent orders)
     createOrderQuest: (order: { orderId: string; menuItemName: string; quantity: number; slaMinutes?: number }) => string;
@@ -421,6 +422,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         completionEvent.quantity = src.quantity;
         completionEvent.targetPrepItemIds = src.targetPrepItemIds;
         completionEvent.targetMenuIds = src.targetMenuIds;
+        completionEvent.businessDate = src.businessDate;
+        completionEvent.slotId = src.slotId;
         // Preserve assignee from the in-progress event if actor didn't override
         if (!completionEvent.assigneeId && src.assigneeId) {
           completionEvent.assigneeId = src.assigneeId;
@@ -677,6 +680,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       publishStateUpdate('state:updated', 'day-plan-status-updated', ['dayPlans']);
     },
 
+    // Slot assignment: bind a Staff to a LaborSlot (Confirmed step)
+    assignSlotStaff: (date: string, slotId: string, staffId: string, staffName: string) => {
+      const storeId = storeIdRef.current || '1';
+      dispatch({ type: 'ASSIGN_SLOT_STAFF', date, storeId, slotId, staffId, staffName });
+      publishStateUpdate('state:updated', 'slot-staff-assigned', ['dayPlans']);
+    },
+
     // Go Live: generate quests from the day plan's selected boxes
     goLiveDayPlan: (date: string) => {
       const storeId = storeIdRef.current || '1';
@@ -688,6 +698,14 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const taskCards = currentState.taskCards || [];
       const now = new Date().toISOString();
       const seenTaskIds = new Set<string>();
+
+      // Build a role -> slot lookup from the plan's laborSlots
+      // so quests inherit the staff binding from the Confirmed step.
+      const slotsByRole = new Map<string, typeof plan.laborSlots[0]>();
+      (plan.laborSlots || []).forEach((slot) => {
+        // First matching slot per role wins (could be extended to multi-slot later)
+        if (!slotsByRole.has(slot.role)) slotsByRole.set(slot.role, slot);
+      });
 
       plan.selectedBoxIds.forEach((boxId) => {
         const box = boxTemplates.find((b) => b.id === boxId);
@@ -711,6 +729,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           const questId = `quest-${boxId}-${taskId}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
           const deadline = new Date(Date.now() + task.standardMinutes * 60 * 1000 * 2).toISOString();
 
+          // Resolve slot for this task's role
+          const matchedSlot = slotsByRole.get(task.role);
+
           const questEvent: DecisionEvent = {
             id: questId,
             type: 'decision',
@@ -729,6 +750,11 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             source: 'system',
             refId: task.id,
             targetValue: quantity,
+            businessDate: date,
+            // Slot linkage: quest inherits slot id and staff from Confirmed plan
+            slotId: matchedSlot?.id,
+            assigneeId: matchedSlot?.assignedStaffId,
+            assigneeName: matchedSlot?.assignedStaffName,
           };
 
           dispatch({ type: 'ADD_EVENT', event: questEvent });

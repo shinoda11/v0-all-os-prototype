@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { useStore } from '@/state/store';
 import { useAuth } from '@/state/auth';
 import { useViewMode, type ViewMode } from '@/core/viewMode';
@@ -38,9 +39,17 @@ const ROLE_COLORS: Record<UserRole, string> = {
 export function HeaderBar({ storeId, onMenuClick }: HeaderBarProps) {
   const { state } = useStore();
   const { currentUser, setMockUser, canSwitchView } = useAuth();
-  const [viewMode, setViewMode, viewModeLoaded] = useViewMode();
+  const [viewMode, setViewMode] = useViewMode();
   const router = useRouter();
   const currentStore = state.stores.find((s) => s.id === storeId);
+
+  // Defer ALL Radix DropdownMenu rendering until after mount.
+  // Radix useId generates IDs from the React tree shape; any server/client
+  // tree difference (conditional renders, localStorage reads) causes
+  // mismatched IDs and hydration errors. By rendering dropdowns only after
+  // mount we completely sidestep the problem.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
 
   // Short name for display
   const shortName = currentStore?.name.replace('Aburi TORA 熟成鮨と炙り鮨 ', '') ?? '';
@@ -87,84 +96,89 @@ export function HeaderBar({ storeId, onMenuClick }: HeaderBarProps) {
             {shortName}
           </div>
         )}
-        
-        {/* View Switcher - Only for Manager+ */}
-        {canSwitchView && viewModeLoaded && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-2">
-                {viewMode === 'manager' ? (
-                  <Briefcase className="h-4 w-4" />
-                ) : (
-                  <Users className="h-4 w-4" />
-                )}
-                <span className="hidden sm:inline">
-                  {viewMode === 'manager' ? 'Manager' : 'Staff'}
-                </span>
-                <ChevronDown className="h-3 w-3" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>View Mode</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={() => handleViewSwitch('manager')}
-                className="gap-2"
-              >
-                <Briefcase className="h-4 w-4" />
-                Manager View
-                {viewMode === 'manager' && <Check className="h-4 w-4 ml-auto" />}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => handleViewSwitch('staff')}
-                className="gap-2"
-              >
-                <Users className="h-4 w-4" />
-                Staff View
-                {viewMode === 'staff' && <Check className="h-4 w-4 ml-auto" />}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
 
-        {/* Mock User Switcher (for testing) */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="gap-2">
-              <User className="h-4 w-4" />
-              <span className="hidden sm:inline">{currentUser.name}</span>
-              <Badge variant="outline" className={ROLE_COLORS[currentUser.role]}>
-                {ROLE_LABELS[currentUser.role]}
-              </Badge>
-              <ChevronDown className="h-3 w-3" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuLabel>Mock User (テスト用)</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem 
-              onClick={() => setMockUser('sv')}
-              className={currentUser.role === 'sv' ? 'bg-accent' : ''}
-            >
-              <Badge className={`mr-2 ${ROLE_COLORS.sv}`}>SV</Badge>
-              佐藤 一郎
-            </DropdownMenuItem>
-            <DropdownMenuItem 
-              onClick={() => setMockUser('manager')}
-              className={currentUser.role === 'manager' ? 'bg-accent' : ''}
-            >
-              <Badge className={`mr-2 ${ROLE_COLORS.manager}`}>Manager</Badge>
-              田中 太郎
-            </DropdownMenuItem>
-            <DropdownMenuItem 
-              onClick={() => setMockUser('staff')}
-              className={currentUser.role === 'staff' ? 'bg-accent' : ''}
-            >
-              <Badge className={`mr-2 ${ROLE_COLORS.staff}`}>Staff</Badge>
-              鈴木 花子
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {/* Dropdowns are client-only to avoid Radix useId hydration mismatch */}
+        {mounted && (
+          <>
+            {/* View Switcher - Only for Manager+ */}
+            {canSwitchView && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-2">
+                    {viewMode === 'manager' ? (
+                      <Briefcase className="h-4 w-4" />
+                    ) : (
+                      <Users className="h-4 w-4" />
+                    )}
+                    <span className="hidden sm:inline">
+                      {viewMode === 'manager' ? 'Manager' : 'Staff'}
+                    </span>
+                    <ChevronDown className="h-3 w-3" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuLabel>View Mode</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => handleViewSwitch('manager')}
+                    className="gap-2"
+                  >
+                    <Briefcase className="h-4 w-4" />
+                    Manager View
+                    {viewMode === 'manager' && <Check className="h-4 w-4 ml-auto" />}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => handleViewSwitch('staff')}
+                    className="gap-2"
+                  >
+                    <Users className="h-4 w-4" />
+                    Staff View
+                    {viewMode === 'staff' && <Check className="h-4 w-4 ml-auto" />}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+
+            {/* Mock User Switcher (for testing) */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="gap-2">
+                  <User className="h-4 w-4" />
+                  <span className="hidden sm:inline">{currentUser.name}</span>
+                  <Badge variant="outline" className={ROLE_COLORS[currentUser.role]}>
+                    {ROLE_LABELS[currentUser.role]}
+                  </Badge>
+                  <ChevronDown className="h-3 w-3" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuLabel>Mock User (テスト用)</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem 
+                  onClick={() => setMockUser('sv')}
+                  className={currentUser.role === 'sv' ? 'bg-accent' : ''}
+                >
+                  <Badge className={`mr-2 ${ROLE_COLORS.sv}`}>SV</Badge>
+                  佐藤 一郎
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => setMockUser('manager')}
+                  className={currentUser.role === 'manager' ? 'bg-accent' : ''}
+                >
+                  <Badge className={`mr-2 ${ROLE_COLORS.manager}`}>Manager</Badge>
+                  田中 太郎
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => setMockUser('staff')}
+                  className={currentUser.role === 'staff' ? 'bg-accent' : ''}
+                >
+                  <Badge className={`mr-2 ${ROLE_COLORS.staff}`}>Staff</Badge>
+                  鈴木 花子
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </>
+        )}
       </div>
     </header>
   );

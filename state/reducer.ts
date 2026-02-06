@@ -265,6 +265,25 @@ export const appReducer = (state: AppState, action: AppAction): AppState => {
       };
     }
 
+    // Slot assignment: bind a staff member to a LaborSlot inside a DayPlan
+    case 'ASSIGN_SLOT_STAFF': {
+      return {
+        ...state,
+        dayPlans: (state.dayPlans || []).map((dp) => {
+          if (dp.date !== action.date || dp.storeId !== action.storeId) return dp;
+          return {
+            ...dp,
+            laborSlots: dp.laborSlots.map((slot) =>
+              slot.id === action.slotId
+                ? { ...slot, assignedStaffId: action.staffId, assignedStaffName: action.staffName }
+                : slot
+            ),
+            updatedAt: new Date().toISOString(),
+          };
+        }),
+      };
+    }
+
     case 'REPLAY_START':
       return {
         ...state,

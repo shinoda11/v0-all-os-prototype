@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { PageHeader } from '@/components/PageHeader';
 import { useParams } from 'next/navigation';
+import { MvpFlowWizard } from '@/components/os/MvpFlowWizard';
 import { 
   TrendingUp,
   Users,
@@ -18,7 +19,6 @@ import {
   Clock,
   ClipboardList,
   ChevronRight,
-  CalendarCheck,
 } from 'lucide-react';
 
 export default function CockpitPage() {
@@ -60,22 +60,8 @@ export default function CockpitPage() {
         subtitle={`${currentStore.name} - ${new Date().toLocaleDateString(locale === 'ja' ? 'ja-JP' : 'en-US', { month: 'long', day: 'numeric' })}`}
       />
 
-      {/* Primary CTA: Build Today's Plan */}
-      <Card className="border-primary/30 bg-primary/5">
-        <CardContent className="flex items-center justify-between pt-4 pb-4">
-          <div>
-            <h3 className="font-semibold text-lg">{t('cockpit.buildPlan')}</h3>
-            <p className="text-sm text-muted-foreground">{t('cockpit.buildPlanDesc')}</p>
-          </div>
-          <Link href={`/stores/${storeId}/os/plan-builder`}>
-            <Button className="gap-2">
-              <CalendarCheck className="h-4 w-4" />
-              {t('cockpit.buildPlanAction')}
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </Link>
-        </CardContent>
-      </Card>
+      {/* MVP Flow Wizard - 5-step guided demo path */}
+      <MvpFlowWizard storeId={storeId} />
 
       {/* KPI Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

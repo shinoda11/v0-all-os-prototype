@@ -12,7 +12,7 @@ import { selectCurrentStore } from '@/core/selectors';
 import { useI18n, useLocaleDateFormat } from '@/i18n/I18nProvider';
 import { useViewMode, type ViewMode } from '@/core/viewMode';
 import type { TimeBand } from '@/core/types';
-import { RefreshCw, Globe, MessageCircle, Users, Briefcase, ChevronDown, Check } from 'lucide-react';
+import { RefreshCw, Globe, MessageCircle, Users, Briefcase, ChevronDown, Check, RotateCcw, Database } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,7 +33,7 @@ export function OSHeader({
   onTimeBandChange,
   showTimeBandTabs = true,
 }: OSHeaderProps) {
-  const { state } = useStore();
+  const { state, actions } = useStore();
   const currentStore = selectCurrentStore(state);
   const { locale, setLocale, t } = useI18n();
   const { formatDate, formatTime } = useLocaleDateFormat();
@@ -55,6 +55,20 @@ export function OSHeader({
     } else {
       router.push(`/stores/${storeId}/floor/todo`);
     }
+  };
+
+  // Demo load feedback
+  const [demoLoaded, setDemoLoaded] = useState(false);
+
+  const handleLoadDemo = () => {
+    actions.seedDemoData();
+    setDemoLoaded(true);
+    setTimeout(() => setDemoLoaded(false), 2000);
+  };
+
+  const handleResetDemo = () => {
+    actions.resetAllData();
+    window.location.reload();
   };
 
   // Use stable initial date to avoid hydration mismatch
@@ -111,8 +125,8 @@ export function OSHeader({
             <span>{t('os.header.lastUpdated')}: {lastUpdatedStr}</span>
           </div>
           
-          {/* View Switcher - Only for Manager/Owner/SV (not staff) */}
-          {canSwitchView && hasRole('manager') && viewModeLoaded && (
+          {/* View Switcher - deferred to after mount to avoid Radix useId hydration mismatch */}
+          {mounted && canSwitchView && hasRole('manager') && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="default" className="px-3 gap-2">
@@ -144,6 +158,35 @@ export function OSHeader({
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+          )}
+          
+          {/* Demo Controls - Manager only */}
+          {hasRole('manager') && (
+            <>
+              <Button
+                variant="ghost"
+                size="default"
+                onClick={handleLoadDemo}
+                className="px-3 gap-2 text-muted-foreground hover:text-primary"
+                disabled={demoLoaded}
+              >
+                {demoLoaded ? (
+                  <Check className="h-4 w-4 text-green-600" />
+                ) : (
+                  <Database className="h-4 w-4" />
+                )}
+                <span>{demoLoaded ? 'Loaded!' : 'Demo: Load dataset'}</span>
+              </Button>
+              <Button
+                variant="ghost"
+                size="default"
+                onClick={handleResetDemo}
+                className="px-3 gap-2 text-muted-foreground hover:text-destructive"
+              >
+                <RotateCcw className="h-4 w-4" />
+                <span>Reset</span>
+              </Button>
+            </>
           )}
           
           {/* Language Toggle */}

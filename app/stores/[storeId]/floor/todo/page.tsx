@@ -197,6 +197,11 @@ function QuestCard({ quest, status, roleNames, onStart, onPause, onResume, onCom
       {t('quests.managerApproved')}
     </Badge>
     )}
+    {quest.assigneeId && quest.slotId && (
+    <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-300 text-xs">
+      {t('quests.mySlot')}
+    </Badge>
+    )}
   </div>
   <DifficultyStars difficulty={difficulty} />
   </div>
@@ -767,14 +772,20 @@ export default function TodayQuestsPage() {
   ) ?? state.staff.find((s) => s.storeId === state.selectedStoreId);
   const myRoleId = myStaff?.roleId;
   
-  // Filter to only show quests assigned to current user or their role
-  const activeTodos = useMemo(() => 
-    allActiveTodos.filter((quest) => 
-      quest.assigneeId === myStaff?.id || 
+  // Filter to only show quests assigned to current user or their role.
+  // Quests with a direct assigneeId match (from Confirmed slot binding) come first.
+  const activeTodos = useMemo(() => {
+    const matching = allActiveTodos.filter((quest) =>
+      quest.assigneeId === myStaff?.id ||
       (myRoleId && quest.distributedToRoles.includes(myRoleId))
-    ),
-    [allActiveTodos, myStaff?.id, myRoleId]
-  );
+    );
+    // Sort: directly-assigned quests first, then the rest (role-match only)
+    return matching.sort((a, b) => {
+      const aDirectlyAssigned = a.assigneeId === myStaff?.id ? 1 : 0;
+      const bDirectlyAssigned = b.assigneeId === myStaff?.id ? 1 : 0;
+      return bDirectlyAssigned - aDirectlyAssigned;
+    });
+  }, [allActiveTodos, myStaff?.id, myRoleId]);
   
   const completedTodos = useMemo(() => 
     allCompletedTodos.filter((quest) => 

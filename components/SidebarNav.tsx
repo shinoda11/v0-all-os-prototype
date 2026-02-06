@@ -74,6 +74,11 @@ const setupSection: NavSection = {
       path: '/os/planning',
       icon: <CalendarCheck className="h-5 w-5" />,
     },
+    {
+      labelKey: 'nav.confirmPlan',
+      path: '/os/confirm-plan',
+      icon: <Users className="h-5 w-5" />,
+    },
   ],
 };
 
