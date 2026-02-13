@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useStore } from '@/state/store';
 import { useI18n } from '@/i18n/I18nProvider';
 import { cn } from '@/lib/utils';
@@ -292,18 +292,54 @@ export function TaskStudio() {
   const { state, actions } = useStore();
   const { t } = useI18n();
 
-  // Data comes exclusively from store - no hardcoded fallback
+  // Local copies for editing. Initialized from store (may be empty on first
+  // render because loadMockData dispatches inside useEffect). The syncs below
+  // pick up the store data once it arrives.
   const [categories, setCategories] = useState<TaskCategory[]>(
     state.taskCategories ?? []
   );
-  
   const [tasks, setTasks] = useState<TaskCard[]>(
     state.taskCards ?? []
   );
-
   const [boxTemplates, setBoxTemplates] = useState<BoxTemplate[]>(
     state.boxTemplates ?? []
   );
+
+  // Sync local state when store data arrives or is replaced (initial load,
+  // seedDemoData, resetAllData). We compare lengths to avoid overwriting
+  // in-progress local edits during normal use.
+  useEffect(() => {
+    const storeCategories = state.taskCategories ?? [];
+    if (storeCategories.length > 0 && categories.length === 0) {
+      setCategories(storeCategories);
+    }
+  }, [state.taskCategories]);
+
+  useEffect(() => {
+    const storeCards = state.taskCards ?? [];
+    if (storeCards.length > 0 && tasks.length === 0) {
+      setTasks(storeCards);
+    }
+  }, [state.taskCards]);
+
+  useEffect(() => {
+    const storeBoxes = state.boxTemplates ?? [];
+    if (storeBoxes.length > 0 && boxTemplates.length === 0) {
+      setBoxTemplates(storeBoxes);
+    }
+  }, [state.boxTemplates]);
+
+  // Also handle full data reloads (seedDemoData / resetAllData) where the
+  // store array reference changes even when local state is already populated.
+  const storeTaskCardsRef = React.useRef(state.taskCards);
+  useEffect(() => {
+    if (state.taskCards !== storeTaskCardsRef.current) {
+      storeTaskCardsRef.current = state.taskCards;
+      setCategories(state.taskCategories ?? []);
+      setTasks(state.taskCards ?? []);
+      setBoxTemplates(state.boxTemplates ?? []);
+    }
+  }, [state.taskCards, state.taskCategories, state.boxTemplates]);
 
   const hasData = categories.length > 0 && tasks.length > 0;
 
@@ -654,7 +690,7 @@ export function TaskStudio() {
     return { byRole, byTimeBand, assigned, unassigned, total: generatedQuests.length };
   }, [generatedQuests]);
 
-  // Empty state when no data is loaded
+  // Empty state when no data is loaded yet (store still initializing)
   if (!hasData) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] gap-4 p-8">
@@ -662,9 +698,12 @@ export function TaskStudio() {
           <AlertCircle className="h-8 w-8 text-muted-foreground" />
         </div>
         <div className="text-center">
-          <h3 className="text-lg font-semibold">タスクカタログにデータがありません</h3>
+          <h3 className="text-lg font-semibold">データを読み込み中...</h3>
           <p className="text-sm text-muted-foreground mt-1">
-            Task Catalog でタスクを登録するか、Cockpit からデモデータを読み込んでください。
+            タスクカタログのデータを読み込んでいます。しばらくお待ちください。
+          </p>
+          <p className="text-xs text-muted-foreground mt-2">
+            表示されない場合は、Cockpit からデモデータを読み込んでください。
           </p>
         </div>
       </div>
