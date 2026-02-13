@@ -48,62 +48,7 @@ import {
 import type { TaskCard, TaskCategory, TaskRole, StarRequirement, QuantityMode, QualityCheck, TimeBand, DecisionEvent, BoxTemplate, BoxRule } from '@/core/types';
 import { Package } from 'lucide-react';
 
-// Initial sample data - 20 tasks across different categories
-const INITIAL_CATEGORIES: TaskCategory[] = [
-  { id: 'cat-1', name: '仕込み' },
-  { id: 'cat-1-1', name: '魚の仕込み', parentId: 'cat-1' },
-  { id: 'cat-1-2', name: '野菜の仕込み', parentId: 'cat-1' },
-  { id: 'cat-1-3', name: 'ソース・タレ', parentId: 'cat-1' },
-  { id: 'cat-2', name: 'フロア' },
-  { id: 'cat-2-1', name: '開店準備', parentId: 'cat-2' },
-  { id: 'cat-2-2', name: '接客', parentId: 'cat-2' },
-  { id: 'cat-3', name: 'ピーク対応' },
-  { id: 'cat-3-1', name: 'ランチピーク', parentId: 'cat-3' },
-  { id: 'cat-3-2', name: 'ディナーピーク', parentId: 'cat-3' },
-];
-
-const INITIAL_TASKS: TaskCard[] = [
-  // 仕込み - 魚
-  { id: 'task-1', categoryId: 'cat-1-1', name: '炙りサーモン握り仕込み', role: 'kitchen', starRequirement: 2, standardMinutes: 30, quantityMode: 'byForecast', baseQuantity: 20, coefficient: 0.02, qualityCheck: 'photo', xpReward: 50, enabled: true },
-  { id: 'task-2', categoryId: 'cat-1-1', name: 'マグロ柵切り', role: 'kitchen', starRequirement: 3, standardMinutes: 45, quantityMode: 'byForecast', baseQuantity: 15, coefficient: 0.015, qualityCheck: 'ai', xpReward: 80, enabled: true },
-  { id: 'task-3', categoryId: 'cat-1-1', name: 'イカ下処理', role: 'prep', starRequirement: 2, standardMinutes: 25, quantityMode: 'byForecast', baseQuantity: 10, coefficient: 0.01, qualityCheck: 'photo', xpReward: 40, enabled: true },
-  { id: 'task-4', categoryId: 'cat-1-1', name: 'エビ背わた取り', role: 'prep', starRequirement: 1, standardMinutes: 20, quantityMode: 'byForecast', baseQuantity: 30, coefficient: 0.03, qualityCheck: 'none', xpReward: 25, enabled: true },
-  // 仕込み - 野菜
-  { id: 'task-5', categoryId: 'cat-1-2', name: 'ネギ小口切り', role: 'prep', starRequirement: 1, standardMinutes: 15, quantityMode: 'fixed', baseQuantity: 5, coefficient: 1.0, qualityCheck: 'none', xpReward: 15, enabled: true },
-  { id: 'task-6', categoryId: 'cat-1-2', name: '大葉洗浄・水切り', role: 'prep', starRequirement: 1, standardMinutes: 10, quantityMode: 'byForecast', baseQuantity: 100, coefficient: 0.05, qualityCheck: 'none', xpReward: 10, enabled: true },
-  { id: 'task-7', categoryId: 'cat-1-2', name: 'ガリ盛り付け準備', role: 'prep', starRequirement: 1, standardMinutes: 10, quantityMode: 'fixed', baseQuantity: 50, coefficient: 1.0, qualityCheck: 'none', xpReward: 10, enabled: true },
-  // 仕込み - ソース
-  { id: 'task-8', categoryId: 'cat-1-3', name: '特製タレ仕込み', role: 'kitchen', starRequirement: 3, standardMinutes: 40, quantityMode: 'fixed', baseQuantity: 2, coefficient: 1.0, qualityCheck: 'ai', xpReward: 70, enabled: true },
-  { id: 'task-9', categoryId: 'cat-1-3', name: 'ポン酢調合', role: 'kitchen', starRequirement: 2, standardMinutes: 15, quantityMode: 'fixed', baseQuantity: 1, coefficient: 1.0, qualityCheck: 'none', xpReward: 20, enabled: true },
-  // フロア - 開店準備
-  { id: 'task-10', categoryId: 'cat-2-1', name: 'テーブルセッティング', role: 'floor', starRequirement: 1, standardMinutes: 20, quantityMode: 'fixed', baseQuantity: 1, coefficient: 1.0, qualityCheck: 'photo', xpReward: 20, enabled: true },
-  { id: 'task-11', categoryId: 'cat-2-1', name: '箸・調味料補充', role: 'floor', starRequirement: 1, standardMinutes: 15, quantityMode: 'fixed', baseQuantity: 1, coefficient: 1.0, qualityCheck: 'none', xpReward: 15, enabled: true },
-  { id: 'task-12', categoryId: 'cat-2-1', name: 'メニュー確認・POP設置', role: 'floor', starRequirement: 1, standardMinutes: 10, quantityMode: 'fixed', baseQuantity: 1, coefficient: 1.0, qualityCheck: 'none', xpReward: 10, enabled: true },
-  // フロア - 接客
-  { id: 'task-13', categoryId: 'cat-2-2', name: 'オーダーテイク', role: 'floor', starRequirement: 2, standardMinutes: 5, quantityMode: 'byOrders', baseQuantity: 1, coefficient: 1.0, qualityCheck: 'none', xpReward: 5, enabled: true },
-  { id: 'task-14', categoryId: 'cat-2-2', name: '配膳', role: 'runner', starRequirement: 1, standardMinutes: 3, quantityMode: 'byOrders', baseQuantity: 1, coefficient: 1.0, qualityCheck: 'none', xpReward: 3, enabled: true },
-  // ピーク対応 - ランチ
-  { id: 'task-15', categoryId: 'cat-3-1', name: 'ランチセット追加仕込み', role: 'kitchen', starRequirement: 2, standardMinutes: 20, quantityMode: 'byForecast', baseQuantity: 10, coefficient: 0.02, qualityCheck: 'none', xpReward: 30, enabled: true },
-  { id: 'task-16', categoryId: 'cat-3-1', name: 'レジ応援', role: 'cashier', starRequirement: 2, standardMinutes: 60, quantityMode: 'fixed', baseQuantity: 1, coefficient: 1.0, qualityCheck: 'none', xpReward: 40, enabled: true },
-  { id: 'task-17', categoryId: 'cat-3-1', name: 'バッシング強化', role: 'floor', starRequirement: 1, standardMinutes: 30, quantityMode: 'fixed', baseQuantity: 1, coefficient: 1.0, qualityCheck: 'none', xpReward: 25, enabled: true },
-  // ピーク対応 - ディナー
-  { id: 'task-18', categoryId: 'cat-3-2', name: '刺身盛り合わせ仕込み', role: 'kitchen', starRequirement: 3, standardMinutes: 35, quantityMode: 'byForecast', baseQuantity: 8, coefficient: 0.015, qualityCheck: 'photo', xpReward: 60, enabled: true },
-  { id: 'task-19', categoryId: 'cat-3-2', name: 'ドリンク準備強化', role: 'floor', starRequirement: 1, standardMinutes: 15, quantityMode: 'fixed', baseQuantity: 1, coefficient: 1.0, qualityCheck: 'none', xpReward: 15, enabled: true },
-  { id: 'task-20', categoryId: 'cat-3-2', name: '予約席セッティング', role: 'floor', starRequirement: 2, standardMinutes: 10, quantityMode: 'fixed', baseQuantity: 1, coefficient: 1.0, qualityCheck: 'photo', xpReward: 15, enabled: true },
-];
-
-// Initial Box Templates - 6 boxes for different time bands and sales ranges
-const INITIAL_BOX_TEMPLATES: BoxTemplate[] = [
-  // Lunch boxes
-  { id: 'box-1', name: 'ランチ基本', timeBand: 'lunch', taskCardIds: ['task-5', 'task-6', 'task-7', 'task-10', 'task-11', 'task-12'], boxRule: { type: 'always' }, enabled: true, description: 'ランチタイム基本準備' },
-  { id: 'box-2', name: 'ランチ繁忙対応', timeBand: 'lunch', taskCardIds: ['task-15', 'task-16', 'task-17'], boxRule: { type: 'salesRange', minSales: 150000 }, enabled: true, description: '予測売上15万円以上時の追加タスク' },
-  // Idle boxes  
-  { id: 'box-3', name: 'アイドル仕込み', timeBand: 'idle', taskCardIds: ['task-1', 'task-2', 'task-3', 'task-4', 'task-8', 'task-9'], boxRule: { type: 'always' }, enabled: true, description: 'アイドル時間の仕込み作業' },
-  // Dinner boxes
-  { id: 'box-4', name: 'ディナー基本', timeBand: 'dinner', taskCardIds: ['task-10', 'task-11', 'task-12', 'task-13', 'task-14'], boxRule: { type: 'always' }, enabled: true, description: 'ディナータイム基本準備' },
-  { id: 'box-5', name: 'ディナー繁忙対応', timeBand: 'dinner', taskCardIds: ['task-18', 'task-19', 'task-20'], boxRule: { type: 'salesRange', minSales: 250000 }, enabled: true, description: '予測売上25万円以上時の追加タスク' },
-  { id: 'box-6', name: 'ディナー高売上対応', timeBand: 'dinner', taskCardIds: ['task-2', 'task-8', 'task-18', 'task-19'], boxRule: { type: 'salesRange', minSales: 350000 }, enabled: true, description: '予測売上35万円以上時の特別対応' },
-];
+// No hardcoded data - all task/category/box data comes from store (loaded via mock.ts / seedDemoData)
 
 // Role display names
 const ROLE_LABELS: Record<TaskRole, string> = {
@@ -347,18 +292,20 @@ export function TaskStudio() {
   const { state, actions } = useStore();
   const { t } = useI18n();
 
-  // Initialize with sample data if empty
-  const [categories, setCategories] = useState<TaskCategory[]>(() => {
-    return state.taskCategories?.length ? state.taskCategories : INITIAL_CATEGORIES;
-  });
+  // Data comes exclusively from store - no hardcoded fallback
+  const [categories, setCategories] = useState<TaskCategory[]>(
+    state.taskCategories ?? []
+  );
   
-  const [tasks, setTasks] = useState<TaskCard[]>(() => {
-    return state.taskCards?.length ? state.taskCards : INITIAL_TASKS;
-  });
+  const [tasks, setTasks] = useState<TaskCard[]>(
+    state.taskCards ?? []
+  );
 
-  const [boxTemplates, setBoxTemplates] = useState<BoxTemplate[]>(() => {
-    return state.boxTemplates?.length ? state.boxTemplates : INITIAL_BOX_TEMPLATES;
-  });
+  const [boxTemplates, setBoxTemplates] = useState<BoxTemplate[]>(
+    state.boxTemplates ?? []
+  );
+
+  const hasData = categories.length > 0 && tasks.length > 0;
 
   // Active tab
   const [activeTab, setActiveTab] = useState<'tasks' | 'boxes' | 'simulation'>('tasks');
@@ -706,6 +653,23 @@ export function TaskStudio() {
 
     return { byRole, byTimeBand, assigned, unassigned, total: generatedQuests.length };
   }, [generatedQuests]);
+
+  // Empty state when no data is loaded
+  if (!hasData) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] gap-4 p-8">
+        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted">
+          <AlertCircle className="h-8 w-8 text-muted-foreground" />
+        </div>
+        <div className="text-center">
+          <h3 className="text-lg font-semibold">タスクカタログにデータがありません</h3>
+          <p className="text-sm text-muted-foreground mt-1">
+            Task Catalog でタスクを登録するか、Cockpit からデモデータを読み込んでください。
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col min-h-[600px] h-full">
