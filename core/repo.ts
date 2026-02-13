@@ -6,7 +6,7 @@
 // ============================================================
 
 import type { AppState, Staff, DomainEvent, Proposal, Incident, TaskCard, TaskCategory, BoxTemplate } from './types';
-import { TASK_CARDS as SEED_TASK_CARDS, TASK_CATEGORIES as SEED_TASK_CATEGORIES } from '@/data/taskCardSeed';
+import { TASK_CARDS as SEED_TASK_CARDS, TASK_CATEGORIES as SEED_TASK_CATEGORIES, BOX_TEMPLATES as SEED_BOX_TEMPLATES } from '@/data/taskCardSeed';
 
 // Storage key for the entire app state
 const STORAGE_KEY = 'all_os_store_v1';
@@ -326,7 +326,7 @@ export function seedDemoData(storeId: string = '1'): Partial<AppState> {
   // Use real seed data (157 cards, 12 categories) instead of old demo stubs
   const taskCategories = SEED_TASK_CATEGORIES;
   const taskCards = SEED_TASK_CARDS;
-  const boxTemplates = createDemoBoxTemplates();
+  const boxTemplates = SEED_BOX_TEMPLATES;
   const todayQuests = createTodayPlanFromTemplates(taskCards, storeId, today);
   
   return {

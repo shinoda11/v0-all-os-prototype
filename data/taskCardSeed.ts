@@ -4,7 +4,7 @@
 // Generated: 2026-02-14
 // ============================================================
 
-import type { TaskCard, TaskCategory, StarRequirement } from '@/core/types';
+import type { TaskCard, TaskCategory, BoxTemplate, StarRequirement } from '@/core/types';
 
 export const TASK_CATEGORIES: TaskCategory[] = [
   { id: 'cat-01', name: '①ネタ仕込み' },
@@ -75,4 +75,65 @@ export const TASK_CARDS: TaskCard[] = [
   { id: 'tc-045', categoryId: 'cat-11', name: '発注確認・承認', role: 'unknown', starRequirement: 2 as StarRequirement, standardMinutes: 15.0, quantityMode: 'fixed', baseQuantity: 1, coefficient: 1, qualityCheck: 'none', xpReward: 50, enabled: true, notes: '自動発注のレビュー・手動修正' },
   { id: 'tc-046', categoryId: 'cat-11', name: '日次レビュー', role: 'unknown', starRequirement: 3 as StarRequirement, standardMinutes: 15.0, quantityMode: 'fixed', baseQuantity: 1, coefficient: 1, qualityCheck: 'none', xpReward: 80, enabled: true, notes: '売上・人件費率・タスク完了率の確認 / All OS上で実施' },
   { id: 'tc-047', categoryId: 'cat-11', name: '週次レビュー', role: 'unknown', starRequirement: 3 as StarRequirement, standardMinutes: 30.0, quantityMode: 'fixed', baseQuantity: 1, coefficient: 1, qualityCheck: 'none', xpReward: 80, enabled: true, notes: '週間パフォーマンス分析・次週計画 / 週1回' },
+];
+
+// ============================================================
+// Box Templates - Group task cards into deployable boxes
+// ============================================================
+
+export const BOX_TEMPLATES: BoxTemplate[] = [
+  {
+    id: 'box-01',
+    name: '開店準備',
+    timeBand: 'lunch',
+    taskCardIds: ['tc-023', 'tc-024', 'tc-025', 'tc-026', 'tc-027', 'tc-028'],
+    boxRule: { type: 'always' },
+    enabled: true,
+    description: 'テーブルセッティング〜ドリンクステーション準備',
+  },
+  {
+    id: 'box-02',
+    name: 'ネタ仕込み基本',
+    timeBand: 'lunch',
+    taskCardIds: ['tc-001', 'tc-002', 'tc-003', 'tc-004', 'tc-005', 'tc-006', 'tc-007', 'tc-008', 'tc-010', 'tc-011', 'tc-012'],
+    boxRule: { type: 'always' },
+    enabled: true,
+    description: 'まぐろ・白身・サーモン等の基本ネタ仕込み',
+  },
+  {
+    id: 'box-03',
+    name: '高難度ネタ仕込み',
+    timeBand: 'lunch',
+    taskCardIds: ['tc-009', 'tc-013', 'tc-014', 'tc-015', 'tc-016', 'tc-017', 'tc-021'],
+    boxRule: { type: 'salesRange', minSales: 150000 },
+    enabled: true,
+    description: '炙りサーモン・貝類・鯖卸し等（★3含む）',
+  },
+  {
+    id: 'box-04',
+    name: 'ピーク対応',
+    timeBand: 'lunch',
+    taskCardIds: ['tc-029', 'tc-030', 'tc-031', 'tc-032', 'tc-033'],
+    boxRule: { type: 'always' },
+    enabled: true,
+    description: 'オーダーテイク〜ウェイティング案内',
+  },
+  {
+    id: 'box-05',
+    name: '閉店作業',
+    timeBand: 'dinner',
+    taskCardIds: ['tc-034', 'tc-035', 'tc-036', 'tc-037', 'tc-038', 'tc-039', 'tc-040', 'tc-041', 'tc-042'],
+    boxRule: { type: 'always' },
+    enabled: true,
+    description: 'レーン停止〜翌日仕込みメモ確認',
+  },
+  {
+    id: 'box-06',
+    name: '管理業務',
+    timeBand: 'lunch',
+    taskCardIds: ['tc-043', 'tc-044', 'tc-045', 'tc-046'],
+    boxRule: { type: 'always' },
+    enabled: true,
+    description: 'シフト確認・朝礼・発注確認・日次レビュー',
+  },
 ];
