@@ -16,6 +16,7 @@ import type {
 
 import mockSushiData from './mock_sushi_events.json';
 import { normalizeEvents, normalizeStaff } from './normalizer';
+import { TASK_CARDS as SEED_TASK_CARDS, TASK_CATEGORIES as SEED_TASK_CATEGORIES } from './taskCardSeed';
 
 // ------------------------------------------------------------
 // Incentive Policy Configuration
@@ -604,6 +605,8 @@ export const loadMockData = (): Partial<AppState> => {
     prepItems: PREP_ITEMS,
     events: allEvents,
     incidents: sampleIncidents,
+    taskCards: SEED_TASK_CARDS,
+    taskCategories: SEED_TASK_CATEGORIES,
     selectedMonth: new Date().toISOString().substring(0, 7),
   };
 };

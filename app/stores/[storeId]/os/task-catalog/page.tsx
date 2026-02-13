@@ -9,6 +9,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
+import { Progress } from '@/components/ui/progress';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import {
   Dialog,
   DialogContent,
@@ -16,7 +18,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog';
 import {
   Select,
@@ -25,18 +26,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { useStore } from '@/state/store';
 import { useI18n } from '@/i18n/I18nProvider';
-import type { TaskCard, TaskCategory, TaskRole, StarRequirement } from '@/core/types';
-import { Plus, Pencil, Trash2, Star, Clock, Zap } from 'lucide-react';
+import type { TaskCard, TaskCategory, TaskRole, StarRequirement, QuantityMode } from '@/core/types';
+import { Plus, Pencil, Trash2, Star, Clock, Zap, FileWarning, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const TASK_ROLES: { value: TaskRole; label: string }[] = [
@@ -45,6 +38,7 @@ const TASK_ROLES: { value: TaskRole; label: string }[] = [
   { value: 'cashier', label: 'キャッシャー' },
   { value: 'prep', label: '仕込み' },
   { value: 'runner', label: 'ランナー' },
+  { value: 'unknown', label: 'その他' },
 ];
 
 const STAR_LEVELS: { value: StarRequirement; label: string }[] = [
@@ -52,6 +46,164 @@ const STAR_LEVELS: { value: StarRequirement; label: string }[] = [
   { value: 2, label: '2 (中級)' },
   { value: 3, label: '3 (熟練)' },
 ];
+
+const QUANTITY_MODES: { value: QuantityMode; label: string }[] = [
+  { value: 'fixed', label: '固定' },
+  { value: 'byForecast', label: '予測連動' },
+  { value: 'byOrders', label: '出数連動' },
+];
+
+// --- Fill Rate Progress Bar ---
+
+function FillRateBar({ taskCards }: { taskCards: TaskCard[] }) {
+  const total = taskCards.length;
+  const filled = taskCards.filter((t) => t.enabled).length;
+  const rate = total > 0 ? Math.round((filled / total) * 100) : 0;
+
+  return (
+    <Card>
+      <CardContent className="py-4">
+        <div className="flex items-center gap-4">
+          <div className="flex-1">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-foreground">
+                充填率
+              </span>
+              <span className="text-sm text-muted-foreground">
+                {filled} / {total} 件 ({rate}%)
+              </span>
+            </div>
+            <Progress value={rate} className="h-3" />
+          </div>
+          <div className="flex gap-3 text-xs text-muted-foreground">
+            <div className="flex items-center gap-1.5">
+              <span className="inline-block h-2.5 w-2.5 rounded-full bg-primary" />
+              充填済み {filled}
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="inline-block h-2.5 w-2.5 rounded-full bg-muted-foreground/30" />
+              未充填 {total - filled}
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// --- Task Card Row ---
+
+function TaskCardRow({
+  task,
+  categoryName,
+  roleLabel,
+  onEdit,
+  onDelete,
+  onToggle,
+}: {
+  task: TaskCard;
+  categoryName: string;
+  roleLabel: string;
+  onEdit: () => void;
+  onDelete: () => void;
+  onToggle: () => void;
+}) {
+  const isDisabled = !task.enabled;
+
+  return (
+    <div
+      className={cn(
+        'flex flex-col gap-2 rounded-lg border p-4 transition-colors',
+        isDisabled
+          ? 'border-dashed border-muted-foreground/20 bg-muted/40'
+          : 'border-border bg-card',
+      )}
+    >
+      {/* Top row: name + badges + actions */}
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <span
+            className={cn(
+              'font-medium',
+              isDisabled && 'text-muted-foreground',
+            )}
+          >
+            {task.name}
+          </span>
+          {isDisabled && (
+            <Badge variant="outline" className="border-amber-500/50 text-amber-600 text-xs">
+              <FileWarning className="mr-1 h-3 w-3" />
+              要入力
+            </Badge>
+          )}
+          {task.isPeak && (
+            <Badge variant="destructive" className="text-xs">
+              Peak
+            </Badge>
+          )}
+        </div>
+        <div className="flex items-center gap-1 shrink-0">
+          <Switch
+            checked={task.enabled}
+            onCheckedChange={onToggle}
+            aria-label={`Toggle ${task.name}`}
+          />
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onEdit}>
+            <Pencil className="h-3.5 w-3.5" />
+            <span className="sr-only">Edit {task.name}</span>
+          </Button>
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onDelete}>
+            <Trash2 className="h-3.5 w-3.5 text-destructive" />
+            <span className="sr-only">Delete {task.name}</span>
+          </Button>
+        </div>
+      </div>
+
+      {/* Info chips */}
+      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+        <Badge variant="secondary" className="font-normal text-xs">
+          {categoryName}
+        </Badge>
+        <Badge variant="outline" className="font-normal text-xs">
+          {roleLabel}
+        </Badge>
+        <span className="flex items-center gap-0.5">
+          {[1, 2, 3].map((i) => (
+            <Star
+              key={i}
+              className={cn(
+                'h-3 w-3',
+                i <= task.starRequirement
+                  ? 'fill-amber-400 text-amber-400'
+                  : 'text-muted-foreground/20',
+              )}
+            />
+          ))}
+        </span>
+        <span className="flex items-center gap-1">
+          <Clock className="h-3 w-3" />
+          {task.standardMinutes}分
+        </span>
+        <span className="flex items-center gap-1">
+          <Zap className="h-3 w-3 text-amber-500" />
+          {task.xpReward}XP
+        </span>
+        <span>
+          {QUANTITY_MODES.find((q) => q.value === task.quantityMode)?.label ?? task.quantityMode}
+        </span>
+      </div>
+
+      {/* Notes */}
+      {task.notes && (
+        <p className={cn('text-xs leading-relaxed', isDisabled ? 'text-muted-foreground/60' : 'text-muted-foreground')}>
+          {task.notes}
+        </p>
+      )}
+    </div>
+  );
+}
+
+// --- Edit Dialog ---
 
 function TaskCardDialog({
   open,
@@ -68,7 +220,7 @@ function TaskCardDialog({
 }) {
   const { t } = useI18n();
   const isEdit = !!taskCard;
-  
+
   const [name, setName] = useState(taskCard?.name ?? '');
   const [categoryId, setCategoryId] = useState(taskCard?.categoryId ?? categories[0]?.id ?? '');
   const [role, setRole] = useState<TaskRole>(taskCard?.role ?? 'kitchen');
@@ -76,6 +228,7 @@ function TaskCardDialog({
   const [standardMinutes, setStandardMinutes] = useState(taskCard?.standardMinutes ?? 15);
   const [xpReward, setXpReward] = useState(taskCard?.xpReward ?? 20);
   const [enabled, setEnabled] = useState(taskCard?.enabled ?? true);
+  const [notes, setNotes] = useState(taskCard?.notes ?? '');
 
   const handleSave = () => {
     const newTaskCard: TaskCard = {
@@ -85,12 +238,13 @@ function TaskCardDialog({
       role,
       starRequirement,
       standardMinutes,
-      quantityMode: 'fixed',
-      baseQuantity: 1,
-      coefficient: 1,
-      qualityCheck: 'none',
+      quantityMode: taskCard?.quantityMode ?? 'fixed',
+      baseQuantity: taskCard?.baseQuantity ?? 1,
+      coefficient: taskCard?.coefficient ?? 1,
+      qualityCheck: taskCard?.qualityCheck ?? 'none',
       xpReward,
       enabled,
+      notes: notes || undefined,
     };
     onSave(newTaskCard);
     onOpenChange(false);
@@ -152,8 +306,8 @@ function TaskCardDialog({
           <div className="grid grid-cols-2 gap-4">
             <div className="grid gap-2">
               <Label>{t('taskCatalog.requiredStars')}</Label>
-              <Select 
-                value={String(starRequirement)} 
+              <Select
+                value={String(starRequirement)}
                 onValueChange={(v) => setStarRequirement(Number(v) as StarRequirement)}
               >
                 <SelectTrigger>
@@ -174,7 +328,8 @@ function TaskCardDialog({
                 type="number"
                 value={standardMinutes}
                 onChange={(e) => setStandardMinutes(Number(e.target.value))}
-                min={1}
+                min={0}
+                step={0.5}
               />
             </div>
           </div>
@@ -193,6 +348,14 @@ function TaskCardDialog({
               <Label>{t('taskCatalog.enabled')}</Label>
             </div>
           </div>
+          <div className="grid gap-2">
+            <Label>工程メモ</Label>
+            <Input
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="工程手順のメモ..."
+            />
+          </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
@@ -207,38 +370,58 @@ function TaskCardDialog({
   );
 }
 
+// --- Main Page ---
+
 export default function TaskCatalogPage() {
   const { t } = useI18n();
   const params = useParams();
   const storeId = params.storeId as string;
   const { state, actions } = useStore();
-  
+
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<TaskCard | null>(null);
-  const [filterCategory, setFilterCategory] = useState<string>('all');
   const [filterRole, setFilterRole] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeTab, setActiveTab] = useState<string>('all');
 
-  const categories = state.taskCategories ?? [];
-  const taskCards = state.taskCards ?? [];
-
-  // Filter task cards
-  const filteredTasks = useMemo(() => {
-    return taskCards.filter((task) => {
-      if (filterCategory !== 'all' && task.categoryId !== filterCategory) return false;
-      if (filterRole !== 'all' && task.role !== filterRole) return false;
-      return true;
-    });
-  }, [taskCards, filterCategory, filterRole]);
+  const categories: TaskCategory[] = state.taskCategories ?? [];
+  const taskCards: TaskCard[] = state.taskCards ?? [];
 
   // Get category name by id
-  const getCategoryName = (categoryId: string) => {
-    return categories.find((c) => c.id === categoryId)?.name ?? categoryId;
-  };
+  const getCategoryName = (categoryId: string) =>
+    categories.find((c) => c.id === categoryId)?.name ?? categoryId;
 
   // Get role label
-  const getRoleLabel = (role: TaskRole) => {
-    return TASK_ROLES.find((r) => r.value === role)?.label ?? role;
-  };
+  const getRoleLabel = (role: TaskRole) =>
+    TASK_ROLES.find((r) => r.value === role)?.label ?? role;
+
+  // Category-level task counts for tab labels
+  const categoryTaskCounts = useMemo(() => {
+    const counts: Record<string, { total: number; filled: number }> = {};
+    for (const cat of categories) {
+      const catTasks = taskCards.filter((tc) => tc.categoryId === cat.id);
+      counts[cat.id] = {
+        total: catTasks.length,
+        filled: catTasks.filter((tc) => tc.enabled).length,
+      };
+    }
+    return counts;
+  }, [categories, taskCards]);
+
+  // Filter task cards by active tab (category), role, and search
+  const filteredTasks = useMemo(() => {
+    return taskCards.filter((task) => {
+      if (activeTab !== 'all' && task.categoryId !== activeTab) return false;
+      if (filterRole !== 'all' && task.role !== filterRole) return false;
+      if (searchQuery.trim()) {
+        const q = searchQuery.trim().toLowerCase();
+        const matchesName = task.name.toLowerCase().includes(q);
+        const matchesNotes = (task.notes ?? '').toLowerCase().includes(q);
+        if (!matchesName && !matchesNotes) return false;
+      }
+      return true;
+    });
+  }, [taskCards, activeTab, filterRole, searchQuery]);
 
   const handleNewTemplate = () => {
     setEditingTask(null);
@@ -269,7 +452,8 @@ export default function TaskCatalogPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <PageHeader
           title={t('taskCatalog.title')}
@@ -281,30 +465,28 @@ export default function TaskCatalogPage() {
         </Button>
       </div>
 
+      {/* Fill Rate Progress */}
+      <FillRateBar taskCards={taskCards} />
+
       {/* Filters */}
       <Card>
-        <CardContent className="py-4">
-          <div className="flex flex-wrap gap-4">
-            <div className="flex items-center gap-2">
-              <Label className="text-sm text-muted-foreground">{t('taskCatalog.category')}:</Label>
-              <Select value={filterCategory} onValueChange={setFilterCategory}>
-                <SelectTrigger className="w-[150px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">{t('common.all')}</SelectItem>
-                  {categories.map((cat) => (
-                    <SelectItem key={cat.id} value={cat.id}>
-                      {cat.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+        <CardContent className="py-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="タスク名・メモで検索..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+              />
             </div>
             <div className="flex items-center gap-2">
-              <Label className="text-sm text-muted-foreground">{t('taskCatalog.role')}:</Label>
+              <Label className="text-sm text-muted-foreground whitespace-nowrap">
+                {t('taskCatalog.role')}:
+              </Label>
               <Select value={filterRole} onValueChange={setFilterRole}>
-                <SelectTrigger className="w-[150px]">
+                <SelectTrigger className="w-[130px]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -317,24 +499,26 @@ export default function TaskCatalogPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="ml-auto text-sm text-muted-foreground">
-              {filteredTasks.length} {t('taskCatalog.templates')}
-            </div>
+            <span className="text-sm text-muted-foreground whitespace-nowrap">
+              {filteredTasks.length} 件表示
+            </span>
           </div>
         </CardContent>
       </Card>
 
-      {/* Task Cards Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">{t('taskCatalog.templates')}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {filteredTasks.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground space-y-4">
+      {/* Category Tabs + Card List */}
+      {taskCards.length === 0 ? (
+        <Card>
+          <CardContent className="py-12">
+            <div className="text-center text-muted-foreground space-y-4">
               <p className="text-lg">{t('taskCatalog.noTemplates')}</p>
               <div className="flex items-center justify-center gap-3">
-                <Button variant="outline" onClick={() => { actions.seedDemoData(); }}>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    actions.seedDemoData();
+                  }}
+                >
                   {t('taskCatalog.loadDemo')}
                 </Button>
                 <span className="text-sm">{t('common.or')}</span>
@@ -343,89 +527,66 @@ export default function TaskCatalogPage() {
                 </Button>
               </div>
             </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t('taskCatalog.name')}</TableHead>
-                  <TableHead>{t('taskCatalog.category')}</TableHead>
-                  <TableHead>{t('taskCatalog.role')}</TableHead>
-                  <TableHead className="text-center">{t('taskCatalog.requiredStars')}</TableHead>
-                  <TableHead className="text-center">{t('taskCatalog.expectedMinutes')}</TableHead>
-                  <TableHead className="text-center">XP</TableHead>
-                  <TableHead className="text-center">{t('taskCatalog.enabled')}</TableHead>
-                  <TableHead className="w-[100px]"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredTasks.map((task) => (
-                  <TableRow key={task.id} className={cn(!task.enabled && 'opacity-50')}>
-                    <TableCell className="font-medium">{task.name}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{getCategoryName(task.categoryId)}</Badge>
-                    </TableCell>
-                    <TableCell>{getRoleLabel(task.role)}</TableCell>
-                    <TableCell className="text-center">
-                      <div className="flex items-center justify-center gap-0.5">
-                        {[1, 2, 3].map((i) => (
-                          <Star
-                            key={i}
-                            className={cn(
-                              'h-4 w-4',
-                              i <= task.starRequirement
-                                ? 'fill-amber-400 text-amber-400'
-                                : 'text-muted-foreground/30'
-                            )}
-                          />
-                        ))}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <div className="flex items-center justify-center gap-1">
-                        <Clock className="h-3 w-3 text-muted-foreground" />
-                        {task.standardMinutes}{t('common.minutes')}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <div className="flex items-center justify-center gap-1">
-                        <Zap className="h-3 w-3 text-amber-500" />
-                        {task.xpReward}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <Switch
-                        checked={task.enabled}
-                        onCheckedChange={() => handleToggleEnabled(task)}
+          </CardContent>
+        </Card>
+      ) : (
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <div className="overflow-x-auto">
+            <TabsList className="inline-flex w-auto">
+              <TabsTrigger value="all" className="text-xs">
+                全カテゴリ ({taskCards.length})
+              </TabsTrigger>
+              {categories.map((cat) => {
+                const counts = categoryTaskCounts[cat.id];
+                if (!counts || counts.total === 0) return null;
+                return (
+                  <TabsTrigger key={cat.id} value={cat.id} className="text-xs whitespace-nowrap">
+                    {cat.name} ({counts.filled}/{counts.total})
+                  </TabsTrigger>
+                );
+              })}
+            </TabsList>
+          </div>
+
+          {/* Shared content area for all tabs */}
+          <TabsContent value={activeTab} className="mt-4">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium">
+                  {activeTab === 'all'
+                    ? `全カテゴリ - ${filteredTasks.length} 件`
+                    : `${getCategoryName(activeTab)} - ${filteredTasks.length} 件`}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {filteredTasks.length === 0 ? (
+                  <p className="text-center py-8 text-sm text-muted-foreground">
+                    該当するタスクカードがありません
+                  </p>
+                ) : (
+                  <div className="grid gap-3">
+                    {filteredTasks.map((task) => (
+                      <TaskCardRow
+                        key={task.id}
+                        task={task}
+                        categoryName={getCategoryName(task.categoryId)}
+                        roleLabel={getRoleLabel(task.role)}
+                        onEdit={() => handleEditTemplate(task)}
+                        onDelete={() => handleDeleteTemplate(task.id)}
+                        onToggle={() => handleToggleEnabled(task)}
                       />
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleEditTemplate(task)}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDeleteTemplate(task.id)}
-                        >
-                          <Trash2 className="h-4 w-4 text-red-500" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      )}
 
       {/* Dialog */}
       <TaskCardDialog
+        key={editingTask?.id ?? 'new'}
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         taskCard={editingTask}
