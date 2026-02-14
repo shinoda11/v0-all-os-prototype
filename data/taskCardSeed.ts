@@ -199,16 +199,16 @@ export const TASK_CARDS: TaskCard[] = [
   { id: 'tc-150', categoryId: 'cat-07', name: '残量チェック・発注メモ', role: 'kitchen', starRequirement: 1 as StarRequirement, standardMinutes: 0, quantityMode: 'byOrders', baseQuantity: 1, coefficient: 1, qualityCheck: 'none', xpReward: 5, enabled: false, notes: '要入力: 標準時間未設定' },
 
   // === ⑨ピーク対応 残り3件 ===
-  { id: 'tc-151', categoryId: 'cat-09', name: '急ぎ握り対応', role: 'prep', starRequirement: 2 as StarRequirement, standardMinutes: 0, quantityMode: 'byOrders', baseQuantity: 1, coefficient: 1, qualityCheck: 'none', xpReward: 10, enabled: false, notes: '要入力: 標準時間未設定' },
-  { id: 'tc-152', categoryId: 'cat-09', name: 'テイクアウト包装', role: 'floor', starRequirement: 1 as StarRequirement, standardMinutes: 0, quantityMode: 'byOrders', baseQuantity: 1, coefficient: 1, qualityCheck: 'none', xpReward: 5, enabled: false, notes: '要入力: 標準時間未設定' },
-  { id: 'tc-153', categoryId: 'cat-09', name: 'クレーム初期対応', role: 'floor', starRequirement: 2 as StarRequirement, standardMinutes: 0, quantityMode: 'byOrders', baseQuantity: 1, coefficient: 1, qualityCheck: 'none', xpReward: 10, enabled: false, notes: '要入力: 標準時間未設定' },
+  { id: 'tc-151', categoryId: 'cat-09', name: '急ぎ握り対応', role: 'prep', starRequirement: 2 as StarRequirement, standardMinutes: 0, quantityMode: 'byOrders', baseQuantity: 1, coefficient: 1, qualityCheck: 'none', xpReward: 10, enabled: false, isPeak: true, notes: '要入力: 標準時間未設定' },
+  { id: 'tc-152', categoryId: 'cat-09', name: 'テイクアウト包装', role: 'floor', starRequirement: 1 as StarRequirement, standardMinutes: 0, quantityMode: 'byOrders', baseQuantity: 1, coefficient: 1, qualityCheck: 'none', xpReward: 5, enabled: false, isPeak: true, notes: '要入力: 標準時間未設定' },
+  { id: 'tc-153', categoryId: 'cat-09', name: 'クレーム初期対応', role: 'floor', starRequirement: 2 as StarRequirement, standardMinutes: 0, quantityMode: 'byOrders', baseQuantity: 1, coefficient: 1, qualityCheck: 'none', xpReward: 10, enabled: false, isPeak: true, notes: '要入力: 標準時間未設定' },
 
   // === ⑪管理業務 残り2件 ===
   { id: 'tc-154', categoryId: 'cat-11', name: '食材ロス集計', role: 'unknown', starRequirement: 2 as StarRequirement, standardMinutes: 0, quantityMode: 'fixed', baseQuantity: 1, coefficient: 1, qualityCheck: 'none', xpReward: 30, enabled: false, notes: '要入力: 標準時間未設定' },
   { id: 'tc-155', categoryId: 'cat-11', name: 'スタッフ面談', role: 'unknown', starRequirement: 3 as StarRequirement, standardMinutes: 0, quantityMode: 'fixed', baseQuantity: 1, coefficient: 1, qualityCheck: 'none', xpReward: 50, enabled: false, notes: '要入力: 標準時間未設定' },
 
   // === ⑫洗い場 2件 ===
-  { id: 'tc-156', categoryId: 'cat-12', name: '食器洗浄', role: 'kitchen', starRequirement: 1 as StarRequirement, standardMinutes: 0, quantityMode: 'byOrders', baseQuantity: 1, coefficient: 1, qualityCheck: 'none', xpReward: 5, enabled: false, isPeak: true, notes: '食洗機投入・手洗い / 常時稼働 / 要入力: 標準時間未設定' },
+  { id: 'tc-156', categoryId: 'cat-12', name: '食器洗浄', role: 'kitchen', starRequirement: 1 as StarRequirement, standardMinutes: 0, quantityMode: 'byOrders', baseQuantity: 1, coefficient: 1, qualityCheck: 'none', xpReward: 5, enabled: false, notes: '食洗機投入・手洗い / 常時稼働 / 要入力: 標準時間未設定' },
   { id: 'tc-157', categoryId: 'cat-12', name: '調理器具洗浄', role: 'kitchen', starRequirement: 1 as StarRequirement, standardMinutes: 0, quantityMode: 'fixed', baseQuantity: 1, coefficient: 1, qualityCheck: 'none', xpReward: 5, enabled: false, notes: '鍋・バット・包丁等の洗浄 / 要入力: 標準時間未設定' },
 ];
 
