@@ -341,7 +341,10 @@ export function TaskStudio() {
     }
   }, [state.taskCards, state.taskCategories, state.boxTemplates]);
 
-  const hasData = categories.length > 0 && tasks.length > 0;
+  // Only gate on categories (they always exist in seed data).
+  // Tasks may be 0 if the user deleted all cards -- the editor must remain
+  // accessible so they can re-add tasks.
+  const hasCategories = categories.length > 0;
 
   // Active tab
   const [activeTab, setActiveTab] = useState<'tasks' | 'boxes' | 'simulation'>('tasks');
@@ -690,8 +693,8 @@ export function TaskStudio() {
     return { byRole, byTimeBand, assigned, unassigned, total: generatedQuests.length };
   }, [generatedQuests]);
 
-  // Empty state when no data is loaded yet (store still initializing)
-  if (!hasData) {
+  // Empty state only when categories haven't loaded (store still initializing)
+  if (!hasCategories) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] gap-4 p-8">
         <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted">
